@@ -3,73 +3,78 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+
     // Helper Functions
     function isAuthed() {
       return request.auth != null;
     }
-
+    
     function getUserRole() {
-      return get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.role;
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
     }
-
+    
     function isRole(role) {
       return isAuthed() && getUserRole() == role;
     }
-    
-    function isAnyRole(roles) {
+
+    function isOneOfRoles(roles) {
       return isAuthed() && getUserRole() in roles;
     }
-    
-    // Collection-level access rules
-    
-    // Only admins can write roles, but any authenticated user can read their OWN role.
+
+    // Collection: roles_admin
+    // Only admins should be able to write roles. For now, we lock it down completely
+    // as the app logic handles the initial (and only) write on user creation.
     match /roles_admin/{userId} {
       allow read: if isAuthed() && request.auth.uid == userId;
-      allow write: if isRole('Superuser'); // Protect role assignments
+      allow write: if false; // Lock down writes completely for now
     }
     
-    // Only authenticated users can see other users' basic info
+    // Collection: users
+    // Users can read their own data. Admins could be allowed to read all.
     match /users/{userId} {
-      allow read: if isAuthed();
-      allow write: if isAuthed() && request.auth.uid == userId; // Users can update their own info
+      allow read, update: if isAuthed() && request.auth.uid == userId;
+      allow create: if isAuthed();
     }
     
-    // Jobs can be read by anyone authenticated, written by leads/supervisors
+    // Generic "allow any authenticated user" for these collections
     match /jobs/{jobId} {
-        allow read: if isAuthed();
-        allow write: if isAnyRole(['Superuser', 'B1 Supervisor', 'B2 Supervisor', 'Tapehead Lead']);
+      allow read, write: if isAuthed();
+    }
+    
+    match /departments/{deptId} {
+       allow read, write: if isAuthed();
     }
 
-    // Tapeheads: Operators can write, supervisors can read/review.
-    match /tapeheads-submissions/{reportId} {
-      allow read: if isAnyRole(['Superuser', 'B2 Supervisor', 'Tapehead Lead']);
-      allow write: if isAnyRole(['Superuser', 'Tapehead Operator', 'Tapehead Lead']);
-    }
+    // Role-Based Access for Report Collections
     
-    // Gantry: Leads/Supervisors only
-    match /gantry-reports/{reportId} {
-      allow read, write: if isAnyRole(['Superuser', 'B1 Supervisor', 'Gantry Lead']);
-    }
-    
-    // Films: Leads/Supervisors only
-    match /films/{reportId} {
-       allow read, write: if isAnyRole(['Superuser', 'B1 Supervisor', 'Films Lead']);
-    }
-
-    // Graphics: Leads/Supervisors only
-    match /graphics-tasks/{taskId} {
-      allow read, write: if isAnyRole(['Superuser', 'B1 Supervisor', 'Graphics Lead']);
-    }
-    
-    // Inspections: QC, Management, and Supervisors
-    match /inspections/{inspectionId} {
-      allow read, write: if isAnyRole(['Superuser', 'Quality Manager', 'Management', 'B1 Supervisor', 'B2 Supervisor']);
-    }
-    
-    // Pregger: Leads/Supervisors only
+    // Pregger: 'B2 Supervisor', 'Pregger Lead'
     match /pregger-reports/{reportId} {
-        allow read, write: if isAnyRole(['Superuser', 'B2 Supervisor', 'Pregger Lead']);
+      allow read, write: if isOneOfRoles(['Superuser', 'B2 Supervisor', 'Pregger Lead', 'Management', 'B1 Supervisor', 'Quality Manager']);
+    }
+    
+    // Tapeheads: 'B2 Supervisor', 'Tapehead Operator', 'Tapehead Lead'
+    match /tapeheads-submissions/{reportId} {
+      allow read, write: if isOneOfRoles(['Superuser', 'B2 Supervisor', 'Tapehead Operator', 'Tapehead Lead', 'Management', 'B1 Supervisor', 'Quality Manager']);
+    }
+    
+    // Gantry: 'B1 Supervisor', 'Gantry Lead'
+    match /gantry-reports/{reportId} {
+       allow read, write: if isOneOfRoles(['Superuser', 'B1 Supervisor', 'Gantry Lead', 'Management', 'B2 Supervisor', 'Quality Manager']);
+    }
+    
+    // Films: 'B1 Supervisor', 'Films Lead'
+    match /films/{reportId} {
+       allow read, write: if isOneOfRoles(['Superuser', 'B1 Supervisor', 'Films Lead', 'Management', 'B2 Supervisor', 'Quality Manager']);
+    }
+
+    // Graphics: 'B1 Supervisor', 'Graphics Lead'
+    match /graphics-tasks/{taskId} {
+       allow read, write: if isOneOfRoles(['Superuser', 'B1 Supervisor', 'Graphics Lead', 'Management', 'B2 Supervisor', 'Quality Manager']);
+    }
+    
+    // QC: 'Quality Manager'
+    match /inspections/{inspectionId} {
+       allow read, write: if isOneOfRoles(['Superuser', 'Quality Manager', 'Management', 'B1 Supervisor', 'B2 Supervisor']);
     }
   }
 }

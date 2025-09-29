@@ -47,10 +47,8 @@ export default function LoginPage() {
     const role = getRoleFromEmail(user.email);
     if (role && user.uid) {
       try {
-        // This is the critical step: Set a custom claim for the user's role.
-        // The custom claim is embedded in the ID token and read by security rules.
-        // We will manage this through a backend function in a real scenario,
-        // but for now, we write to a 'roles' collection that rules can read.
+        // This is the critical step: Create documents that the security rules can read.
+        // We write the role to two places for flexible rule creation.
         const roleDocRef = doc(firestore, 'roles_admin', user.uid);
         await setDoc(roleDocRef, { role: role });
         
@@ -63,10 +61,6 @@ export default function LoginPage() {
         }, { merge: true });
 
         console.log(`Role '${role}' assigned and user document created for ${user.uid}`);
-
-        // IMPORTANT: Force a refresh of the ID token to get the new custom claim.
-        // This ensures subsequent Firestore requests have the role in their auth token.
-        await user.getIdToken(true);
 
       } catch (error) {
         console.error("Error assigning role/user doc:", error);
@@ -85,16 +79,19 @@ export default function LoginPage() {
 
     try {
       const userCredential = await signInWithEmailAndPassword(firebaseAuth, email, password);
+      // Ensure role documents are set on every login for consistency
       await assignRoleAndUserDoc(userCredential.user); 
       toast({
         title: 'Login Successful',
         description: 'Welcome back!',
       });
-      // No router.push here, the layout effect will handle it.
+      // The layout effect will handle redirecting to the dashboard
     } catch (error: any) {
+      // If the user doesn't exist, create them
       if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
         try {
           const userCredential = await createUserWithEmailAndPassword(firebaseAuth, email, password);
+          // This is the first time, so create their role and user documents
           await assignRoleAndUserDoc(userCredential.user);
           toast({
             title: 'Account Created & Logged In',
