@@ -157,7 +157,7 @@ export async function setTapeheadsSubmissions(reports: Report[]) {
     await writeData('tapeheadsSubmissions', reports);
 }
 
-export function addOeJob(firestore: Firestore, job: { oeBase: string, sections: Array<{ sectionId: string, panelStart: number, panelEnd: number }> }): void {
+export async function addOeJob(firestore: Firestore, job: { oeBase: string, sections: Array<{ sectionId: string, panelStart: number, panelEnd: number }> }): Promise<void> {
     const newJob = {
         oeBase: job.oeBase,
         status: 'pending',
@@ -168,7 +168,7 @@ export function addOeJob(firestore: Firestore, job: { oeBase: string, sections: 
 }
 
 
-export function addFilmsReport(firestore: Firestore, report: Omit<FilmsReport, 'id'>): void {
+export async function addFilmsReport(firestore: Firestore, report: Omit<FilmsReport, 'id'>): Promise<void> {
     const newReport = { ...report };
     const filmsCollection = collection(firestore, 'films');
     addDocumentNonBlocking(filmsCollection, newReport);
@@ -221,18 +221,20 @@ export async function markPanelsAsCompleted(firestore: Firestore, oeBase: string
     });
 }
 
-export function addTapeheadsSubmission(firestore: Firestore, report: Report): void {
+export async function addTapeheadsSubmission(firestore: Firestore, report: Report): Promise<void> {
     const docRef = doc(firestore, 'tapeheads-submissions', report.id);
     setDocumentNonBlocking(docRef, report, { merge: true });
 }
 
-export function updateTapeheadsSubmission(firestore: Firestore, updatedReport: Report): void {
+export async function updateTapeheadsSubmission(firestore: Firestore, updatedReport: Report): Promise<void> {
     const docRef = doc(firestore, 'tapeheads-submissions', updatedReport.id);
     updateDocumentNonBlocking(docRef, updatedReport);
 }
 
-export function deleteTapeheadsSubmission(firestore: Firestore, id: string): void {
+export async function deleteTapeheadsSubmission(firestore: Firestore, id: string): Promise<void> {
     const docRef = doc(firestore, 'tapeheads-submissions', id);
     deleteDocumentNonBlocking(docRef);
 }
+
+
 
