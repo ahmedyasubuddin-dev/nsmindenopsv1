@@ -27,10 +27,6 @@ const users = {
   'gantry_lead@ns.com': 'password',
   'films_lead@ns.com': 'password',
   'graphics_lead@ns.com': 'password',
-  // Old users for compatibility
-  'lead@ns.com': 'GavinKilledFishes',
-  'operator@ns.com': 'GavinKilledFishes',
-  'head@ns.com': 'GavinKilledFishes',
 };
 
 export default function LoginPage() {
