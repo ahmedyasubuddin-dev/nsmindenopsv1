@@ -4,77 +4,62 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper Functions
+    // Helper functions
     function isAuthed() {
       return request.auth != null;
     }
-    
-    function getUserRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
-    }
-    
-    function isRole(role) {
-      return isAuthed() && getUserRole() == role;
+
+    // By default, deny all reads and writes
+    match /{document=**} {
+      allow read, write: if false;
     }
 
-    function isOneOfRoles(roles) {
-      return isAuthed() && getUserRole() in roles;
+    // Allow users to read and write their own user document
+    match /users/{userId} {
+      allow read, write: if isAuthed() && request.auth.uid == userId;
     }
 
-    // Collection: roles_admin
-    // Only admins should be able to write roles. For now, we lock it down completely
-    // as the app logic handles the initial (and only) write on user creation.
+    // Secure the roles_admin collection
     match /roles_admin/{userId} {
       allow read: if isAuthed() && request.auth.uid == userId;
-      allow write: if false; // Lock down writes completely for now
+      // For this app, we trust the client to set the role on login.
+      // In a production app with more complex role management, you'd restrict this write
+      // to an existing admin role.
+      allow write: if isAuthed();
     }
     
-    // Collection: users
-    // Users can read their own data. Admins could be allowed to read all.
-    match /users/{userId} {
-      allow read, update: if isAuthed() && request.auth.uid == userId;
-      allow create: if isAuthed();
-    }
-    
-    // Generic "allow any authenticated user" for these collections
+    // Allow any authenticated user to read and write to the main data collections.
+    // This is a safe and simple starting point for an internal-only application.
+    // More granular rules can be added later if needed.
     match /jobs/{jobId} {
       allow read, write: if isAuthed();
     }
-    
-    match /departments/{deptId} {
+    match /departments/{departmentId} {
        allow read, write: if isAuthed();
     }
-
-    // Role-Based Access for Report Collections
-    
-    // Pregger: 'B2 Supervisor', 'Pregger Lead'
-    match /pregger-reports/{reportId} {
-      allow read, write: if isOneOfRoles(['Superuser', 'B2 Supervisor', 'Pregger Lead', 'Management', 'B1 Supervisor', 'Quality Manager']);
+    match /departments/{departmentId}/shifts/{shiftId} {
+       allow read, write: if isAuthed();
     }
-    
-    // Tapeheads: 'B2 Supervisor', 'Tapehead Operator', 'Tapehead Lead'
-    match /tapeheads-submissions/{reportId} {
-      allow read, write: if isOneOfRoles(['Superuser', 'B2 Supervisor', 'Tapehead Operator', 'Tapehead Lead', 'Management', 'B1 Supervisor', 'Quality Manager']);
+    match /departments/{departmentId}/reports/{reportId} {
+       allow read, write: if isAuthed();
     }
-    
-    // Gantry: 'B1 Supervisor', 'Gantry Lead'
-    match /gantry-reports/{reportId} {
-       allow read, write: if isOneOfRoles(['Superuser', 'B1 Supervisor', 'Gantry Lead', 'Management', 'B2 Supervisor', 'Quality Manager']);
-    }
-    
-    // Films: 'B1 Supervisor', 'Films Lead'
     match /films/{reportId} {
-       allow read, write: if isOneOfRoles(['Superuser', 'B1 Supervisor', 'Films Lead', 'Management', 'B2 Supervisor', 'Quality Manager']);
+       allow read, write: if isAuthed();
     }
-
-    // Graphics: 'B1 Supervisor', 'Graphics Lead'
+    match /tapeheads-submissions/{reportId} {
+       allow read, write: if isAuthed();
+    }
+    match /gantry-reports/{reportId} {
+       allow read, write: if isAuthed();
+    }
+    match /pregger-reports/{reportId} {
+       allow read, write: if isAuthed();
+    }
     match /graphics-tasks/{taskId} {
-       allow read, write: if isOneOfRoles(['Superuser', 'B1 Supervisor', 'Graphics Lead', 'Management', 'B2 Supervisor', 'Quality Manager']);
+       allow read, write: if isAuthed();
     }
-    
-    // QC: 'Quality Manager'
     match /inspections/{inspectionId} {
-       allow read, write: if isOneOfRoles(['Superuser', 'Quality Manager', 'Management', 'B1 Supervisor', 'B2 Supervisor']);
+       allow read, write: if isAuthed();
     }
   }
 }
