@@ -9,7 +9,6 @@ import {
     collection,
     deleteDoc,
     doc,
-    Firestore,
     getDoc,
     getDocs,
     query,
@@ -17,135 +16,9 @@ import {
     updateDoc,
     where
 } from 'firebase/firestore';
-import { getSdks, initializeFirebase } from '@/firebase';
+import { firestore } from '@/firebase/server-init';
+import type { FilmsReport, GantryReport, GraphicsTask, InspectionSubmission, OeJob, PreggerReport } from './types';
 
-// Since this file is marked with 'use server', we can initialize Firebase services here.
-// This instance will be used for all server-side data operations.
-const { firestore } = initializeFirebase();
-
-
-//_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-//
-// Type Definitions
-//
-//_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-export interface OeSection {
-  sectionId: string;
-  panelStart: number;
-  panelEnd: number;
-  completedPanels?: string[];
-}
-
-export interface OeJob {
-  id?: string;
-  oeBase: string;
-  status: 'pending' | 'in-progress' | 'completed';
-  sections: OeSection[];
-}
-
-export interface FilmsReport {
-    id: string;
-    report_date: string;
-    gantry_number: string;
-    sails_started: Array<{ sail_number: string; comments?: string }>;
-    sails_finished: Array<{ sail_number: string; comments?: string }>;
-}
-
-export interface GantryReport {
-    id: string;
-    report_date: string;
-    date: string;
-    shift: string;
-    zone_assignment?: string;
-    zoneLeads?: Array<{
-        zone_number: string;
-        lead_name: string;
-    }>;
-    personnel?: Array<{
-        name: string;
-        start_time?: string;
-        end_time?: string;
-    }>;
-    molds?: Array<{
-        mold_number: string;
-        sails?: Array<{
-            sail_number: string;
-            stage_of_process?: string;
-            issues?: string;
-        }>;
-        images?: any[];
-        downtime_caused?: boolean;
-    }>;
-    downtime?: Array<{
-        reason: string;
-        duration: number;
-    }>;
-    maintenance?: Array<{
-        description: string;
-        duration: number;
-    }>;
-}
-
-export interface GraphicsTask {
-    id: string;
-    type: 'cutting' | 'inking';
-    status: 'todo' | 'inProgress' | 'done';
-    tagId: string;
-    content: string;
-    tagType?: 'Sail' | 'Decal';
-    sidedness?: 'Single-Sided' | 'Double-Sided';
-    sideOfWork?: 'Port' | 'Starboard';
-    workTypes?: string[];
-    durationMins?: number;
-    personnelCount?: number;
-    tapeUsed?: boolean;
-    isFinished?: boolean;
-    startedAt?: string;
-    completedAt?: string;
-}
-
-export interface PreggerReport {
-    id: string;
-    report_date: string;
-    shift: string;
-    workCompleted: Array<{
-        tape_id: string;
-        meters: number;
-        waste_meters: number;
-        material_description: string;
-    }>;
-    personnel: Array<{
-        name: string;
-        start_time: string;
-        end_time: string;
-    }>;
-    downtime?: Array<{
-        reason: string;
-        duration_minutes: number;
-    }>;
-    briefing_items?: string;
-    current_work?: string;
-    operational_problems?: string;
-    personnel_notes?: string;
-    bonding_complete?: boolean;
-    epa_report?: boolean;
-    end_of_shift_checklist?: boolean;
-    images?: any;
-}
-
-
-export interface InspectionSubmission {
-    id: string;
-    inspectionDate: string;
-    oeNumber: string;
-    inspectorName: string;
-    totalScore: number;
-    status: 'Pass' | 'Reinspection Required' | 'Fail';
-    reinspection?: {
-        finalOutcome: string;
-        comments: string;
-    };
-}
 
 export async function addOeJob(job: { oeBase: string, sections: Array<{ sectionId: string, panelStart: number, panelEnd: number }> }): Promise<void> {
     const newJob = {
@@ -168,8 +41,6 @@ export async function addFilmsReport(report: Omit<FilmsReport, 'id'>): Promise<v
 }
 
 export async function setGraphicsTasks(tasks: GraphicsTask[]): Promise<void> {
-    // This is inefficient for individual updates, but fine for a full replacement.
-    // In a real app, you'd update individual task documents.
     for (const task of tasks) {
         const taskRef = doc(firestore, 'graphics_tasks', task.id);
         await setDoc(taskRef, task, { merge: true });
@@ -238,7 +109,7 @@ export async function getOeJobs(): Promise<OeJob[]> {
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as OeJob));
 }
 
-export async function getOeSection(oeBase: string, sectionId: string): Promise<OeSection | null> {
+export async function getOeSection(oeBase: string, sectionId: string): Promise<OeJob['sections'][0] | null> {
     const jobs = await getOeJobs();
     const job = jobs.find(j => j.oeBase === oeBase);
     return job?.sections.find(s => s.sectionId === sectionId) || null;
