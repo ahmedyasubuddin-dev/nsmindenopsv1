@@ -17,8 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Layers } from 'lucide-react';
 import { useFirestore } from '@/firebase';
-import { useCollection, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 
 interface FilmsInfo {
     status: 'Prepped' | 'In Progress' | 'No Entry';
@@ -41,22 +40,38 @@ export default function TapeheadsStatusPage() {
   const [sortBy, setSortBy] = useState<'date' | 'status'>('date');
   const firestore = useFirestore();
 
-  const tapeheadsQuery = useMemoFirebase(() => collection(firestore, 'tapeheads_submissions'), [firestore]);
-  const { data: tapeheadsSubmissions, isLoading: tapeheadsLoading } = useCollection<Report>(tapeheadsQuery);
+  const [tapeheadsSubmissions, setTapeheadsSubmissions] = useState<Report[]>([]);
+  const [filmsData, setFilmsData] = useState<FilmsReport[]>([]);
+  const [gantryReportsData, setGantryReportsData] = useState<GantryReport[]>([]);
+  const [inspectionsData, setInspectionsData] = useState<InspectionSubmission[]>([]);
+  const [oeJobs, setOeJobs] = useState<OeJob[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filmsQuery = useMemoFirebase(() => collection(firestore, 'films'), [firestore]);
-  const { data: filmsData, isLoading: filmsLoading } = useCollection<FilmsReport>(filmsQuery);
-
-  const gantryQuery = useMemoFirebase(() => collection(firestore, 'gantry_reports'), [firestore]);
-  const { data: gantryReportsData, isLoading: gantryLoading } = useCollection<GantryReport>(gantryQuery);
-
-  const inspectionsQuery = useMemoFirebase(() => collection(firestore, 'inspections'), [firestore]);
-  const { data: inspectionsData, isLoading: inspectionsLoading } = useCollection<InspectionSubmission>(inspectionsQuery);
-
-  const jobsQuery = useMemoFirebase(() => collection(firestore, 'jobs'), [firestore]);
-  const { data: oeJobs, isLoading: jobsLoading } = useCollection<OeJob>(jobsQuery);
-
-  const loading = tapeheadsLoading || filmsLoading || gantryLoading || inspectionsLoading || jobsLoading;
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!firestore) return;
+      try {
+        setLoading(true);
+        const [tapeheadsSnapshot, filmsSnapshot, gantrySnapshot, inspectionsSnapshot, jobsSnapshot] = await Promise.all([
+          getDocs(collection(firestore, 'tapeheads_submissions')),
+          getDocs(collection(firestore, 'films')),
+          getDocs(collection(firestore, 'gantry_reports')),
+          getDocs(collection(firestore, 'inspections')),
+          getDocs(collection(firestore, 'jobs')),
+        ]);
+        setTapeheadsSubmissions(tapeheadsSnapshot.docs.map(doc => doc.data() as Report));
+        setFilmsData(filmsSnapshot.docs.map(doc => doc.data() as FilmsReport));
+        setGantryReportsData(gantrySnapshot.docs.map(doc => doc.data() as GantryReport));
+        setInspectionsData(inspectionsSnapshot.docs.map(doc => doc.data() as InspectionSubmission));
+        setOeJobs(jobsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as OeJob)));
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [firestore]);
 
 
   // Set default OE after data is loaded

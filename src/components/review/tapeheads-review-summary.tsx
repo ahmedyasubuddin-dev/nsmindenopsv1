@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getTapeheadsSubmissions, deleteTapeheadsSubmission, type Report } from '@/lib/data-store';
+import { deleteTapeheadsSubmission, type Report } from '@/lib/data-store';
 import { isSameDay } from 'date-fns';
 import { Textarea } from '../ui/textarea';
 import { useToast } from '@/hooks/use-toast';
@@ -20,6 +20,8 @@ import { Edit, Trash2 } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 import { TapeheadsOperatorForm } from '../tapeheads-operator-form';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { useFirestore } from '@/firebase';
 
 const reviewSchema = z.object({
   date: z.date(),
@@ -89,7 +91,8 @@ function OperatorSubmissionCard({ report, onDelete, onEdit }: { report: Report, 
 
 export function TapeheadsReviewSummary() {
   const { toast } = useToast();
-  const [allSubmissions, setAllSubmissions] = useState<Report[]>([]);
+  const firestore = useFirestore();
+  const [submissions, setSubmissions] = useState<Report[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [aiSummary, setAiSummary] = useState('');
   const [isEditDialogOpen, setEditDialogOpen] = useState(false);
@@ -106,32 +109,43 @@ export function TapeheadsReviewSummary() {
 
   const { date, shift } = form.watch();
 
-  useEffect(() => {
-    getTapeheadsSubmissions().then(setAllSubmissions);
-  }, []);
+  const fetchSubmissions = useCallback(async () => {
+    if (!firestore || !date || !shift) {
+        setSubmissions([]);
+        return;
+    };
+    setIsLoading(true);
+    try {
+        const startDate = new Date(date);
+        startDate.setHours(0, 0, 0, 0);
+        const endDate = new Date(date);
+        endDate.setHours(23, 59, 59, 999);
 
-  const handleLoadSubmissions = () => {
-    // This is now handled by the submissions useMemo
-    setAiSummary(''); 
-  };
-  
-  const submissions = useMemo(() => {
-    const selectedDate = form.getValues('date');
-    const selectedShift = form.getValues('shift');
-
-    if (!selectedDate || !selectedShift) {
-        return [];
+        const q = query(
+            collection(firestore, 'tapeheads_submissions'),
+            where('shift', '==', parseInt(shift, 10)),
+            where('date', '>=', startDate),
+            where('date', '<=', endDate)
+        );
+        const querySnapshot = await getDocs(q);
+        const reports = querySnapshot.docs.map(doc => doc.data() as Report);
+        setSubmissions(reports);
+    } catch (error) {
+        console.error("Error fetching submissions:", error);
+        toast({ title: "Error", description: "Failed to load submissions.", variant: "destructive" });
+    } finally {
+        setIsLoading(false);
     }
-    return allSubmissions.filter(s =>
-      isSameDay(new Date(s.date), selectedDate) && String(s.shift) === selectedShift
-    );
-  }, [date, shift, allSubmissions]);
+}, [firestore, date, shift, toast]);
 
+
+  useEffect(() => {
+    fetchSubmissions();
+  }, [fetchSubmissions]);
 
   const handleDeleteReport = async (id: string) => {
-    await deleteTapeheadsSubmission(id);
-    const updatedSubmissions = await getTapeheadsSubmissions();
-    setAllSubmissions(updatedSubmissions);
+    await deleteTapeheadsSubmission(firestore, id);
+    fetchSubmissions();
     toast({
         title: "Report Deleted",
         description: "The operator submission has been removed.",
@@ -146,8 +160,7 @@ export function TapeheadsReviewSummary() {
   const handleUpdateReport = async (updatedReport: Report) => {
     setEditDialogOpen(false);
     setReportToEdit(undefined);
-    const updatedSubmissions = await getTapeheadsSubmissions();
-    setAllSubmissions(updatedSubmissions);
+    fetchSubmissions();
   }
   
   const handleGenerateSummary = async () => {
@@ -242,6 +255,16 @@ export function TapeheadsReviewSummary() {
               </div>
             </CardContent>
           </Card>
+          
+           {isLoading && <p>Loading submissions...</p>}
+
+          {!isLoading && submissions.length === 0 && (
+            <Card>
+                <CardContent className="p-6 text-center text-muted-foreground">
+                    No operator submissions found for the selected date and shift.
+                </CardContent>
+            </Card>
+          )}
 
           {submissions.length > 0 && (
             <div className="space-y-6">
@@ -313,3 +336,5 @@ export function TapeheadsReviewSummary() {
     </div>
   );
 }
+
+    

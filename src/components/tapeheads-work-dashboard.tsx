@@ -1,7 +1,7 @@
 
 "use client"
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from './page-header';
@@ -13,8 +13,8 @@ import type { Report, WorkItem } from '@/lib/data-store';
 import { Progress } from './ui/progress';
 import { DatePicker } from './ui/date-picker';
 import { format, isSameDay } from 'date-fns';
-import { useCollection, useMemoFirebase, useFirestore } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { useFirestore } from '@/firebase';
+import { collection, getDocs } from 'firebase/firestore';
 
 function SubmittedReportCard({ report, workItem, itemIndex }: { report: Report, workItem: WorkItem, itemIndex: number }) {
     const router = useRouter();
@@ -85,9 +85,24 @@ function SubmittedReportCard({ report, workItem, itemIndex }: { report: Report, 
 export function TapeheadsWorkDashboard() {
     const [date, setDate] = useState<Date | undefined>(new Date());
     const firestore = useFirestore();
-    
-    const submissionsQuery = useMemoFirebase(() => collection(firestore, 'tapeheads_submissions'), [firestore]);
-    const { data: reports, isLoading: loading } = useCollection<Report>(submissionsQuery);
+    const [reports, setReports] = useState<Report[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchReports = async () => {
+            if (!firestore) return;
+            try {
+                setLoading(true);
+                const snapshot = await getDocs(collection(firestore, 'tapeheads_submissions'));
+                setReports(snapshot.docs.map(doc => doc.data() as Report));
+            } catch (error) {
+                console.error("Error fetching reports:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchReports();
+    }, [firestore]);
 
     const filteredWorkItems = React.useMemo(() => {
         if (!reports) return [];

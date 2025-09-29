@@ -12,8 +12,7 @@ import { AlertTriangle, CheckCircle, Factory, ShieldCheck, TrendingUp, Users, Wr
 import type { FilmsReport, GantryReport, GraphicsTask, InspectionSubmission, OeJob } from '@/lib/data-store';
 import type { Report } from '@/lib/types';
 import { format } from 'date-fns';
-import { useCollection, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 
 const bottleneckChartConfig = {
@@ -36,26 +35,47 @@ export default function DashboardPage() {
     const [isClient, setIsClient] = useState(false);
     const firestore = useFirestore();
 
-    const tapeheadsQuery = useMemoFirebase(() => collection(firestore, 'tapeheads_submissions'), [firestore]);
-    const { data: tapeheadsSubmissions, isLoading: tapeheadsLoading } = useCollection<Report>(tapeheadsQuery);
+    const [tapeheadsSubmissions, setTapeheadsSubmissions] = useState<Report[]>([]);
+    const [filmsData, setFilmsData] = useState<FilmsReport[]>([]);
+    const [gantryReportsData, setGantryReportsData] = useState<GantryReport[]>([]);
+    const [graphicsTasksData, setGraphicsTasksData] = useState<GraphicsTask[]>([]);
+    const [inspectionsData, setInspectionsData] = useState<InspectionSubmission[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    const filmsQuery = useMemoFirebase(() => collection(firestore, 'films'), [firestore]);
-    const { data: filmsData, isLoading: filmsLoading } = useCollection<FilmsReport>(filmsQuery);
-
-    const gantryQuery = useMemoFirebase(() => collection(firestore, 'gantry_reports'), [firestore]);
-    const { data: gantryReportsData, isLoading: gantryLoading } = useCollection<GantryReport>(gantryQuery);
-
-    const graphicsQuery = useMemoFirebase(() => collection(firestore, 'graphics_tasks'), [firestore]);
-    const { data: graphicsTasksData, isLoading: graphicsLoading } = useCollection<GraphicsTask>(graphicsQuery);
-
-    const inspectionsQuery = useMemoFirebase(() => collection(firestore, 'inspections'), [firestore]);
-    const { data: inspectionsData, isLoading: inspectionsLoading } = useCollection<InspectionSubmission>(inspectionsQuery);
-
-    const loading = tapeheadsLoading || filmsLoading || gantryLoading || graphicsLoading || inspectionsLoading;
-
-    useEffect(() => {
+     useEffect(() => {
         setIsClient(true);
-    }, []);
+        const fetchData = async () => {
+            if (!firestore) return;
+            try {
+                setLoading(true);
+                const tapeheadsPromise = getDocs(collection(firestore, 'tapeheads_submissions'));
+                const filmsPromise = getDocs(collection(firestore, 'films'));
+                const gantryPromise = getDocs(collection(firestore, 'gantry_reports'));
+                const graphicsPromise = getDocs(collection(firestore, 'graphics_tasks'));
+                const inspectionsPromise = getDocs(collection(firestore, 'inspections'));
+
+                const [tapeheadsSnapshot, filmsSnapshot, gantrySnapshot, graphicsSnapshot, inspectionsSnapshot] = await Promise.all([
+                    tapeheadsPromise,
+                    filmsPromise,
+                    gantryPromise,
+                    graphicsPromise,
+                    inspectionsPromise,
+                ]);
+
+                setTapeheadsSubmissions(tapeheadsSnapshot.docs.map(doc => doc.data() as Report));
+                setFilmsData(filmsSnapshot.docs.map(doc => doc.data() as FilmsReport));
+                setGantryReportsData(gantrySnapshot.docs.map(doc => doc.data() as GantryReport));
+                setGraphicsTasksData(graphicsSnapshot.docs.map(doc => doc.data() as GraphicsTask));
+                setInspectionsData(inspectionsSnapshot.docs.map(doc => doc.data() as InspectionSubmission));
+            } catch (error) {
+                console.error("Error fetching dashboard data:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, [firestore]);
 
     const dashboardData = useMemo(() => {
         // --- KPIs ---
