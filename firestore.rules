@@ -2,17 +2,76 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    // Helper function to check if the user has a specific role.
-    function isSignedIn() {
-      return request.auth != null;
+
+    // Helper Functions to get user roles and check permissions
+    function getUserRole() {
+      return get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.role;
     }
 
-    // Since we don't store roles in Firestore tokens yet, we'll allow any authenticated user.
-    // This is a common pattern for internal apps.
-    // We can add role-based logic here later if needed.
-    match /{document=**} {
-      allow read, write: if isSignedIn();
+    function isSuperuser() {
+      return getUserRole() == 'Superuser';
+    }
+    
+    function isB2Supervisor() {
+        return getUserRole() == 'B2 Supervisor';
+    }
+
+    function isB1Supervisor() {
+        return getUserRole() == 'B1 Supervisor';
+    }
+    
+    function isQualityManager() {
+        return getUserRole() == 'Quality Manager';
+    }
+
+    function isManagement() {
+        return getUserRole() == 'Management';
+    }
+
+    function isTapeheadLead() {
+        return getUserRole() == 'Tapehead Lead';
+    }
+
+    // Rules for each collection
+    match /jobs/{jobId} {
+      allow read, write: if isSuperuser() || isManagement() || isB1Supervisor() || isB2Supervisor() || isQualityManager();
+    }
+    
+    match /inspections/{inspectionId} {
+        allow read, write: if isSuperuser() || isQualityManager();
+    }
+
+    match /tapeheads-submissions/{reportId} {
+      allow read, write: if isSuperuser() || isB2Supervisor() || isTapeheadLead() || request.auth.uid == resource.data.userId;
+    }
+
+    match /gantry-reports/{reportId} {
+        allow read, write: if isSuperuser() || isB1Supervisor() || getUserRole() == 'Gantry Lead' || request.auth.uid == resource.data.userId;
+    }
+
+    match /pregger-reports/{reportId} {
+        allow read, write: if isSuperuser() || isB2Supervisor() || getUserRole() == 'Pregger Lead' || request.auth.uid == resource.data.userId;
+    }
+
+    match /films/{reportId} {
+        allow read, write: if isSuperuser() || isB1Supervisor() || getUserRole() == 'Films Lead' || request.auth.uid == resource.data.userId;
+    }
+
+    match /graphics-tasks/{taskId} {
+        allow read, write: if isSuperuser() || isB1Supervisor() || getUserRole() == 'Graphics Lead' || request.auth.uid == resource.data.userId;
+    }
+    
+    // Default-allow for any authenticated user for collections that all roles can access or write to.
+    match /{path=**} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Secure the roles_admin collection: only Superusers can modify roles
+    match /roles_admin/{userId} {
+      allow read: if request.auth != null;
+      allow write: if isSuperuser();
     }
   }
 }
+
+    

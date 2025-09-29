@@ -246,6 +246,17 @@
           "type": "string"
         }
       }
+    },
+    "AdminRole": {
+      "title": "Admin Role",
+      "description": "A document that assigns a role to a user. The document ID is the user's UID.",
+      "type": "object",
+      "properties": {
+        "role": {
+          "type": "string",
+          "description": "The role assigned to the user."
+        }
+      }
     }
   },
   "auth": {
@@ -349,13 +360,13 @@
         "definition": {
           "entityName": "AdminRole",
           "schema": {
-            "$ref": "#/backend/entities/User"
+            "$ref": "#/backend/entities/AdminRole"
           },
-          "description": "Indicates administrative privileges.  Existence of the document grants admin access. The content of the document is irrelevant.",
+          "description": "Stores the role for a given user. The document ID is the user's UID. This collection is secured so only admins can modify it.",
           "params": [
             {
               "name": "userId",
-              "description": "The unique identifier of the user."
+              "description": "The unique identifier of the user (UID)."
             }
           ]
         }
@@ -418,3 +429,5 @@
     "reasoning": "The Firestore structure is designed to support the ShiftView application, focusing on shift reports across different departments. The structure prioritizes Authorization Independence to facilitate secure and atomic operations.  \n\nAuthorization Independence is achieved through denormalization.  Specifically, the `User.departmentId` and `User.role` are critical for authorization.  Since reports are associated with users, and access to reports depends on the user's role and department, these attributes are denormalized into the `Report` documents.\n\nThe structure is segregated to ensure homogeneous security postures, with reports separated by department and then by user. This separation simplifies security rules by ensuring consistent access requirements within each subcollection. Collaborative access, if needed in the future (e.g., shift leads reviewing reports), can be implemented using membership maps within the `Report` documents or by creating dedicated review collections with appropriate membership controls.  Global roles (`admin`) can be managed through dedicated collections like `/roles_admin/{uid}`.\n\nQAPs are supported through structural segregation and path-based ownership. List operations can be secured by limiting access based on user roles and department affiliations, without relying on filtering data within the rules themselves.\n\nThe chosen structure enables secure and scalable list operations and facilitates simple, robust, and easily debuggable security rules."
   }
 }
+
+    
