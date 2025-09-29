@@ -12,6 +12,8 @@ import type { InspectionSubmission } from "@/lib/data-store";
 import { Button } from "../ui/button";
 import { generateSailStatusPdf } from "@/lib/generate-sail-status-pdf";
 import { useToast } from "@/hooks/use-toast";
+import { useUser } from "@/firebase";
+import { getRoleFromEmail, hasPermission } from "@/lib/roles";
 
 interface FilmsInfo {
     status: 'Prepped' | 'In Progress' | 'No Entry';
@@ -201,6 +203,10 @@ export function SailStatusCard({ item }: SailStatusCardProps) {
   const { report, filmsInfo, gantryHistory, qcInspection, totalPanelsForSection, ...workItem } = item;
   const isCompleted = workItem.endOfShiftStatus === 'Completed';
   const { toast } = useToast();
+  const { user } = useUser();
+  const role = getRoleFromEmail(user?.email);
+
+  const canView = (permission: any) => hasPermission(role, permission);
 
   const handleExportPdf = async () => {
     toast({
@@ -239,26 +245,32 @@ export function SailStatusCard({ item }: SailStatusCardProps) {
       </CardHeader>
       <CardContent className="space-y-4 flex-grow">
         
-         <div>
-            <div className="flex justify-between items-center mb-2">
-                <h4 className="font-semibold text-primary/90 flex items-center gap-2"><User size={16}/>Tapeheads Department</h4>
-                 <Badge variant={isCompleted ? "default" : "outline"} className={cn(isCompleted ? "bg-green-600" : "border-amber-500 text-amber-600")}>
-                    {isCompleted ? <CheckCircle className="mr-1 h-3 w-3" /> : <Clock className="mr-1 h-3 w-3" />}
-                    {workItem.endOfShiftStatus}
-                </Badge>
-            </div>
-            <div className="grid grid-cols-2 gap-4 pl-2">
-                <DetailItem icon={<ClipboardList size={14}/>} label="Panels" value={`${workItem.panelsWorkedOn.length} of ${totalPanelsForSection}`} />
-                <DetailItem icon={<Ruler size={14}/>} label="Total Meters" value={`${workItem.total_meters}m`} />
-            </div>
-        </div>
+         {canView('nav:report:tapeheads') && (
+            <>
+                <div>
+                    <div className="flex justify-between items-center mb-2">
+                        <h4 className="font-semibold text-primary/90 flex items-center gap-2"><User size={16}/>Tapeheads Department</h4>
+                        <Badge variant={isCompleted ? "default" : "outline"} className={cn(isCompleted ? "bg-green-600" : "border-amber-500 text-amber-600")}>
+                            {isCompleted ? <CheckCircle className="mr-1 h-3 w-3" /> : <Clock className="mr-1 h-3 w-3" />}
+                            {workItem.endOfShiftStatus}
+                        </Badge>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 pl-2">
+                        <DetailItem icon={<ClipboardList size={14}/>} label="Panels" value={`${workItem.panelsWorkedOn.length} of ${totalPanelsForSection}`} />
+                        <DetailItem icon={<Ruler size={14}/>} label="Total Meters" value={`${workItem.total_meters}m`} />
+                    </div>
+                </div>
+                <Separator />
+            </>
+         )}
 
-        <Separator />
-        <FilmsStatusSection filmsInfo={filmsInfo} />
-        <Separator />
-        <GantryStatusSection gantryHistory={gantryHistory} />
-        <Separator />
-        <QcInspectionSection qcInspection={qcInspection} />
+        {canView('nav:report:films') && <FilmsStatusSection filmsInfo={filmsInfo} />}
+        {canView('nav:report:films') && <Separator />}
+
+        {canView('nav:report:gantry') && <GantryStatusSection gantryHistory={gantryHistory} />}
+        {canView('nav:report:gantry') && <Separator />}
+
+        {canView('nav:qc') && <QcInspectionSection qcInspection={qcInspection} />}
         
       </CardContent>
     </Card>

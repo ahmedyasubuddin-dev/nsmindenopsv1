@@ -1,11 +1,18 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow read and write access to any authenticated user
+  
+    // Helper function to check if the user has a specific role.
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Since we don't store roles in Firestore tokens yet, we'll allow any authenticated user.
+    // This is a common pattern for internal apps.
+    // We can add role-based logic here later if needed.
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if isSignedIn();
     }
   }
 }

@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Layers } from 'lucide-react';
 import { useCollection, useFirebase, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
+import { getRoleFromEmail, hasPermission } from '@/lib/roles';
 
 interface FilmsInfo {
     status: 'Prepped' | 'In Progress' | 'No Entry';
@@ -45,21 +46,24 @@ interface EnrichedWorkItem extends WorkItem {
 
 export default function TapeheadsStatusPage() {
   const { firestore } = useFirebase();
-  const { isUserLoading } = useUser();
+  const { user, isUserLoading } = useUser();
   const [selectedOe, setSelectedOe] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [sortBy, setSortBy] = useState<'date' | 'status'>('date');
+  const role = getRoleFromEmail(user?.email);
+  
+  const canView = (permission: any) => hasPermission(role, permission);
 
-  const tapeheadsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'tapeheads-submissions')), [firestore, isUserLoading]);
+  const tapeheadsQuery = useMemoFirebase(() => (isUserLoading || !canView('nav:report:tapeheads')) ? null : query(collection(firestore, 'tapeheads-submissions')), [firestore, isUserLoading, role]);
   const { data: tapeheadsSubmissions, isLoading: isLoadingTapeheads } = useCollection<Report>(tapeheadsQuery);
 
-  const filmsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'films')), [firestore, isUserLoading]);
+  const filmsQuery = useMemoFirebase(() => (isUserLoading || !canView('nav:report:films')) ? null : query(collection(firestore, 'films')), [firestore, isUserLoading, role]);
   const { data: filmsData, isLoading: isLoadingFilms } = useCollection<FilmsReport>(filmsQuery);
 
-  const gantryQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'gantry-reports')), [firestore, isUserLoading]);
+  const gantryQuery = useMemoFirebase(() => (isUserLoading || !canView('nav:report:gantry')) ? null : query(collection(firestore, 'gantry-reports')), [firestore, isUserLoading, role]);
   const { data: gantryReportsData, isLoading: isLoadingGantry } = useCollection<GantryReport>(gantryQuery);
 
-  const inspectionsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'inspections')), [firestore, isUserLoading]);
+  const inspectionsQuery = useMemoFirebase(() => (isUserLoading || !canView('nav:qc')) ? null : query(collection(firestore, 'inspections')), [firestore, isUserLoading, role]);
   const { data: inspectionsData, isLoading: isLoadingInspections } = useCollection<InspectionSubmission>(inspectionsQuery);
 
   const jobsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'jobs')), [firestore, isUserLoading]);

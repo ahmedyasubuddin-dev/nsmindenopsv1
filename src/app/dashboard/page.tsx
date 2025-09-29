@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { Separator } from '@/components/ui/separator';
 import { useCollection, useFirebase, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
+import { getRoleFromEmail, hasPermission } from '@/lib/roles';
 
 const bottleneckChartConfig = {
   count: {
@@ -34,22 +35,25 @@ type ActivityItem = {
 
 export default function DashboardPage() {
     const { firestore } = useFirebase();
-    const { isUserLoading } = useUser();
+    const { user, isUserLoading } = useUser();
     const [isClient, setIsClient] = useState(false);
+    const role = getRoleFromEmail(user?.email);
 
-    const tapeheadsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'tapeheads-submissions')), [firestore, isUserLoading]);
+    const canView = (permission: any) => hasPermission(role, permission);
+
+    const tapeheadsQuery = useMemoFirebase(() => (isUserLoading || !canView('nav:report:tapeheads')) ? null : query(collection(firestore, 'tapeheads-submissions')), [firestore, isUserLoading, role]);
     const { data: tapeheadsSubmissions, isLoading: isLoadingTapeheads } = useCollection<Report>(tapeheadsQuery);
 
-    const filmsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'films')), [firestore, isUserLoading]);
+    const filmsQuery = useMemoFirebase(() => (isUserLoading || !canView('nav:report:films')) ? null : query(collection(firestore, 'films')), [firestore, isUserLoading, role]);
     const { data: filmsData, isLoading: isLoadingFilms } = useCollection<FilmsReport>(filmsQuery);
 
-    const gantryQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'gantry-reports')), [firestore, isUserLoading]);
+    const gantryQuery = useMemoFirebase(() => (isUserLoading || !canView('nav:report:gantry')) ? null : query(collection(firestore, 'gantry-reports')), [firestore, isUserLoading, role]);
     const { data: gantryReportsData, isLoading: isLoadingGantry } = useCollection<GantryReport>(gantryQuery);
 
-    const graphicsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'graphics-tasks')), [firestore, isUserLoading]);
+    const graphicsQuery = useMemoFirebase(() => (isUserLoading || !canView('nav:report:graphics')) ? null : query(collection(firestore, 'graphics-tasks')), [firestore, isUserLoading, role]);
     const { data: graphicsTasksData, isLoading: isLoadingGraphics } = useCollection<GraphicsTask>(graphicsQuery);
 
-    const inspectionsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'inspections')), [firestore, isUserLoading]);
+    const inspectionsQuery = useMemoFirebase(() => (isUserLoading || !canView('nav:qc')) ? null : query(collection(firestore, 'inspections')), [firestore, isUserLoading, role]);
     const { data: inspectionsData, isLoading: isLoadingInspections } = useCollection<InspectionSubmission>(inspectionsQuery);
 
     const loading = isLoadingTapeheads || isLoadingFilms || isLoadingGantry || isLoadingGraphics || isLoadingInspections || isUserLoading;
@@ -172,36 +176,42 @@ export default function DashboardPage() {
                     <p className="text-xs text-muted-foreground">OEs with activity</p>
                 </CardContent>
             </Card>
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Total Output</CardTitle>
-                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold">{dashboardData.totalMetersToday.toLocaleString()}m</div>
-                     <p className="text-xs text-muted-foreground">From Tapeheads department</p>
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Quality Alerts</CardTitle>
-                    <AlertTriangle className="h-4 w-4 text-destructive" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold">{dashboardData.qualityAlerts}</div>
-                    <p className="text-xs text-muted-foreground">Sails needing reinspection or failed</p>
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Total Downtime</CardTitle>
-                    <Wrench className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold">{dashboardData.totalDowntimeHours} <span className="text-sm text-muted-foreground">hrs</span></div>
-                    <p className="text-xs text-muted-foreground">Across all departments</p>
-                </CardContent>
-            </Card>
+             {canView('nav:analytics:tapeheads') && (
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Total Output</CardTitle>
+                        <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{dashboardData.totalMetersToday.toLocaleString()}m</div>
+                        <p className="text-xs text-muted-foreground">From Tapeheads department</p>
+                    </CardContent>
+                </Card>
+            )}
+             {canView('nav:qc') && (
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Quality Alerts</CardTitle>
+                        <AlertTriangle className="h-4 w-4 text-destructive" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{dashboardData.qualityAlerts}</div>
+                        <p className="text-xs text-muted-foreground">Sails needing reinspection or failed</p>
+                    </CardContent>
+                </Card>
+            )}
+            {canView('nav:analytics:gantry') && (
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Total Downtime</CardTitle>
+                        <Wrench className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{dashboardData.totalDowntimeHours} <span className="text-sm text-muted-foreground">hrs</span></div>
+                        <p className="text-xs text-muted-foreground">Across all departments</p>
+                    </CardContent>
+                </Card>
+            )}
       </div>
 
       <div className="grid gap-6 grid-cols-1 lg:grid-cols-5">
@@ -215,10 +225,10 @@ export default function DashboardPage() {
                     <div key={index} className="flex items-start gap-4">
                         <div className="flex-shrink-0 pt-1">
                              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
-                                {item.dept === 'Tapeheads' && <Users className="h-4 w-4 text-muted-foreground" />}
-                                {item.dept === 'Films' && <CheckCircle className="h-4 w-4 text-muted-foreground" />}
-                                {item.dept === 'Gantry' && <Factory className="h-4 w-4 text-muted-foreground" />}
-                                {item.dept === 'Graphics' && <Users className="h-4 w-4 text-muted-foreground" />}
+                                {item.dept === 'Tapeheads' && canView('nav:report:tapeheads') && <Users className="h-4 w-4 text-muted-foreground" />}
+                                {item.dept === 'Films' && canView('nav:report:films') && <CheckCircle className="h-4 w-4 text-muted-foreground" />}
+                                {item.dept === 'Gantry' && canView('nav:report:gantry') && <Factory className="h-4 w-4 text-muted-foreground" />}
+                                {item.dept === 'Graphics' && canView('nav:report:graphics') && <Users className="h-4 w-4 text-muted-foreground" />}
                              </span>
                         </div>
                         <div className="flex-1">
