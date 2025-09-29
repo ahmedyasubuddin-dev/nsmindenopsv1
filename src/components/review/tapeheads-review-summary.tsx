@@ -144,7 +144,7 @@ export function TapeheadsReviewSummary() {
   }, [fetchSubmissions]);
 
   const handleDeleteReport = async (id: string) => {
-    await deleteTapeheadsSubmission(firestore, id);
+    await deleteTapeheadsSubmission(id);
     fetchSubmissions();
     toast({
         title: "Report Deleted",
