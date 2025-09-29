@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Factory, TrendingUp, CheckCircle, AlertTriangle, Users } from "lucide-react"
 import { getGantryReportsData } from "@/lib/data-store"
-import type { GantryReport } from "@/lib/data-store"
+import type { GantryReport } from "@/lib/types"
 
 const classifySailType = (sailNumber?: string): 'Sail' | 'Panel' | 'Scarf' => {
   if (!sailNumber || sailNumber.length < 3) return 'Scarf';
@@ -55,10 +55,13 @@ export function GantryAnalytics() {
   });
 
   React.useEffect(() => {
-    getGantryReportsData().then(data => {
+    async function fetchData() {
+        setLoading(true);
+        const data = await getGantryReportsData();
         setAllReports(data);
         setLoading(false);
-    });
+    }
+    fetchData();
   }, []);
 
   const handleFilterChange = (key: keyof typeof filters, value: string) => {
@@ -128,7 +131,7 @@ export function GantryAnalytics() {
     const dailyData: Record<string, any> = {};
   
     filteredReports.forEach(report => {
-      const date = report.date;
+      const date = report.date.toISOString().split('T')[0];
       if (!dailyData[date]) {
         dailyData[date] = {
           date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
@@ -315,7 +318,7 @@ export function GantryAnalytics() {
                                         <TableRow key={sail.reportId + sail.sail_number}>
                                             <TableCell>{sail.sail_number}</TableCell>
                                             <TableCell>{sail.issues}</TableCell>
-                                            <TableCell>{sail.date}</TableCell>
+                                            <TableCell>{sail.date.toISOString().split('T')[0]}</TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>

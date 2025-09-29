@@ -6,8 +6,8 @@ import { DragDropContext, Droppable, Draggable, OnDragEndResponder } from '@hell
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
 import { GraphicsTaskCard } from './graphics-task-card';
-import type { GraphicsTask as Task } from '@/lib/data-store';
-import { getGraphicsTasks } from '@/lib/data-store';
+import type { GraphicsTask as Task } from '@/lib/types';
+import { setGraphicsTasks, getGraphicsTasks } from '@/lib/data-store';
 
 interface KanbanBoardProps {
     tasks: Task[];
@@ -50,6 +50,7 @@ export function GraphicsKanbanBoard({ tasks, setTasks, type, onAddTask, onUpdate
 
             const newTasks = allTasks.map(t => t.id === draggableId ? updatedTask : t);
             setTasks(newTasks);
+            await setGraphicsTasks(newTasks);
         }
     };
     

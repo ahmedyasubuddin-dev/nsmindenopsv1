@@ -21,7 +21,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
-import type { GraphicsTask as Task } from '@/lib/data-store';
+import type { GraphicsTask as Task } from '@/lib/types';
 import { FormControl, FormItem } from '../ui/form';
 
 interface TaskCardProps {
@@ -193,5 +193,3 @@ export function GraphicsTaskCard({ task, onUpdate, onDelete }: TaskCardProps) {
         </Dialog>
     );
 }
-
-    

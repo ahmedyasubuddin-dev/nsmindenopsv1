@@ -3,7 +3,6 @@
  * @fileoverview This file provides the data access layer for the application,
  * interacting with Google Cloud Firestore.
  */
-import type { Report, WorkItem } from './types';
 import {
     addDoc,
     collection,
@@ -17,7 +16,7 @@ import {
     where
 } from 'firebase/firestore';
 import { firestore } from '@/firebase/server-init';
-import type { FilmsReport, GantryReport, GraphicsTask, InspectionSubmission, OeJob, PreggerReport } from './types';
+import type { Report, FilmsReport, GantryReport, GraphicsTask, InspectionSubmission, OeJob, PreggerReport } from './types';
 
 
 export async function addOeJob(job: { oeBase: string, sections: Array<{ sectionId: string, panelStart: number, panelEnd: number }> }): Promise<void> {
@@ -41,10 +40,12 @@ export async function addFilmsReport(report: Omit<FilmsReport, 'id'>): Promise<v
 }
 
 export async function setGraphicsTasks(tasks: GraphicsTask[]): Promise<void> {
+    const batch = [];
     for (const task of tasks) {
         const taskRef = doc(firestore, 'graphics_tasks', task.id);
-        await setDoc(taskRef, task, { merge: true });
+        batch.push(setDoc(taskRef, task, { merge: true }));
     }
+    await Promise.all(batch);
 }
 
 
@@ -101,9 +102,6 @@ export async function deleteTapeheadsSubmission(id: string): Promise<void> {
     await deleteDoc(submissionRef);
 }
 
-// Functions to get data - these are used by client components with hooks
-// In a real app with server-side rendering, you might fetch this data in Server Components.
-
 export async function getOeJobs(): Promise<OeJob[]> {
     const snapshot = await getDocs(collection(firestore, 'jobs'));
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as OeJob));
@@ -117,7 +115,7 @@ export async function getOeSection(oeBase: string, sectionId: string): Promise<O
 
 export async function getTapeheadsSubmissions(): Promise<Report[]> {
     const snapshot = await getDocs(collection(firestore, 'tapeheads_submissions'));
-    return snapshot.docs.map(doc => doc.data() as Report);
+    return snapshot.docs.map(doc => ({...doc.data(), date: (doc.data().date as any).toDate() } as Report));
 }
 
 export async function getFilmsData(): Promise<FilmsReport[]> {
@@ -127,7 +125,7 @@ export async function getFilmsData(): Promise<FilmsReport[]> {
 
 export async function getGantryReportsData(): Promise<GantryReport[]> {
     const snapshot = await getDocs(collection(firestore, 'gantry_reports'));
-    return snapshot.docs.map(doc => doc.data() as GantryReport);
+     return snapshot.docs.map(doc => ({...doc.data(), date: new Date(doc.data().date) } as GantryReport));
 }
 
 export async function getGraphicsTasks(): Promise<GraphicsTask[]> {

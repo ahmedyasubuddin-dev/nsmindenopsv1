@@ -19,7 +19,7 @@ import { Factory, TrendingUp, Clock, Zap } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../ui/accordion"
 import { Badge } from "../ui/badge"
 import { getPreggerReportsData } from "@/lib/data-store"
-import type { PreggerReport } from "@/lib/data-store"
+import type { PreggerReport } from "@/lib/types"
 
 const productionChartConfig = {
   shift1: { label: "Shift 1", color: "hsl(var(--chart-1))" },
@@ -48,10 +48,13 @@ export function PreggerAnalytics() {
   });
 
   React.useEffect(() => {
-    getPreggerReportsData().then(data => {
+    async function fetchData() {
+        setLoading(true);
+        const data = await getPreggerReportsData();
         setAllData(data);
         setLoading(false);
-    });
+    }
+    fetchData();
   }, []);
 
   const handleFilterChange = (key: keyof typeof filters, value: string) => {

@@ -22,7 +22,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Checkbox } from "./ui/checkbox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
 import { GraphicsKanbanBoard } from "./graphics/graphics-kanban-board"
-import type { GraphicsTask as Task } from "@/lib/data-store"
+import type { GraphicsTask as Task } from "@/lib/types"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "./ui/dialog"
 import { sendShippingNotification } from "@/ai/flows/send-notification-flow"
 import { getGraphicsTasks, setGraphicsTasks } from "@/lib/data-store"
@@ -98,10 +98,13 @@ export function GraphicsReportForm() {
     });
 
     useEffect(() => {
-        getGraphicsTasks().then(tasks => {
+        async function fetchData() {
+            setLoading(true);
+            const tasks = await getGraphicsTasks();
             setTasks(tasks);
             setLoading(false);
-        });
+        }
+        fetchData();
     }, []);
     
      useEffect(() => {
