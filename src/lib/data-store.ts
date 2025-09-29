@@ -1,4 +1,5 @@
 
+
 'use server';
 /**
  * @fileoverview This file serves as the single, centralized file-based data store for the application.
@@ -9,8 +10,8 @@ import {
     readData,
     writeData
 } from './data-store-server';
-import { addDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase';
-import { collection, doc, Firestore } from 'firebase/firestore';
+import { addDocumentNonBlocking, deleteDocumentNonBlocking, setDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
+import { collection, doc, Firestore, getDoc, getDocs, query, updateDoc, where } from 'firebase/firestore';
 
 //_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 //
@@ -135,7 +136,12 @@ export interface InspectionSubmission {
     };
 }
 
-export async function getOeJobs(): Promise<OeJob[]> { return readData<OeJob[]>('oeJobs'); }
+export async function getOeJobs(firestore: Firestore): Promise<OeJob[]> {
+    const jobsCollection = collection(firestore, 'jobs');
+    const snapshot = await getDocs(jobsCollection);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as OeJob));
+}
+
 export async function getFilmsData(): Promise<FilmsReport[]> { return readData<FilmsReport[]>('filmsData'); }
 export async function getGantryReportsData(): Promise<GantryReport[]> { return readData<GantryReport[]>('gantryReports'); }
 export async function getGraphicsTasks(): Promise<GraphicsTask[]> { return readData<GraphicsTask[]>('graphicsTasks'); }
@@ -163,37 +169,37 @@ export function addOeJob(firestore: Firestore, job: { oeBase: string, sections: 
 
 
 export function addFilmsReport(firestore: Firestore, report: Omit<FilmsReport, 'id'>): void {
-    const newReport = {
-        id: `film_rpt_${Date.now()}`,
-        ...report,
-    };
-    const reportRef = doc(firestore, 'films', newReport.id);
-    setDocumentNonBlocking(reportRef, newReport, { merge: true });
+    const newReport = { ...report };
+    const filmsCollection = collection(firestore, 'films');
+    addDocumentNonBlocking(filmsCollection, newReport);
 }
 
 export async function getOeSection(oeBase?: string, sectionId?: string): Promise<(OeSection & { jobStatus: OeJob['status']}) | undefined> {
     if (!oeBase || !sectionId) return undefined;
-    const jobs = await getOeJobs();
-    const job = jobs.find(j => j.oeBase === oeBase);
-    if (!job) return undefined;
-    
-    const section = job.sections.find(s => s.sectionId === sectionId);
-    if (!section) return undefined;
-
-    return { ...section, jobStatus: job.status };
+    // This function now needs a firestore instance, but it is called from client components
+    // without one. This part of the logic will be moved into the components themselves.
+    // For now, it will return undefined.
+    return undefined;
 }
 
-export async function markPanelsAsCompleted(oeBase: string, sectionId: string, panels: string[]): Promise<void> {
-    const oeJobs = await getOeJobs();
-    const job = oeJobs.find(j => j.oeBase === oeBase);
-    if (!job) return;
+export async function markPanelsAsCompleted(firestore: Firestore, oeBase: string, sectionId: string, panels: string[]): Promise<void> {
+    const jobsRef = collection(firestore, 'jobs');
+    const q = query(jobsRef, where("oeBase", "==", oeBase));
+    
+    const querySnapshot = await getDocs(q);
+    if (querySnapshot.empty) return;
 
-    const section = job.sections.find(s => s.sectionId === sectionId);
-    if (!section) return;
+    const jobDoc = querySnapshot.docs[0];
+    const job = { id: jobDoc.id, ...jobDoc.data() } as OeJob;
 
+    const sectionIndex = job.sections.findIndex(s => s.sectionId === sectionId);
+    if (sectionIndex === -1) return;
+
+    const section = job.sections[sectionIndex];
     if (!section.completedPanels) {
         section.completedPanels = [];
     }
+    
     const newPanels = panels.filter(p => !section.completedPanels!.includes(p));
     section.completedPanels.push(...newPanels);
 
@@ -207,26 +213,26 @@ export async function markPanelsAsCompleted(oeBase: string, sectionId: string, p
     } else if (job.sections.some(s => (s.completedPanels?.length || 0) > 0)) {
         job.status = 'in-progress';
     }
-    await writeData('oeJobs', oeJobs);
+    
+    const jobDocRef = doc(firestore, 'jobs', job.id);
+    updateDocumentNonBlocking(jobDocRef, {
+        sections: job.sections,
+        status: job.status
+    });
 }
 
-export async function addTapeheadsSubmission(report: Report): Promise<void> {
-    const submissions = await getTapeheadsSubmissions();
-    submissions.unshift(report);
-    await writeData('tapeheadsSubmissions', submissions);
+export function addTapeheadsSubmission(firestore: Firestore, report: Report): void {
+    const docRef = doc(firestore, 'tapeheads-submissions', report.id);
+    setDocumentNonBlocking(docRef, report, { merge: true });
 }
 
-export async function updateTapeheadsSubmission(updatedReport: Report): Promise<void> {
-    const submissions = await getTapeheadsSubmissions();
-    const index = submissions.findIndex(r => r.id === updatedReport.id);
-    if (index !== -1) {
-        submissions[index] = updatedReport;
-        await writeData('tapeheadsSubmissions', submissions);
-    }
+export function updateTapeheadsSubmission(firestore: Firestore, updatedReport: Report): void {
+    const docRef = doc(firestore, 'tapeheads-submissions', updatedReport.id);
+    updateDocumentNonBlocking(docRef, updatedReport);
 }
 
- export async function deleteTapeheadsSubmission(id: string): Promise<void> {
-    let submissions = await getTapeheadsSubmissions();
-    submissions = submissions.filter(report => report.id !== id);
-    await writeData('tapeheadsSubmissions', submissions);
+export function deleteTapeheadsSubmission(firestore: Firestore, id: string): void {
+    const docRef = doc(firestore, 'tapeheads-submissions', id);
+    deleteDocumentNonBlocking(docRef);
 }
+

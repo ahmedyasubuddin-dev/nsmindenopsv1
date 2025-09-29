@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -31,21 +32,23 @@ import React, { useEffect, useMemo, useState } from "react"
 import { MultiSelect, MultiSelectOption } from "./ui/multi-select"
 import { useRouter } from "next/navigation"
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group"
-import { getOeJobs, getOeSection, getTapeheadsSubmissions, addTapeheadsSubmission, updateTapeheadsSubmission, markPanelsAsCompleted } from "@/lib/data-store"
+import { getOeJobs, addTapeheadsSubmission, updateTapeheadsSubmission, markPanelsAsCompleted } from "@/lib/data-store"
 import type { Report, WorkItem, OeJob, OeSection } from "@/lib/data-store"
+import { useCollection, useFirebase, useMemoFirebase } from "@/firebase"
+import { collection, query } from "firebase/firestore"
 
 const tapeIdsList = [
-    "928108", "938108", "938108T", "928128", "938128", "938128T", "*938138*", 
-    "938148", "928107", "938107", "928127", "938127", "938147", "938167", 
-    "926107", "936107", "926117", "936117", "936137", "936157", "936176", 
-    "926107Y", "936107Y", "926117Y", "936117Y", "936137Y", "936157Y", "936176Y", 
-    "937130", "937108", "937108BLK", "937148", "937108Y", "937148Y", "937152", 
-    "935100", "935120", "935121", "935148", "935148Y", "935169", "930505", 
-    "930515", "930535", "931010", "931011", "931013", "935000", "935001", 
-    "935003", "935030", "935031", "935033", "935603", "935621", "935623", 
-    "935648", "935667", "936606", "936607", "936608", "936617", "936618", 
-    "936607Y", "936617Y", "938608", "*938638*", "938608W", "GPFL50D-30H", 
-    "GPFL50D-40H", "GPFL50D-50H", "GPFL50D-70H", "GPFL50D-95H", "GPFL50D-125H", 
+    "928108", "938108", "938108T", "928128", "938128", "938128T", "*938138*",
+    "938148", "928107", "938107", "928127", "938127", "938147", "938167",
+    "926107", "936107", "926117", "936117", "936137", "936157", "936176",
+    "926107Y", "936107Y", "926117Y", "936117Y", "936137Y", "936157Y", "936176Y",
+    "937130", "937108", "937108BLK", "937148", "937108Y", "937148Y", "937152",
+    "935100", "935120", "935121", "935148", "935148Y", "935169", "930505",
+    "930515", "930535", "931010", "931011", "931013", "935000", "935001",
+    "935003", "935030", "935031", "935033", "935603", "935621", "935623",
+    "935648", "935667", "936606", "936607", "936608", "936617", "936618",
+    "936607Y", "936617Y", "938608", "*938638*", "938608W", "GPFL50D-30H",
+    "GPFL50D-40H", "GPFL50D-50H", "GPFL50D-70H", "GPFL50D-95H", "GPFL50D-125H",
     "0", "937630", "937130"
 ];
 const tapeIds = [...new Set(tapeIdsList)];
@@ -145,6 +148,7 @@ interface TapeheadsOperatorFormProps {
 export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsOperatorFormProps) {
   const { toast } = useToast();
   const router = useRouter();
+  const { firestore } = useFirebase();
   
   const isEditMode = !!reportToEdit;
 
@@ -277,11 +281,11 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
     // Logic to update panel statuses
     for (const item of values.workItems) {
         if (item.endOfShiftStatus === 'Completed') {
-            await markPanelsAsCompleted(item.oeNumber, item.section, item.panelsWorkedOn);
+            await markPanelsAsCompleted(firestore, item.oeNumber, item.section, item.panelsWorkedOn);
         }
     }
 
-    const reportData: Partial<Report> = {
+    const reportData: Report = {
         id: reportToEdit?.id || `rpt_${Date.now()}`,
         date: values.date,
         shift: parseInt(values.shift, 10) as 1 | 2 | 3,
@@ -319,10 +323,10 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
     };
     
     if (onFormSubmit) {
-      await updateTapeheadsSubmission(reportData as Report);
+      updateTapeheadsSubmission(firestore, reportData as Report);
       onFormSubmit(reportData as Report);
     } else {
-      await addTapeheadsSubmission(reportData as Report);
+      addTapeheadsSubmission(firestore, reportData as Report);
       router.push('/report/tapeheads');
     }
 
@@ -416,9 +420,13 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
 
 function WorkItemCard({ index, remove, control, isEditMode }: { index: number, remove: (index: number) => void, control: any, isEditMode: boolean }) {
   const { toast } = useToast();
-  const [availableOes, setAvailableOes] = useState<string[]>([]);
-  const [oeJobs, setOeJobs] = useState<OeJob[]>([]);
-  const [allSubmissions, setAllSubmissions] = useState<Report[]>([]);
+  const { firestore } = useFirebase();
+
+  const jobsQuery = useMemoFirebase(() => query(collection(firestore, 'jobs')), [firestore]);
+  const { data: oeJobs, isLoading: isLoadingJobs } = useCollection<OeJob>(jobsQuery);
+  
+  const submissionsQuery = useMemoFirebase(() => query(collection(firestore, 'tapeheads-submissions')), [firestore]);
+  const { data: allSubmissions, isLoading: isLoadingSubmissions } = useCollection<Report>(submissionsQuery);
 
   const watchOeNumber = useWatch({ control, name: `workItems.${index}.oeNumber` });
   const watchSection = useWatch({ control, name: `workItems.${index}.section` });
@@ -432,15 +440,11 @@ function WorkItemCard({ index, remove, control, isEditMode }: { index: number, r
   const { fields: nestedPanelFields, append: appendNestedPanel, remove: removeNestedPanel } = useFieldArray({ control: control, name: `workItems.${index}.nestedPanels` });
 
   useEffect(() => {
-    getTapeheadsSubmissions().then(setAllSubmissions);
-  }, []);
-
-  useEffect(() => {
-    if (!watchOeNumber || !watchSection || !watchPanelsWorkedOn || watchPanelsWorkedOn.length === 0 || isEditMode) {
+    if (isLoadingSubmissions || !watchOeNumber || !watchSection || !watchPanelsWorkedOn || watchPanelsWorkedOn.length === 0 || isEditMode) {
       return;
     }
 
-    const isPanelInProgress = allSubmissions.some(report =>
+    const isPanelInProgress = (allSubmissions || []).some(report =>
       report.workItems?.some(item => {
         if (item.oeNumber !== watchOeNumber || item.section !== watchSection || item.endOfShiftStatus !== 'In Progress') {
           return false;
@@ -459,18 +463,14 @@ function WorkItemCard({ index, remove, control, isEditMode }: { index: number, r
         variant: "destructive",
       });
     }
-  }, [watchOeNumber, watchSection, watchPanelsWorkedOn, toast, isEditMode, allSubmissions]);
-
-  const handleOeDropdownOpen = async () => {
-    const jobs = await getOeJobs();
-    setOeJobs(jobs);
-    setAvailableOes([...new Set(jobs.map(j => j.oeBase))]);
-  };
-
-  const availableSails = useMemo(() => watchOeNumber ? oeJobs.filter(j => j.oeBase === watchOeNumber).flatMap(j => j.sections?.map(s => s.sectionId) || []) : [], [watchOeNumber, oeJobs]);
+  }, [watchOeNumber, watchSection, watchPanelsWorkedOn, toast, isEditMode, allSubmissions, isLoadingSubmissions]);
+  
+  const availableOes = useMemo(() => oeJobs ? [...new Set(oeJobs.map(j => j.oeBase))] : [], [oeJobs]);
+  
+  const availableSails = useMemo(() => watchOeNumber && oeJobs ? (oeJobs.find(j => j.oeBase === watchOeNumber)?.sections.map(s => s.sectionId) || []) : [], [watchOeNumber, oeJobs]);
   
   const panelOptions = useMemo(() => {
-      if (!watchOeNumber || !watchSection) return [];
+      if (!watchOeNumber || !watchSection || !oeJobs) return [];
       const job = oeJobs.find(j => j.oeBase === watchOeNumber);
       const sail = job?.sections.find(s => s.sectionId === watchSection);
       if (!sail) return [];
@@ -492,8 +492,8 @@ function WorkItemCard({ index, remove, control, isEditMode }: { index: number, r
        <Button type="button" variant="ghost" size="icon" className="text-destructive absolute top-2 right-2" onClick={() => remove(index)}><Trash2 className="size-4" /></Button>
       <div className="space-y-4">
          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-             <FormField control={control} name={`workItems.${index}.oeNumber`} render={({ field }) => (<FormItem><FormLabel>OE Number</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} onOpenChange={(open) => open && handleOeDropdownOpen()}><FormControl><SelectTrigger><SelectValue placeholder="Select an OE..." /></SelectTrigger></FormControl><SelectContent>{availableOes.map(oe => <SelectItem key={oe} value={oe}>{oe}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
-             <FormField control={control} name={`workItems.${index}.section`} render={({ field }) => (<FormItem><FormLabel>Sail #</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} disabled={!watchOeNumber}><FormControl><SelectTrigger><SelectValue placeholder="Select a Sail #" /></SelectTrigger></FormControl><SelectContent>{availableSails.map(sailId => <SelectItem key={sailId} value={sailId}>{sailId}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
+             <FormField control={control} name={`workItems.${index}.oeNumber`} render={({ field }) => (<FormItem><FormLabel>OE Number</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select an OE..." /></SelectTrigger></FormControl><SelectContent>{availableOes.map(oe => <SelectItem key={oe} value={oe}>{oe}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
+             <FormField control={control} name={`workItems.${index}.section`} render={({ field }) => (<FormItem><FormLabel>Sail #</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} disabled={!watchOeNumber}><FormControl><SelectTrigger><SelectValue placeholder="Select a Sail #" /></SelectTrigger></FormControl><SelectContent>{(availableSails || []).map(sailId => <SelectItem key={sailId} value={sailId}>{sailId}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t">
             <FormField control={control} name={`workItems.${index}.panelWorkType`} render={({ field }) => (

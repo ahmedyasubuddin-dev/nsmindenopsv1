@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -10,8 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getTapeheadsSubmissions, deleteTapeheadsSubmission, type Report } from '@/lib/data-store';
-import { isSameDay } from 'date-fns';
+import { deleteTapeheadsSubmission, type Report } from '@/lib/data-store';
+import { isSameDay, format } from 'date-fns';
 import { Textarea } from '../ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { summarizeShift } from '@/ai/flows/summarize-shift-flow';
@@ -20,6 +21,8 @@ import { Edit, Trash2 } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 import { TapeheadsOperatorForm } from '../tapeheads-operator-form';
+import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
+import { collection, query, where } from 'firebase/firestore';
 
 const reviewSchema = z.object({
   date: z.date(),
@@ -89,7 +92,7 @@ function OperatorSubmissionCard({ report, onDelete, onEdit }: { report: Report, 
 
 export function TapeheadsReviewSummary() {
   const { toast } = useToast();
-  const [allSubmissions, setAllSubmissions] = useState<Report[]>([]);
+  const { firestore } = useFirebase();
   const [isLoading, setIsLoading] = useState(false);
   const [aiSummary, setAiSummary] = useState('');
   const [isEditDialogOpen, setEditDialogOpen] = useState(false);
@@ -106,32 +109,31 @@ export function TapeheadsReviewSummary() {
 
   const { date, shift } = form.watch();
 
-  useEffect(() => {
-    getTapeheadsSubmissions().then(setAllSubmissions);
-  }, []);
+  const submissionsQuery = useMemoFirebase(() => {
+    if (!date || !shift) return null;
+    
+    // Firestore queries are best with start/end ranges for dates
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    return query(
+      collection(firestore, 'tapeheads-submissions'),
+      where('date', '>=', startOfDay),
+      where('date', '<=', endOfDay),
+      where('shift', '==', parseInt(shift, 10))
+    );
+  }, [date, shift, firestore]);
+
+  const { data: submissions, isLoading: isLoadingSubmissions } = useCollection<Report>(submissionsQuery);
 
   const handleLoadSubmissions = () => {
-    // This is now handled by the submissions useMemo
     setAiSummary(''); 
   };
   
-  const submissions = useMemo(() => {
-    const selectedDate = form.getValues('date');
-    const selectedShift = form.getValues('shift');
-
-    if (!selectedDate || !selectedShift) {
-        return [];
-    }
-    return allSubmissions.filter(s =>
-      isSameDay(new Date(s.date), selectedDate) && String(s.shift) === selectedShift
-    );
-  }, [date, shift, allSubmissions]);
-
-
   const handleDeleteReport = async (id: string) => {
-    await deleteTapeheadsSubmission(id);
-    const updatedSubmissions = await getTapeheadsSubmissions();
-    setAllSubmissions(updatedSubmissions);
+    deleteTapeheadsSubmission(firestore, id);
     toast({
         title: "Report Deleted",
         description: "The operator submission has been removed.",
@@ -146,12 +148,11 @@ export function TapeheadsReviewSummary() {
   const handleUpdateReport = async (updatedReport: Report) => {
     setEditDialogOpen(false);
     setReportToEdit(undefined);
-    const updatedSubmissions = await getTapeheadsSubmissions();
-    setAllSubmissions(updatedSubmissions);
+    // Real-time updates handle UI refresh
   }
   
   const handleGenerateSummary = async () => {
-    if (submissions.length === 0) {
+    if (!submissions || submissions.length === 0) {
         toast({ title: "No data", description: "Load submissions before generating a summary.", variant: "destructive" });
         return;
     }
@@ -168,8 +169,9 @@ export function TapeheadsReviewSummary() {
     }
   }
 
-
   const summaryStats = useMemo(() => {
+    if (!submissions) return null;
+
     const allWorkItemsWithTh = submissions.flatMap(s => 
         (s.workItems || []).map(item => ({...item, thNumber: s.thNumber}))
     );
@@ -198,7 +200,6 @@ export function TapeheadsReviewSummary() {
         item.panelsWorkedOn?.forEach(p => acc[key].add(p));
         return acc;
     }, {} as Record<string, Set<string>>);
-
 
     return {
       totalMeters, totalTapes, totalHours, totalDowntime,
@@ -243,7 +244,7 @@ export function TapeheadsReviewSummary() {
             </CardContent>
           </Card>
 
-          {submissions.length > 0 && (
+          {isLoadingSubmissions ? (<p>Loading submissions...</p>) : submissions && submissions.length > 0 && summaryStats && (
             <div className="space-y-6">
                  <Card>
                     <CardHeader>
@@ -313,3 +314,4 @@ export function TapeheadsReviewSummary() {
     </div>
   );
 }
+
