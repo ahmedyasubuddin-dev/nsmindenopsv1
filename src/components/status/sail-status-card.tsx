@@ -8,10 +8,23 @@ import { cn } from "@/lib/utils";
 import { CheckCircle, AlertTriangle, Layers, Clock, Shapes, Ruler, Wind, User, Calendar, CircleDot, Film, GanttChartSquare, XCircle, Hourglass, Factory, Wrench, Image as ImageIcon, ShieldCheck, FileDown, ClipboardList } from "lucide-react";
 import { format } from "date-fns";
 import { Separator } from "../ui/separator";
-import type { InspectionSubmission } from "@/lib/data-store";
+import type { InspectionSubmission, FilmsReport, GantryReport } from "@/lib/data-store";
 import { Button } from "../ui/button";
 import { generateSailStatusPdf } from "@/lib/generate-sail-status-pdf";
 import { useToast } from "@/hooks/use-toast";
+
+interface EnrichedWorkItem extends WorkItem {
+  report: Report;
+  filmsInfo: FilmsInfo;
+  gantryHistory: GantryReport[];
+  qcInspection?: InspectionSubmission;
+  totalPanelsForSection: number;
+}
+
+interface SailStatusCardProps {
+  item: EnrichedWorkItem;
+}
+
 
 interface FilmsInfo {
     status: 'Prepped' | 'In Progress' | 'No Entry';
@@ -20,26 +33,6 @@ interface FilmsInfo {
     notes?: string;
 }
 
-interface GantryInfo {
-    moldNumber: string;
-    stage: string;
-    issues?: string;
-    downtimeCaused?: boolean;
-    date: string;
-    images?: any[];
-}
-
-export interface EnrichedWorkItem extends WorkItem {
-  report: Report;
-  filmsInfo: FilmsInfo;
-  gantryHistory: GantryInfo[];
-  qcInspection?: InspectionSubmission;
-  totalPanelsForSection: number;
-}
-
-interface SailStatusCardProps {
-  item: EnrichedWorkItem;
-}
 
 const DetailItem = ({ icon, label, value, className }: { icon: React.ReactNode, label: string, value: React.ReactNode, className?: string }) => (
     <div className={cn("flex items-start gap-3", className)}>
@@ -85,7 +78,7 @@ function FilmsStatusSection({ filmsInfo }: { filmsInfo: FilmsInfo }) {
   )
 }
 
-function GantryStatusSection({ gantryHistory }: { gantryHistory: GantryInfo[] }) {
+function GantryStatusSection({ gantryHistory }: { gantryHistory: GantryReport[] }) {
     if (gantryHistory.length === 0) {
         return (
              <div>
@@ -114,30 +107,30 @@ function GantryStatusSection({ gantryHistory }: { gantryHistory: GantryInfo[] })
         <div>
             <div className="flex justify-between items-center mb-2">
                 <h4 className="font-semibold text-primary/90 flex items-center gap-2"><Factory size={16}/>Gantry Department</h4>
-                {getStageBadge(latestEntry.stage)}
+                {getStageBadge(latestEntry.molds?.[0]?.sails?.[0]?.stage_of_process || 'Unknown')}
             </div>
             {gantryHistory.map((entry, index) => (
               <div key={index} className="p-3 border rounded-md bg-background/50 mb-2">
                 <div className="grid grid-cols-1 gap-y-3 text-sm">
                     <DetailItem icon={<Calendar size={14}/>} label="Date of Entry" value={format(new Date(entry.date), 'MMM d, yyyy')} />
-                    <DetailItem icon={<GanttChartSquare size={14}/>} label="Gantry/Mold" value={entry.moldNumber} />
-                    <DetailItem icon={<CircleDot size={14}/>} label="Stage" value={entry.stage} />
+                    <DetailItem icon={<GanttChartSquare size={14}/>} label="Gantry/Mold" value={entry.molds?.[0]?.mold_number || 'N/A'} />
+                    <DetailItem icon={<CircleDot size={14}/>} label="Stage" value={entry.molds?.[0]?.sails?.[0]?.stage_of_process || 'N/A'} />
                     
-                    {entry.issues && entry.issues !== "None" && (
-                        <DetailItem icon={<AlertTriangle size={14} className="text-destructive"/>} label="Issues Reported" value={entry.issues} />
+                    {entry.molds?.[0]?.sails?.[0]?.issues && entry.molds[0].sails[0].issues !== "None" && (
+                        <DetailItem icon={<AlertTriangle size={14} className="text-destructive"/>} label="Issues Reported" value={entry.molds[0].sails[0].issues} />
                     )}
 
-                    {entry.downtimeCaused && (
+                    {entry.molds?.[0]?.downtime_caused && (
                         <Badge variant="destructive" className="mt-1 w-fit">
                             <AlertTriangle className="mr-1 h-3 w-3" /> Downtime Flagged
                         </Badge>
                     )}
                     
-                    {entry.images && entry.images.length > 0 && (
+                    {entry.molds?.[0]?.images && entry.molds[0].images.length > 0 && (
                        <DetailItem 
                            icon={<ImageIcon size={14}/>} 
                            label="Visual Log" 
-                           value={`${entry.images.length} image(s) uploaded`} 
+                           value={`${entry.molds[0].images.length} image(s) uploaded`} 
                        />
                     )}
                 </div>

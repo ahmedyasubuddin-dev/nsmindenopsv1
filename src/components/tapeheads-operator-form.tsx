@@ -31,22 +31,23 @@ import React, { useEffect, useMemo, useState } from "react"
 import { MultiSelect, MultiSelectOption } from "./ui/multi-select"
 import { useRouter } from "next/navigation"
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group"
-import { getOeJobs, getOeSection, getTapeheadsSubmissions, addTapeheadsSubmission, updateTapeheadsSubmission, markPanelsAsCompleted } from "@/lib/data-store"
-import type { Report, WorkItem, OeJob, OeSection } from "@/lib/data-store"
+import { getOeJobs, getTapeheadsSubmissions, addTapeheadsSubmission, updateTapeheadsSubmission, markPanelsAsCompleted } from "@/lib/data-store"
+import type { Report, WorkItem, OeJob } from "@/lib/data-store"
+import { useFirestore } from "@/firebase"
 
 const tapeIdsList = [
-    "928108", "938108", "938108T", "928128", "938128", "938128T", "*938138*", 
-    "938148", "928107", "938107", "928127", "938127", "938147", "938167", 
-    "926107", "936107", "926117", "936117", "936137", "936157", "936176", 
-    "926107Y", "936107Y", "926117Y", "936117Y", "936137Y", "936157Y", "936176Y", 
-    "937130", "937108", "937108BLK", "937148", "937108Y", "937148Y", "937152", 
-    "935100", "935120", "935121", "935148", "935148Y", "935169", "930505", 
-    "930515", "930535", "931010", "931011", "931013", "935000", "935001", 
-    "935003", "935030", "935031", "935033", "935603", "935621", "935623", 
-    "935648", "935667", "936606", "936607", "936608", "936617", "936618", 
-    "936607Y", "936617Y", "938608", "*938638*", "938608W", "GPFL50D-30H", 
-    "GPFL50D-40H", "GPFL50D-50H", "GPFL50D-70H", "GPFL50D-95H", "GPFL50D-125H", 
-    "0", "937630", "937130"
+    "928108", "938108", "938108T", "928128", "938128T", "*938138*",
+    "938148", "928107", "928127", "938147", "938167", "926107", "936107",
+    "926117", "936117", "936137", "936157", "936176", "926107Y", "936107Y",
+    "926117Y", "936117Y", "936137Y", "936157Y", "936176Y", "937130",
+    "937108", "937108BLK", "937148", "937108Y", "937148Y", "937152",
+    "935100", "935120", "935121", "935148", "935148Y", "935169", "930505",
+    "930515", "930535", "931010", "931011", "931013", "935000", "935001",
+    "935003", "935030", "935031", "935033", "935603", "935621", "935623",
+    "935648", "935667", "936606", "936607", "936608", "936617", "936618",
+    "936607Y", "936617Y", "938608", "*938638*", "938608W", "GPFL50D-30H",
+    "GPFL50D-40H", "GPFL50D-50H", "GPFL50D-70H", "GPFL50D-95H", "GPFL50D-125H",
+    "0", "937630",
 ];
 const tapeIds = [...new Set(tapeIdsList)];
 
@@ -145,6 +146,7 @@ interface TapeheadsOperatorFormProps {
 export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsOperatorFormProps) {
   const { toast } = useToast();
   const router = useRouter();
+  const firestore = useFirestore();
   
   const isEditMode = !!reportToEdit;
 
@@ -277,11 +279,11 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
     // Logic to update panel statuses
     for (const item of values.workItems) {
         if (item.endOfShiftStatus === 'Completed') {
-            await markPanelsAsCompleted(item.oeNumber, item.section, item.panelsWorkedOn);
+            await markPanelsAsCompleted(firestore, item.oeNumber, item.section, item.panelsWorkedOn);
         }
     }
 
-    const reportData: Partial<Report> = {
+    const reportData: Report = {
         id: reportToEdit?.id || `rpt_${Date.now()}`,
         date: values.date,
         shift: parseInt(values.shift, 10) as 1 | 2 | 3,
@@ -319,10 +321,10 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
     };
     
     if (onFormSubmit) {
-      await updateTapeheadsSubmission(reportData as Report);
-      onFormSubmit(reportData as Report);
+      updateTapeheadsSubmission(firestore, reportData);
+      onFormSubmit(reportData);
     } else {
-      await addTapeheadsSubmission(reportData as Report);
+      addTapeheadsSubmission(firestore, reportData);
       router.push('/report/tapeheads');
     }
 
@@ -416,6 +418,7 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
 
 function WorkItemCard({ index, remove, control, isEditMode }: { index: number, remove: (index: number) => void, control: any, isEditMode: boolean }) {
   const { toast } = useToast();
+  const firestore = useFirestore();
   const [availableOes, setAvailableOes] = useState<string[]>([]);
   const [oeJobs, setOeJobs] = useState<OeJob[]>([]);
   const [allSubmissions, setAllSubmissions] = useState<Report[]>([]);
@@ -432,8 +435,8 @@ function WorkItemCard({ index, remove, control, isEditMode }: { index: number, r
   const { fields: nestedPanelFields, append: appendNestedPanel, remove: removeNestedPanel } = useFieldArray({ control: control, name: `workItems.${index}.nestedPanels` });
 
   useEffect(() => {
-    getTapeheadsSubmissions().then(setAllSubmissions);
-  }, []);
+    getTapeheadsSubmissions(firestore).then(setAllSubmissions);
+  }, [firestore]);
 
   useEffect(() => {
     if (!watchOeNumber || !watchSection || !watchPanelsWorkedOn || watchPanelsWorkedOn.length === 0 || isEditMode) {
@@ -462,7 +465,7 @@ function WorkItemCard({ index, remove, control, isEditMode }: { index: number, r
   }, [watchOeNumber, watchSection, watchPanelsWorkedOn, toast, isEditMode, allSubmissions]);
 
   const handleOeDropdownOpen = async () => {
-    const jobs = await getOeJobs();
+    const jobs = await getOeJobs(firestore);
     setOeJobs(jobs);
     setAvailableOes([...new Set(jobs.map(j => j.oeBase))]);
   };

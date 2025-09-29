@@ -1,7 +1,7 @@
 
 "use client"
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from './page-header';
@@ -9,11 +9,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Badge } from './ui/badge';
 import { CheckCircle, Edit, ChevronsRight } from 'lucide-react';
-import { getTapeheadsSubmissions } from '@/lib/data-store';
-import type { Report, WorkItem } from '@/lib/data-store';
+import { getTapeheadsSubmissions, type Report, type WorkItem } from '@/lib/data-store';
 import { Progress } from './ui/progress';
 import { DatePicker } from './ui/date-picker';
 import { format, isSameDay } from 'date-fns';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
 
 function SubmittedReportCard({ report, workItem, itemIndex }: { report: Report, workItem: WorkItem, itemIndex: number }) {
     const router = useRouter();
@@ -83,20 +84,13 @@ function SubmittedReportCard({ report, workItem, itemIndex }: { report: Report, 
 
 export function TapeheadsWorkDashboard() {
     const [date, setDate] = useState<Date | undefined>(new Date());
-    const [reports, setReports] = useState<Report[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        const loadReports = async () => {
-            setLoading(true);
-            const submissions = await getTapeheadsSubmissions();
-            setReports(submissions);
-            setLoading(false);
-        };
-        loadReports();
-    }, []);
+    const firestore = useFirestore();
+    
+    const submissionsQuery = useMemoFirebase(() => collection(firestore, 'tapeheads_submissions'), [firestore]);
+    const { data: reports, isLoading: loading } = useCollection<Report>(submissionsQuery);
 
     const filteredWorkItems = React.useMemo(() => {
+        if (!reports) return [];
         return reports.flatMap(report => 
             (report.workItems || []).map((workItem, index) => ({ report, workItem, id: `${report.id}-${index}` }))
         ).filter(({ report, workItem }) => {
