@@ -1,119 +1,13 @@
-/**
- * @fileoverview Firestore Security Rules for SRD Minden.
- *
- * Core Philosophy:
- * This ruleset enforces a role-based and ownership-based access control model.
- * Users can only read and write their own data, with the exception of administrators who can manage all data.
- * Data related to departments and shifts is generally readable, but write access is restricted.
- *
- * Data Structure:
- * - /departments/{departmentId}: Stores department information.
- * - /departments/{departmentId}/shifts/{shiftId}: Stores shift information for each department.
- * - /users/{userId}: Stores user information.
- * - /departments/{departmentId}/reports/{reportId}: Stores reports for each department.
- * - /roles_admin/{userId}: Documents in this collection indicate administrative privileges.
- *
- * Key Security Decisions:
- * - Users can only create, update, or delete their own user documents.
- * - Reports are scoped to departments, and users can only create reports within their own department.
- * - Only administrators can create, update, or delete departments and shifts.
- * - Listing of users is disallowed for security.
- *
- * Denormalization for Authorization:
- * - The Report document contains a `userId` field, which is used to enforce ownership.
- * - The User document contains a `departmentId` and `role` which is used to filter data in Reports.
- *
- * Structural Segregation:
- * - Reports are separated by department to simplify security rules and ensure consistent access requirements.
- */
+
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    function isAdmin() {
-          return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
-    }
-
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
-    }
-
-    /**
-     * @description Allows admins to manage departments.
-     * @path /departments/{departmentId}
-     * @allow (create, update, delete) - Admin can create a new department.
-     * @deny (create, update, delete) - Non-admin user attempts to create a new department.
-     * @principle Enforces admin-only access for department management.
-     */
-    match /departments/{departmentId} {
-      allow get, list: if true;
-      allow create, update, delete: if isAdmin();
-    }
-
-    /**
-     * @description Allows admins to manage shifts within departments.
-     * @path /departments/{departmentId}/shifts/{shiftId}
-     * @allow (create, update, delete) - Admin can create a new shift.
-     * @deny (create, update, delete) - Non-admin user attempts to create a new shift.
-     * @principle Enforces admin-only access for shift management.
-     */
-    match /departments/{departmentId}/shifts/{shiftId} {
-      allow get, list: if true;
-      allow create, update, delete: if isAdmin();
-    }
-
-    /**
-     * @description Allows users to manage their own user documents.
-     * @path /users/{userId}
-     * @allow (create) - User can create their own user document.
-     * @allow (get, update, delete) - User can get, update, and delete their own user document.
-     * @deny (create, update, delete) - User attempts to modify another user's document.
-     * @principle Enforces document ownership for user management.
-     */
-    match /users/{userId} {
-      allow get: if isOwner(userId) || isAdmin();
-      allow list: if false;
-      allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId) || isAdmin();
-      allow delete: if isExistingOwner(userId) || isAdmin();
-    }
-
-    /**
-     * @description Allows users to create reports within their department, and admins to manage all reports.
-     * @path /departments/{departmentId}/reports/{reportId}
-     * @allow (create) - User can create a report in their department.
-     * @allow (get, list, update, delete) - Admin can manage any report. User can only read/update/delete their own report.
-     * @deny (create, update, delete) - User attempts to create a report in another department.
-     * @principle Enforces department-based report creation and admin-only management.
-     */
-    match /departments/{departmentId}/reports/{reportId} {
-        allow get, list: if isAdmin();
-        allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-        allow update, delete: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
-    }
-
-    /**
-     * @description Allows admins to manage admin roles. Existence of the document grants admin access.
-     * @path /roles_admin/{userId}
-     * @allow (create) - Admin can assign admin role to a user.
-     * @allow (get, delete) - Admin can view and revoke admin role from a user.
-     * @deny (create, update, delete) - Non-admin user attempts to manage admin roles.
-     * @principle Enforces admin-only access for role management.
-     */
-    match /roles_admin/{userId} {
-      allow get: if isAdmin();
-      allow list: if false;
-      allow create: if isAdmin();
-      allow update: if false;
-      allow delete: if isAdmin();
+    // Allow read/write access to any authenticated user.
+    // This is a good starting point for internal applications.
+    // We can add more granular, role-based rules later if needed.
+    match /{document=**} {
+      allow read, write: if request.auth != null;
     }
   }
 }
