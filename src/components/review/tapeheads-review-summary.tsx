@@ -21,7 +21,7 @@ import { Edit, Trash2 } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 import { TapeheadsOperatorForm } from '../tapeheads-operator-form';
-import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirebase, useMemoFirebase, useAuth as useFirebaseAuth } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
 
 const reviewSchema = z.object({
@@ -93,6 +93,7 @@ function OperatorSubmissionCard({ report, onDelete, onEdit }: { report: Report, 
 export function TapeheadsReviewSummary() {
   const { toast } = useToast();
   const { firestore } = useFirebase();
+  const { isUserLoading } = useFirebaseAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [aiSummary, setAiSummary] = useState('');
   const [isEditDialogOpen, setEditDialogOpen] = useState(false);
@@ -110,7 +111,7 @@ export function TapeheadsReviewSummary() {
   const { date, shift } = form.watch();
 
   const submissionsQuery = useMemoFirebase(() => {
-    if (!date || !shift) return null;
+    if (!date || !shift || isUserLoading) return null;
     
     // Firestore queries are best with start/end ranges for dates
     const startOfDay = new Date(date);
@@ -124,7 +125,7 @@ export function TapeheadsReviewSummary() {
       where('date', '<=', endOfDay),
       where('shift', '==', parseInt(shift, 10))
     );
-  }, [date, shift, firestore]);
+  }, [date, shift, firestore, isUserLoading]);
 
   const { data: submissions, isLoading: isLoadingSubmissions } = useCollection<Report>(submissionsQuery);
 
@@ -133,7 +134,7 @@ export function TapeheadsReviewSummary() {
   };
   
   const handleDeleteReport = async (id: string) => {
-    deleteTapeheadsSubmission(firestore, id);
+    await deleteTapeheadsSubmission(firestore, id);
     toast({
         title: "Report Deleted",
         description: "The operator submission has been removed.",
@@ -315,3 +316,4 @@ export function TapeheadsReviewSummary() {
   );
 }
 
+    

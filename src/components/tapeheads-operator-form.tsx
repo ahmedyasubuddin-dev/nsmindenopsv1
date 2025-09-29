@@ -32,9 +32,9 @@ import React, { useEffect, useMemo, useState } from "react"
 import { MultiSelect, MultiSelectOption } from "./ui/multi-select"
 import { useRouter } from "next/navigation"
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group"
-import { getOeJobs, addTapeheadsSubmission, updateTapeheadsSubmission, markPanelsAsCompleted } from "@/lib/data-store"
+import { addTapeheadsSubmission, updateTapeheadsSubmission, markPanelsAsCompleted } from "@/lib/data-store"
 import type { Report, WorkItem, OeJob, OeSection } from "@/lib/data-store"
-import { useCollection, useFirebase, useMemoFirebase } from "@/firebase"
+import { useCollection, useFirebase, useMemoFirebase, useAuth as useFirebaseAuth } from "@/firebase"
 import { collection, query } from "firebase/firestore"
 
 const tapeIdsList = [
@@ -323,10 +323,10 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
     };
     
     if (onFormSubmit) {
-      updateTapeheadsSubmission(firestore, reportData as Report);
+      await updateTapeheadsSubmission(firestore, reportData as Report);
       onFormSubmit(reportData as Report);
     } else {
-      addTapeheadsSubmission(firestore, reportData as Report);
+      await addTapeheadsSubmission(firestore, reportData as Report);
       router.push('/report/tapeheads');
     }
 
@@ -421,11 +421,12 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
 function WorkItemCard({ index, remove, control, isEditMode }: { index: number, remove: (index: number) => void, control: any, isEditMode: boolean }) {
   const { toast } = useToast();
   const { firestore } = useFirebase();
+  const { isUserLoading } = useFirebaseAuth();
 
-  const jobsQuery = useMemoFirebase(() => query(collection(firestore, 'jobs')), [firestore]);
+  const jobsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'jobs')), [firestore, isUserLoading]);
   const { data: oeJobs, isLoading: isLoadingJobs } = useCollection<OeJob>(jobsQuery);
   
-  const submissionsQuery = useMemoFirebase(() => query(collection(firestore, 'tapeheads-submissions')), [firestore]);
+  const submissionsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'tapeheads-submissions')), [firestore, isUserLoading]);
   const { data: allSubmissions, isLoading: isLoadingSubmissions } = useCollection<Report>(submissionsQuery);
 
   const watchOeNumber = useWatch({ control, name: `workItems.${index}.oeNumber` });
@@ -562,7 +563,5 @@ function WorkItemCard({ index, remove, control, isEditMode }: { index: number, r
     </Card>
   );
 }
-
-    
 
     

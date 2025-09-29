@@ -16,7 +16,7 @@ import { SailStatusCard } from '@/components/status/sail-status-card';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Layers } from 'lucide-react';
-import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirebase, useMemoFirebase, useAuth as useFirebaseAuth } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
 
 interface FilmsInfo {
@@ -45,23 +45,24 @@ interface EnrichedWorkItem extends WorkItem {
 
 export default function TapeheadsStatusPage() {
   const { firestore } = useFirebase();
+  const { isUserLoading } = useFirebaseAuth();
   const [selectedOe, setSelectedOe] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [sortBy, setSortBy] = useState<'date' | 'status'>('date');
 
-  const tapeheadsQuery = useMemoFirebase(() => query(collection(firestore, 'tapeheads-submissions')), [firestore]);
+  const tapeheadsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'tapeheads-submissions')), [firestore, isUserLoading]);
   const { data: tapeheadsSubmissions, isLoading: isLoadingTapeheads } = useCollection<Report>(tapeheadsQuery);
 
-  const filmsQuery = useMemoFirebase(() => query(collection(firestore, 'films')), [firestore]);
+  const filmsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'films')), [firestore, isUserLoading]);
   const { data: filmsData, isLoading: isLoadingFilms } = useCollection<FilmsReport>(filmsQuery);
 
-  const gantryQuery = useMemoFirebase(() => query(collection(firestore, 'gantry-reports')), [firestore]);
+  const gantryQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'gantry-reports')), [firestore, isUserLoading]);
   const { data: gantryReportsData, isLoading: isLoadingGantry } = useCollection<GantryReport>(gantryQuery);
 
-  const inspectionsQuery = useMemoFirebase(() => query(collection(firestore, 'inspections')), [firestore]);
+  const inspectionsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'inspections')), [firestore, isUserLoading]);
   const { data: inspectionsData, isLoading: isLoadingInspections } = useCollection<InspectionSubmission>(inspectionsQuery);
 
-  const jobsQuery = useMemoFirebase(() => query(collection(firestore, 'jobs')), [firestore]);
+  const jobsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'jobs')), [firestore, isUserLoading]);
   const { data: oeJobs, isLoading: isLoadingJobs } = useCollection<OeJob>(jobsQuery);
   
   const loading = isLoadingTapeheads || isLoadingFilms || isLoadingGantry || isLoadingInspections || isLoadingJobs;
@@ -242,3 +243,5 @@ export default function TapeheadsStatusPage() {
     </div>
   );
 }
+
+    

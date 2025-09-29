@@ -17,8 +17,9 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Target, Gauge, Clock, Zap, AlertTriangle } from "lucide-react"
 import type { Report } from "@/lib/types"
-import { getTapeheadsSubmissions } from "@/lib/data-store"
 import { Badge } from "../ui/badge"
+import { useCollection, useFirebase, useMemoFirebase, useAuth as useFirebaseAuth } from "@/firebase"
+import { collection, query } from "firebase/firestore"
 
 const downtimeReasonsConfig = {
     "Machine Jam": { label: 'Machine Jam', color: 'hsl(var(--chart-1))' },
@@ -49,25 +50,22 @@ const calculateHours = (startTimeStr?: string, endTimeStr?: string): number => {
 }
 
 export function TapeheadsAnalytics() {
-  const [allData, setAllData] = React.useState<Report[]>([]);
-  const [loading, setLoading] = React.useState(true);
+  const { firestore } = useFirebase();
+  const { isUserLoading } = useFirebaseAuth();
   const [filters, setFilters] = React.useState({
     shift: 'all',
     operatorName: '',
   });
 
-  React.useEffect(() => {
-    getTapeheadsSubmissions().then(data => {
-        setAllData(data);
-        setLoading(false);
-    });
-  }, []);
+  const reportsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'tapeheads-submissions')), [firestore, isUserLoading]);
+  const { data: allData, isLoading: loading } = useCollection<Report>(reportsQuery);
 
   const handleFilterChange = (key: keyof typeof filters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
   
   const data = React.useMemo(() => {
+    if (!allData) return [];
     return allData.filter(report => {
         if (filters.shift !== 'all' && String(report.shift) !== filters.shift) return false;
         if (filters.operatorName && !report.operatorName.toLowerCase().includes(filters.operatorName.toLowerCase())) return false;
@@ -302,3 +300,5 @@ export function TapeheadsAnalytics() {
     </div>
   )
 }
+
+    

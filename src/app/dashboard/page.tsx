@@ -13,7 +13,7 @@ import { type FilmsReport, type GantryReport, type GraphicsTask, type Inspection
 import type { Report } from '@/lib/types';
 import { format } from 'date-fns';
 import { Separator } from '@/components/ui/separator';
-import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirebase, useMemoFirebase, useAuth as useFirebaseAuth } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
 
 const bottleneckChartConfig = {
@@ -34,21 +34,22 @@ type ActivityItem = {
 
 export default function DashboardPage() {
     const { firestore } = useFirebase();
+    const { isUserLoading } = useFirebaseAuth();
     const [isClient, setIsClient] = useState(false);
 
-    const tapeheadsQuery = useMemoFirebase(() => query(collection(firestore, 'tapeheads-submissions')), [firestore]);
+    const tapeheadsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'tapeheads-submissions')), [firestore, isUserLoading]);
     const { data: tapeheadsSubmissions, isLoading: isLoadingTapeheads } = useCollection<Report>(tapeheadsQuery);
 
-    const filmsQuery = useMemoFirebase(() => query(collection(firestore, 'films')), [firestore]);
+    const filmsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'films')), [firestore, isUserLoading]);
     const { data: filmsData, isLoading: isLoadingFilms } = useCollection<FilmsReport>(filmsQuery);
 
-    const gantryQuery = useMemoFirebase(() => query(collection(firestore, 'gantry-reports')), [firestore]);
+    const gantryQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'gantry-reports')), [firestore, isUserLoading]);
     const { data: gantryReportsData, isLoading: isLoadingGantry } = useCollection<GantryReport>(gantryQuery);
 
-    const graphicsQuery = useMemoFirebase(() => query(collection(firestore, 'graphics-tasks')), [firestore]);
+    const graphicsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'graphics-tasks')), [firestore, isUserLoading]);
     const { data: graphicsTasksData, isLoading: isLoadingGraphics } = useCollection<GraphicsTask>(graphicsQuery);
 
-    const inspectionsQuery = useMemoFirebase(() => query(collection(firestore, 'inspections')), [firestore]);
+    const inspectionsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'inspections')), [firestore, isUserLoading]);
     const { data: inspectionsData, isLoading: isLoadingInspections } = useCollection<InspectionSubmission>(inspectionsQuery);
 
     const loading = isLoadingTapeheads || isLoadingFilms || isLoadingGantry || isLoadingGraphics || isLoadingInspections;
@@ -267,3 +268,5 @@ export default function DashboardPage() {
     </div>
   )
 }
+
+    
