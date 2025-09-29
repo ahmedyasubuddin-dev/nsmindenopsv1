@@ -141,30 +141,9 @@ export async function getOeJobs(firestore: Firestore): Promise<OeJob[]> {
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as OeJob));
 }
 
-// These functions still read from local files and will be replaced.
-export async function getFilmsData(firestore: Firestore): Promise<FilmsReport[]> { 
-    const snapshot = await getDocs(collection(firestore, 'films'));
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FilmsReport));
-}
-export async function getGantryReportsData(firestore: Firestore): Promise<GantryReport[]> {
-    const snapshot = await getDocs(collection(firestore, 'gantry-reports'));
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as GantryReport));
-}
-export async function getGraphicsTasks(firestore: Firestore): Promise<GraphicsTask[]> {
-    const snapshot = await getDocs(collection(firestore, 'graphics-tasks'));
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as GraphicsTask));
-}
-export async function getPreggerReportsData(firestore: Firestore): Promise<PreggerReport[]> {
-    const snapshot = await getDocs(collection(firestore, 'pregger-reports'));
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PreggerReport));
-}
-export async function getInspectionsData(firestore: Firestore): Promise<InspectionSubmission[]> {
-    const snapshot = await getDocs(collection(firestore, 'inspections'));
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as InspectionSubmission));
-}
-export async function getTapeheadsSubmissions(firestore: Firestore): Promise<Report[]> {
-    const snapshot = await getDocs(collection(firestore, 'tapeheads-submissions'));
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Report));
+export async function addGraphicsTask(firestore: Firestore, task: GraphicsTask): Promise<void> {
+    const docRef = doc(firestore, 'graphics-tasks', task.id);
+    await setDocumentNonBlocking(docRef, task, { merge: true });
 }
 
 export async function updateGraphicsTask(firestore: Firestore, task: GraphicsTask): Promise<void> {
@@ -176,16 +155,6 @@ export async function deleteGraphicsTask(firestore: Firestore, taskId: string): 
     const docRef = doc(firestore, 'graphics-tasks', taskId);
     await deleteDocumentNonBlocking(docRef);
 }
-
-export async function setGraphicsTasks(firestore: Firestore, tasks: GraphicsTask[]): Promise<void> {
-    const batch = [];
-    for (const task of tasks) {
-        const docRef = doc(firestore, 'graphics-tasks', task.id);
-        batch.push(setDocumentNonBlocking(docRef, task, { merge: true }));
-    }
-    await Promise.all(batch);
-}
-
 
 export async function addOeJob(firestore: Firestore, job: { oeBase: string, sections: Array<{ sectionId: string, panelStart: number, panelEnd: number }> }): Promise<void> {
     const newJob = {

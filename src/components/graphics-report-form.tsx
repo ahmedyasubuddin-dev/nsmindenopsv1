@@ -27,8 +27,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { sendShippingNotification } from "@/ai/flows/send-notification-flow"
 import { updateGraphicsTask, deleteGraphicsTask, addGraphicsTask } from "@/lib/data-store"
 import { PageHeader } from "@/components/page-header"
-import { useCollection, useFirebase, useMemoFirebase } from "@/firebase"
-import { useAuth as useFirebaseAuth } from "@/firebase"
+import { useCollection, useFirebase, useMemoFirebase, useAuth as useFirebaseAuth } from "@/firebase"
 import { collection, query } from "firebase/firestore"
 
 
