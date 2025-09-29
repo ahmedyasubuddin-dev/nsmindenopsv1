@@ -14,8 +14,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Factory, TrendingUp, CheckCircle, AlertTriangle, Users } from "lucide-react"
-import { getGantryReportsData } from "@/lib/data-store"
+import { useCollection, useFirebase, useMemoFirebase } from "@/firebase"
 import type { GantryReport } from "@/lib/data-store"
+import { collection, query } from "firebase/firestore"
 
 const classifySailType = (sailNumber?: string): 'Sail' | 'Panel' | 'Scarf' => {
   if (!sailNumber || sailNumber.length < 3) return 'Scarf';
@@ -46,20 +47,15 @@ const issueTypesConfig: ChartConfig = {
 }
 
 export function GantryAnalytics() {
-  const [allReports, setAllReports] = React.useState<GantryReport[]>([]);
-  const [loading, setLoading] = React.useState(true);
+  const { firestore } = useFirebase();
+  const gantryQuery = useMemoFirebase(() => query(collection(firestore, 'gantry-reports')), [firestore]);
+  const { data: allReports, isLoading: loading } = useCollection<GantryReport>(gantryQuery);
+
   const [filters, setFilters] = React.useState({
     shift: "all",
     dateRange: "30",
     zone: "all",
   });
-
-  React.useEffect(() => {
-    getGantryReportsData().then(data => {
-        setAllReports(data);
-        setLoading(false);
-    });
-  }, []);
 
   const handleFilterChange = (key: keyof typeof filters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -99,6 +95,7 @@ export function GantryAnalytics() {
   }, [filteredReports]);
 
   const coreMetrics = useMemo(() => {
+    if (!filteredReports) return { totalSailsProcessed: 0, totalSails: 0, totalPanels: 0, totalScarfs: 0, quality: 0, efficiency: 0, totalPersonnel: 0, sailsWithZeroIssues: 0 };
     const totalSailsProcessed = allSails.length;
     const totalSails = allSails.filter(s => s.sail_type === 'Sail').length;
     const totalPanels = allSails.filter(s => s.sail_type === 'Panel').length;
@@ -125,6 +122,7 @@ export function GantryAnalytics() {
   }, [filteredReports, allSails]);
 
   const productivityData = useMemo(() => {
+    if (!filteredReports) return [];
     const dailyData: Record<string, any> = {};
   
     filteredReports.forEach(report => {
@@ -157,6 +155,7 @@ export function GantryAnalytics() {
   }, [filteredReports]);
 
   const downtimeAnalysis = useMemo(() => {
+    if (!filteredReports) return { reasonsData: [], shiftsData: [], totalDowntime: 0 };
     const downtimeByReason: Record<string, number> = {};
     const downtimeByShift: Record<string, { total: number, count: number }> = {};
   
@@ -195,6 +194,7 @@ export function GantryAnalytics() {
   }, [filteredReports]);
   
     const rootCauseAnalysis = useMemo(() => {
+        if (!allSails) return { issueData: [], sailsWithIssues: [] };
         const issueCounts: Record<string, number> = {};
         const sailsWithIssues = allSails.filter(s => s.hasIssues && s.issues !== 'Other' && s.issues !== 'None');
 
@@ -209,6 +209,7 @@ export function GantryAnalytics() {
     }, [allSails]);
     
     const stageFlowAnalysis = useMemo(() => {
+        if (!allSails) return [];
         const stageCounts: Record<string, number> = {};
         allSails.forEach(sail => {
             const stage = sail.stage_of_process || "Unknown";

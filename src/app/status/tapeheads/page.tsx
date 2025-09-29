@@ -10,12 +10,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { PageHeader } from '@/components/page-header';
-import { getTapeheadsSubmissions, getFilmsData, getGantryReportsData, getInspectionsData, getOeSection, getOeJobs, type InspectionSubmission, type OeJob, type FilmsReport, type GantryReport } from '@/lib/data-store';
+import { getOeSection, type InspectionSubmission, type OeJob, type FilmsReport, type GantryReport } from '@/lib/data-store';
 import type { Report, WorkItem } from '@/lib/types';
 import { SailStatusCard } from '@/components/status/sail-status-card';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Layers } from 'lucide-react';
+import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
+import { collection, query } from 'firebase/firestore';
 
 interface FilmsInfo {
     status: 'Prepped' | 'In Progress' | 'No Entry';
@@ -42,54 +44,41 @@ interface EnrichedWorkItem extends WorkItem {
 }
 
 export default function TapeheadsStatusPage() {
+  const { firestore } = useFirebase();
   const [selectedOe, setSelectedOe] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [sortBy, setSortBy] = useState<'date' | 'status'>('date');
-  const [tapeheadsSubmissions, setTapeheadsSubmissions] = useState<Report[]>([]);
-  const [filmsData, setFilmsData] = useState<FilmsReport[]>([]);
-  const [gantryReportsData, setGantryReportsData] = useState<GantryReport[]>([]);
-  const [inspectionsData, setInspectionsData] = useState<InspectionSubmission[]>([]);
-  const [oeJobs, setOeJobs] = useState<OeJob[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  // Initial data load
+  const tapeheadsQuery = useMemoFirebase(() => query(collection(firestore, 'tapeheads-submissions')), [firestore]);
+  const { data: tapeheadsSubmissions, isLoading: isLoadingTapeheads } = useCollection<Report>(tapeheadsQuery);
+
+  const filmsQuery = useMemoFirebase(() => query(collection(firestore, 'films')), [firestore]);
+  const { data: filmsData, isLoading: isLoadingFilms } = useCollection<FilmsReport>(filmsQuery);
+
+  const gantryQuery = useMemoFirebase(() => query(collection(firestore, 'gantry-reports')), [firestore]);
+  const { data: gantryReportsData, isLoading: isLoadingGantry } = useCollection<GantryReport>(gantryQuery);
+
+  const inspectionsQuery = useMemoFirebase(() => query(collection(firestore, 'inspections')), [firestore]);
+  const { data: inspectionsData, isLoading: isLoadingInspections } = useCollection<InspectionSubmission>(inspectionsQuery);
+
+  const jobsQuery = useMemoFirebase(() => query(collection(firestore, 'jobs')), [firestore]);
+  const { data: oeJobs, isLoading: isLoadingJobs } = useCollection<OeJob>(jobsQuery);
+  
+  const loading = isLoadingTapeheads || isLoadingFilms || isLoadingGantry || isLoadingInspections || isLoadingJobs;
+
   useEffect(() => {
-    const loadAllData = async () => {
-        setLoading(true);
-        try {
-            const [tapeheads, films, gantry, inspections, jobs] = await Promise.all([
-                getTapeheadsSubmissions(),
-                getFilmsData(),
-                getGantryReportsData(),
-                getInspectionsData(),
-                getOeJobs()
-            ]);
-            setTapeheadsSubmissions(tapeheads);
-            setFilmsData(films);
-            setGantryReportsData(gantry);
-            setInspectionsData(inspections);
-            setOeJobs(jobs);
-
-            // Set default OE after data is loaded
-            if (tapeheads.length > 0) {
-                const mostRecentReport = [...tapeheads].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
-                const defaultOe = mostRecentReport.workItems?.[0]?.oeNumber;
-                if (defaultOe) {
-                    setSelectedOe(defaultOe);
-                    setSearchTerm(defaultOe);
-                }
-            }
-        } catch (error) {
-            console.error("Failed to load status page data:", error);
-        } finally {
-            setLoading(false);
+    if (!loading && tapeheadsSubmissions && tapeheadsSubmissions.length > 0 && !selectedOe) {
+        const mostRecentReport = [...tapeheadsSubmissions].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+        const defaultOe = mostRecentReport.workItems?.[0]?.oeNumber;
+        if (defaultOe) {
+            setSelectedOe(defaultOe);
+            setSearchTerm(defaultOe);
         }
-    };
-    loadAllData();
-  }, []);
+    }
+  }, [loading, tapeheadsSubmissions, selectedOe]);
 
   const totalPanelsForOe = useMemo(() => {
-    if (!selectedOe) return 0;
+    if (!selectedOe || !oeJobs) return 0;
     const job = oeJobs.find(j => j.oeBase === selectedOe);
     if (!job) return 0;
     return job.sections.reduce((total, section) => {
@@ -98,7 +87,7 @@ export default function TapeheadsStatusPage() {
   }, [selectedOe, oeJobs]);
 
   const sailWorkItems = useMemo(() => {
-    if (!selectedOe) return [];
+    if (!selectedOe || !tapeheadsSubmissions || !filmsData || !gantryReportsData || !inspectionsData || !oeJobs) return [];
 
     const items: { [sailKey: string]: EnrichedWorkItem[] } = {};
 
@@ -108,7 +97,6 @@ export default function TapeheadsStatusPage() {
           const sailKey = `${item.oeNumber}-${item.section}`;
           const sailNumber = sailKey;
           
-          // --- Find Films Department Info ---
           let filmsInfo: FilmsInfo = { status: 'No Entry' };
           const finishedReport = filmsData.find(fr => fr.sails_finished.some(s => s.sail_number === sailNumber));
           const startedReport = filmsData.find(fr => fr.sails_started.some(s => s.sail_number === sailNumber));
@@ -128,9 +116,7 @@ export default function TapeheadsStatusPage() {
                   gantry: startedReport.gantry_number,
               };
           }
-          // --- End of Films Logic ---
 
-          // --- Find Gantry Department Info ---
           const gantryHistory: GantryInfo[] = [];
           gantryReportsData.forEach(gantryReport => {
               gantryReport.molds?.forEach(mold => {
@@ -148,19 +134,13 @@ export default function TapeheadsStatusPage() {
                   });
               });
           });
-           // Sort history by most recent date
           gantryHistory.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-          // --- End of Gantry Logic ---
 
-          // --- Find QC Inspection Info ---
           const qcInspection = inspectionsData.find(qc => qc.oeNumber === sailNumber);
-          // --- End of QC Logic ---
-
-          // --- Get Total Panels for Section ---
+          
           const oeJob = oeJobs.find(job => job.oeBase === item.oeNumber);
           const oeSection = oeJob?.sections.find(sec => sec.sectionId === item.section);
           const totalPanelsForSection = oeSection ? (oeSection.panelEnd - oeSection.panelStart + 1) : 0;
-          // --- End of Total Panels Logic ---
           
           if (!items[sailKey]) {
             items[sailKey] = [];
@@ -170,15 +150,12 @@ export default function TapeheadsStatusPage() {
       });
     });
 
-    // For each sail, we only want the most recent update.
     const latestWorkItems = Object.values(items).map(workLog => {
-        // Find the most recent report for this specific sail
         return workLog.reduce((latest, current) => {
             return new Date(current.report.date) > new Date(latest.report.date) ? current : latest;
         });
     });
 
-    // Sorting logic
     latestWorkItems.sort((a, b) => {
       if (sortBy === 'status') {
         if (a.endOfShiftStatus === b.endOfShiftStatus) {
@@ -186,7 +163,6 @@ export default function TapeheadsStatusPage() {
         }
         return a.endOfShiftStatus === 'Completed' ? 1 : -1;
       }
-      // Default to sorting by date
       return new Date(b.report.date).getTime() - new Date(a.report.date).getTime();
     });
 

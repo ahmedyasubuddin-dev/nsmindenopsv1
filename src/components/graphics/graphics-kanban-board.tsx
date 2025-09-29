@@ -7,11 +7,11 @@ import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
 import { GraphicsTaskCard } from './graphics-task-card';
 import type { GraphicsTask as Task } from '@/lib/data-store';
-import { getGraphicsTasks } from '@/lib/data-store';
+import { useFirestore } from '@/firebase';
+import { updateGraphicsTask } from '@/lib/data-store';
 
 interface KanbanBoardProps {
     tasks: Task[];
-    setTasks: (tasks: Task[]) => void;
     type: 'cutting' | 'inking';
     onAddTask: () => void;
     onUpdateTask: (task: Task) => void;
@@ -24,7 +24,8 @@ const columns = {
     done: { id: 'done', title: 'Completed' },
 };
 
-export function GraphicsKanbanBoard({ tasks, setTasks, type, onAddTask, onUpdateTask, onDeleteTask }: KanbanBoardProps) {
+export function GraphicsKanbanBoard({ tasks, type, onAddTask, onUpdateTask, onDeleteTask }: KanbanBoardProps) {
+    const firestore = useFirestore();
 
     const onDragEnd: OnDragEndResponder = async (result) => {
         const { destination, source, draggableId } = result;
@@ -37,19 +38,17 @@ export function GraphicsKanbanBoard({ tasks, setTasks, type, onAddTask, onUpdate
             return;
         }
         
-        const allTasks = await getGraphicsTasks();
-        const task = allTasks.find(t => t.id === draggableId);
+        const task = tasks.find(t => t.id === draggableId);
 
         if (task) {
             const newStatus = destination.droppableId as 'todo' | 'inProgress' | 'done';
-            const updatedTask = { ...task, status: newStatus };
+            const updatedTask: Task = { ...task, status: newStatus };
             
             if (newStatus === 'done' && !task.completedAt) {
                 updatedTask.completedAt = new Date().toISOString();
             }
 
-            const newTasks = allTasks.map(t => t.id === draggableId ? updatedTask : t);
-            setTasks(newTasks);
+            onUpdateTask(updatedTask);
         }
     };
     

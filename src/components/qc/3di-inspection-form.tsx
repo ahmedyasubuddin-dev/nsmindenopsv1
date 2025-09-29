@@ -20,6 +20,8 @@ import { cn } from '@/lib/utils';
 import { Card } from '../ui/card';
 import { defectCategories } from '@/lib/qc-data';
 import { FileDown } from 'lucide-react';
+import { addInspection } from '@/lib/data-store';
+import { useFirestore } from '@/firebase';
 
 const temperatureSchema = z.object({
   head: z.coerce.number().optional(),
@@ -103,6 +105,7 @@ export type InspectionFormValues = z.infer<typeof inspectionFormSchema>;
 
 export function ThreeDiInspectionForm() {
   const { toast } = useToast();
+  const firestore = useFirestore();
   const methods = useForm<InspectionFormValues>({
     resolver: zodResolver(inspectionFormSchema),
     defaultValues: {
@@ -173,7 +176,14 @@ export function ThreeDiInspectionForm() {
   const showReinspection = totalScore >= 61 && totalScore < 100;
 
   async function onSubmit(data: InspectionFormValues) {
-    console.log({ ...data, totalScore, status: inspectionStatus.text });
+    const submissionData = { 
+        ...data, 
+        inspectionDate: data.inspectionDate.toISOString(),
+        totalScore, 
+        status: inspectionStatus.text as 'Pass' | 'Reinspection Required' | 'Fail'
+    };
+    
+    await addInspection(firestore, submissionData);
     
     // Dynamically import the PDF generator only on the client-side
     const { generatePdf } = await import('@/lib/generate-qc-pdf');
@@ -183,6 +193,7 @@ export function ThreeDiInspectionForm() {
       title: 'Inspection Submitted & PDF Generated',
       description: `OE# ${data.oeNumber} has been submitted with a score of ${totalScore}.`,
     });
+    methods.reset();
   }
 
   const handleExportPdf = async () => {

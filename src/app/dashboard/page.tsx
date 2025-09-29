@@ -9,10 +9,12 @@ import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
 import type { ChartConfig } from "@/components/ui/chart";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, CheckCircle, Factory, ShieldCheck, TrendingUp, Users, Wrench } from "lucide-react";
-import { getTapeheadsSubmissions, getFilmsData, getGantryReportsData, getGraphicsTasks, getInspectionsData, type FilmsReport, type GantryReport, type GraphicsTask, type InspectionSubmission, type OeJob } from '@/lib/data-store';
+import { type FilmsReport, type GantryReport, type GraphicsTask, type InspectionSubmission, type OeJob } from '@/lib/data-store';
 import type { Report } from '@/lib/types';
 import { format } from 'date-fns';
 import { Separator } from '@/components/ui/separator';
+import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
+import { collection, query } from 'firebase/firestore';
 
 const bottleneckChartConfig = {
   count: {
@@ -31,52 +33,56 @@ type ActivityItem = {
 
 
 export default function DashboardPage() {
+    const { firestore } = useFirebase();
     const [isClient, setIsClient] = useState(false);
-    const [tapeheadsSubmissions, setTapeheadsSubmissions] = useState<Report[]>([]);
-    const [filmsData, setFilmsData] = useState<FilmsReport[]>([]);
-    const [gantryReportsData, setGantryReportsData] = useState<GantryReport[]>([]);
-    const [graphicsTasksData, setGraphicsTasksData] = useState<GraphicsTask[]>([]);
-    const [inspectionsData, setInspectionsData] = useState<InspectionSubmission[]>([]);
-    const [loading, setLoading] = useState(true);
+
+    const tapeheadsQuery = useMemoFirebase(() => query(collection(firestore, 'tapeheads-submissions')), [firestore]);
+    const { data: tapeheadsSubmissions, isLoading: isLoadingTapeheads } = useCollection<Report>(tapeheadsQuery);
+
+    const filmsQuery = useMemoFirebase(() => query(collection(firestore, 'films')), [firestore]);
+    const { data: filmsData, isLoading: isLoadingFilms } = useCollection<FilmsReport>(filmsQuery);
+
+    const gantryQuery = useMemoFirebase(() => query(collection(firestore, 'gantry-reports')), [firestore]);
+    const { data: gantryReportsData, isLoading: isLoadingGantry } = useCollection<GantryReport>(gantryQuery);
+
+    const graphicsQuery = useMemoFirebase(() => query(collection(firestore, 'graphics-tasks')), [firestore]);
+    const { data: graphicsTasksData, isLoading: isLoadingGraphics } = useCollection<GraphicsTask>(graphicsQuery);
+
+    const inspectionsQuery = useMemoFirebase(() => query(collection(firestore, 'inspections')), [firestore]);
+    const { data: inspectionsData, isLoading: isLoadingInspections } = useCollection<InspectionSubmission>(inspectionsQuery);
+
+    const loading = isLoadingTapeheads || isLoadingFilms || isLoadingGantry || isLoadingGraphics || isLoadingInspections;
 
     useEffect(() => {
         setIsClient(true);
-        const loadData = async () => {
-            try {
-                setTapeheadsSubmissions(await getTapeheadsSubmissions());
-                setFilmsData(await getFilmsData());
-                setGantryReportsData(await getGantryReportsData());
-                setGraphicsTasksData(await getGraphicsTasks());
-                setInspectionsData(await getInspectionsData());
-            } catch (error) {
-                console.error("Failed to load dashboard data", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        loadData();
     }, []);
 
     const dashboardData = useMemo(() => {
+        const safeTapeheads = tapeheadsSubmissions || [];
+        const safeFilms = filmsData || [];
+        const safeGantry = gantryReportsData || [];
+        const safeGraphics = graphicsTasksData || [];
+        const safeInspections = inspectionsData || [];
+
         // --- KPIs ---
         const activeWorkOrders = new Set(
             [
-                ...tapeheadsSubmissions.flatMap(r => r.workItems?.map(wi => wi.oeNumber) || []),
-                ...filmsData.flatMap(r => [...r.sails_started, ...r.sails_finished]).map(s => s.sail_number.split('-')[0]),
-                ...gantryReportsData.flatMap(r => r.molds?.flatMap(m => m.sails?.map(s => s.sail_number.split('-')[0]) || []) || []),
+                ...safeTapeheads.flatMap(r => r.workItems?.map(wi => wi.oeNumber) || []),
+                ...safeFilms.flatMap(r => [...r.sails_started, ...r.sails_finished]).map(s => s.sail_number.split('-')[0]),
+                ...safeGantry.flatMap(r => r.molds?.flatMap(m => m.sails?.map(s => s.sail_number.split('-')[0]) || []) || []),
             ].filter(Boolean)
         );
         
-        const totalMetersToday = tapeheadsSubmissions
+        const totalMetersToday = safeTapeheads
             .reduce((sum, r) => sum + (r.total_meters || 0), 0);
 
-        const qualityAlerts = inspectionsData.filter(i => i.status !== 'Pass').length;
+        const qualityAlerts = safeInspections.filter(i => i.status !== 'Pass').length;
         
-        const totalDowntimeMinutes = gantryReportsData
+        const totalDowntimeMinutes = safeGantry
             .reduce((sum, r) => sum + (r.downtime?.reduce((dSum, d) => dSum + d.duration, 0) || 0), 0);
         
         // --- Activity Feed ---
-        const tapeheadsActivity: ActivityItem[] = tapeheadsSubmissions.flatMap(r => 
+        const tapeheadsActivity: ActivityItem[] = safeTapeheads.flatMap(r => 
             (r.workItems || []).map(wi => ({
                 dept: 'Tapeheads',
                 oe: `${wi.oeNumber}-${wi.section}`,
@@ -86,7 +92,7 @@ export default function DashboardPage() {
             }))
         );
 
-        const filmsActivity: ActivityItem[] = filmsData.flatMap(r => 
+        const filmsActivity: ActivityItem[] = safeFilms.flatMap(r => 
              r.sails_finished.map(s => ({
                 dept: 'Films',
                 oe: s.sail_number,
@@ -96,7 +102,7 @@ export default function DashboardPage() {
             }))
         );
         
-        const gantryActivity: ActivityItem[] = gantryReportsData.flatMap(r =>
+        const gantryActivity: ActivityItem[] = safeGantry.flatMap(r =>
             (r.molds || []).flatMap(m => 
                 (m.sails || []).map(s => ({
                     dept: 'Gantry',
@@ -108,7 +114,7 @@ export default function DashboardPage() {
             )
         );
         
-        const graphicsActivity: ActivityItem[] = graphicsTasksData
+        const graphicsActivity: ActivityItem[] = safeGraphics
             .filter(t => t.status === 'done' && t.completedAt)
             .map(t => ({
                 dept: 'Graphics',
@@ -124,11 +130,11 @@ export default function DashboardPage() {
 
         // --- Bottleneck Chart ---
         const bottleneckData = [
-            { dept: 'Tapeheads', count: tapeheadsSubmissions.filter(r => (r.workItems || []).some(wi => wi.endOfShiftStatus === 'In Progress')).length },
-            { dept: 'Films', count: filmsData.filter(r => r.sails_started.length > 0 && r.sails_finished.length === 0).length },
-            { dept: 'Gantry', count: gantryReportsData.filter(r => (r.molds || []).some(m => (m.sails || []).some(s => s.stage_of_process !== 'Lamination Inspection'))).length },
-            { dept: 'Graphics', count: graphicsTasksData.filter(t => t.status === 'inProgress').length },
-            { dept: 'QC', count: inspectionsData.filter(i => i.status === 'Reinspection Required').length },
+            { dept: 'Tapeheads', count: safeTapeheads.filter(r => (r.workItems || []).some(wi => wi.endOfShiftStatus === 'In Progress')).length },
+            { dept: 'Films', count: safeFilms.filter(r => r.sails_started.length > 0 && r.sails_finished.length === 0).length },
+            { dept: 'Gantry', count: safeGantry.filter(r => (r.molds || []).some(m => (m.sails || []).some(s => s.stage_of_process !== 'Lamination Inspection'))).length },
+            { dept: 'Graphics', count: safeGraphics.filter(t => t.status === 'inProgress').length },
+            { dept: 'QC', count: safeInspections.filter(i => i.status === 'Reinspection Required').length },
         ];
 
 
@@ -216,7 +222,7 @@ export default function DashboardPage() {
                         </div>
                         <div className="flex-1">
                              <div className="flex justify-between items-center">
-                                <p className="font-semibold">{item.oe}</p>
+                                <div className="font-semibold">{item.oe}</div>
                                 <Badge variant="secondary">{item.dept}</Badge>
                             </div>
                             <p className="text-sm text-muted-foreground">{item.details}</p>

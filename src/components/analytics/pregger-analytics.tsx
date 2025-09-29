@@ -18,8 +18,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Factory, TrendingUp, Clock, Zap } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../ui/accordion"
 import { Badge } from "../ui/badge"
-import { getPreggerReportsData } from "@/lib/data-store"
+import { useCollection, useFirebase, useMemoFirebase } from "@/firebase"
 import type { PreggerReport } from "@/lib/data-store"
+import { collection, query } from "firebase/firestore"
 
 const productionChartConfig = {
   shift1: { label: "Shift 1", color: "hsl(var(--chart-1))" },
@@ -39,26 +40,22 @@ const CustomLegend = () => {
 };
 
 export function PreggerAnalytics() {
-  const [allData, setAllData] = React.useState<PreggerReport[]>([]);
-  const [loading, setLoading] = React.useState(true);
+  const { firestore } = useFirebase();
+  const preggerQuery = useMemoFirebase(() => query(collection(firestore, 'pregger-reports')), [firestore]);
+  const { data: allData, isLoading: loading } = useCollection<PreggerReport>(preggerQuery);
+
   const [filters, setFilters] = React.useState({
     dateFrom: '2023-10-25',
     dateTo: '2023-10-27',
     shift: 'all',
   });
 
-  React.useEffect(() => {
-    getPreggerReportsData().then(data => {
-        setAllData(data);
-        setLoading(false);
-    });
-  }, []);
-
   const handleFilterChange = (key: keyof typeof filters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
   
   const data = React.useMemo(() => {
+    if (!allData) return [];
     return allData.filter(report => {
         const reportDate = new Date(report.report_date);
         const fromDate = filters.dateFrom ? new Date(filters.dateFrom) : null;
@@ -73,6 +70,7 @@ export function PreggerAnalytics() {
   }, [allData, filters]);
   
   const kpiData = React.useMemo(() => {
+    if (!data) return { totalMeters: '0', yieldRate: '0%', totalDowntime: '0 min', operationalEfficiency: '0 m/hr' };
     const totalMeters = data.reduce((acc, report) => acc + report.workCompleted.reduce((sum, work) => sum + work.meters, 0), 0);
     const totalWaste = data.reduce((acc, report) => acc + report.workCompleted.reduce((sum, work) => sum + work.waste_meters, 0), 0);
     const totalDowntime = data.reduce((acc, report) => acc + (report.downtime?.reduce((sum, down) => sum + down.duration_minutes, 0) || 0), 0);
@@ -90,6 +88,7 @@ export function PreggerAnalytics() {
   }, [data]);
   
   const productionByDay = React.useMemo(() => {
+    if (!data) return [];
     const dailyData: { [key: string]: any } = {};
     data.forEach(report => {
       const date = new Date(report.report_date).toLocaleDateString();
@@ -103,6 +102,7 @@ export function PreggerAnalytics() {
   }, [data]);
 
   const downtimeByReason = React.useMemo(() => {
+    if (!data) return [];
     const reasonData: { [key: string]: number } = {};
     data.forEach(report => {
       report.downtime?.forEach(d => {
@@ -226,7 +226,7 @@ export function PreggerAnalytics() {
                     <CardHeader><CardTitle>Report Drilldown</CardTitle></CardHeader>
                     <CardContent className="max-h-96 overflow-y-auto">
                        <Accordion type="single" collapsible className="w-full">
-                         {data.map(report => (
+                         {data && data.map(report => (
                             <AccordionItem key={report.id} value={report.id}>
                                 <AccordionTrigger>
                                     <div className="flex justify-between w-full pr-4">

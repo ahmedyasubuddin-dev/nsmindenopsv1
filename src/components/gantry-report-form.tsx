@@ -31,7 +31,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ImageUpload } from "./image-upload"
 import { Switch } from "./ui/switch"
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert"
-import { getFilmsData, type FilmsReport } from "@/lib/data-store"
+import { getFilmsData, type FilmsReport, addGantryReport } from "@/lib/data-store"
+import { useCollection, useFirebase, useMemoFirebase } from "@/firebase"
+import { collection, query } from "firebase/firestore"
 
 const stageOfProcessOptions = [
     "RF Smart Mold Adjust", "Grid Base Film Installation", "Panel Installation", 
@@ -153,6 +155,7 @@ function Section({ title, description, children }: { title: string, description?
 
 export function GantryReportForm() {
   const { toast } = useToast();
+  const firestore = useFirestore();
   const form = useForm<GantryReportFormValues>({
     resolver: zodResolver(gantryReportSchema),
     defaultValues,
@@ -175,8 +178,12 @@ export function GantryReportForm() {
   }, [selectedShift, form]);
 
 
-  function onSubmit(values: GantryReportFormValues) {
-    console.log(values);
+  async function onSubmit(values: GantryReportFormValues) {
+    await addGantryReport(firestore, {
+        ...values,
+        report_date: values.report_date.toISOString(),
+        date: values.report_date.toISOString(),
+    });
     toast({
       title: "Gantry Report Submitted!",
       description: "Your detailed report has been successfully submitted.",
@@ -293,6 +300,10 @@ export function GantryReportForm() {
 }
 
 function MoldField({ moldIndex, control, removeMold }: { moldIndex: number, control: any, removeMold: (index: number) => void }) {
+  const firestore = useFirestore();
+  const filmsQuery = useMemoFirebase(() => query(collection(firestore, 'films')), [firestore]);
+  const { data: filmsData, isLoading: isLoadingFilms } = useCollection<FilmsReport>(filmsQuery);
+
   const { fields: sailFields, append: appendSail, remove: removeSail } = useFieldArray({
     control,
     name: `molds.${moldIndex}.sails`
@@ -313,20 +324,15 @@ function MoldField({ moldIndex, control, removeMold }: { moldIndex: number, cont
       name: `molds.${moldIndex}.mold_number`
   });
   
-  const [filmsData, setFilmsData] = React.useState<FilmsReport[]>([]);
-  
-  React.useEffect(() => {
-    getFilmsData().then(setFilmsData);
-  }, []);
-
   const sailsReadyForGantry = React.useMemo(() => {
+    if (!filmsData) return [];
     const finishedSails = filmsData.flatMap(report => report.sails_finished.map(sail => sail.sail_number));
     return [...new Set(finishedSails)]; // Return unique sail numbers
   }, [filmsData]);
 
 
   const gantryMismatch = React.useMemo(() => {
-    if (!watchMoldNumber || !watchSails) return null;
+    if (!watchMoldNumber || !watchSails || !filmsData) return null;
 
     const getGantryNumberFromString = (str: string) => {
         const match = str.match(/Gantry\s*(\d+)/i);
@@ -471,5 +477,3 @@ function MoldField({ moldIndex, control, removeMold }: { moldIndex: number, cont
     </Card>
   )
 }
-
-    

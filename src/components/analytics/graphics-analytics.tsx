@@ -8,28 +8,24 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, Clock, PackageCheck, Send } from "lucide-react";
 import { format, isSameDay } from 'date-fns';
-import { getGraphicsTasks } from '@/lib/data-store';
 import type { GraphicsTask } from '@/lib/data-store';
 import { Button } from '../ui/button';
 import { sendShippingNotification } from '@/ai/flows/send-notification-flow';
 import { useToast } from '@/hooks/use-toast';
+import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
+import { collection, query } from 'firebase/firestore';
 
 export function GraphicsAnalytics() {
+    const { firestore } = useFirebase();
     const [date, setDate] = useState<Date | undefined>(new Date());
-    const [allTasks, setAllTasks] = useState<GraphicsTask[]>([]);
-    const [loading, setLoading] = useState(true);
+    const tasksQuery = useMemoFirebase(() => query(collection(firestore, 'graphics-tasks')), [firestore]);
+    const { data: allTasks, isLoading: loading } = useCollection<GraphicsTask>(tasksQuery);
+    
     const [notifiedTags, setNotifiedTags] = useState<Set<string>>(new Set());
     const { toast } = useToast();
 
-    useEffect(() => {
-        getGraphicsTasks().then(data => {
-            setAllTasks(data);
-            setLoading(false);
-        });
-    }, []);
-
     const dailyData = useMemo(() => {
-        if (!date) {
+        if (!date || !allTasks) {
             return {
                 startedTasks: [],
                 completedTasks: [],
@@ -51,6 +47,7 @@ export function GraphicsAnalytics() {
     }, [date, allTasks]);
     
     const readyForShippingTags = useMemo(() => {
+        if (!allTasks) return [];
         const finishedTagIds = new Set<string>();
         const tagTaskMap: Record<string, GraphicsTask[]> = {};
 

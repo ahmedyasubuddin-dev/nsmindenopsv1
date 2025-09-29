@@ -30,6 +30,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/hooks/use-toast"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
+import { useFirestore } from "@/firebase"
+import { addPreggerReport } from "@/lib/data-store"
 
 const tapeIdsList = [
     "928108", "938108", "938108T", "928128", "938128", "938128T", "*938138*", 
@@ -104,6 +106,7 @@ function SectionHeader({ title, description }: { title: string, description?: st
 
 export function PreggerReportForm() {
   const { toast } = useToast();
+  const firestore = useFirestore();
   const form = useForm<PreggerReportFormValues>({
     resolver: zodResolver(preggerReportSchema),
     defaultValues,
@@ -125,8 +128,12 @@ export function PreggerReportForm() {
   });
 
 
-  function onSubmit(values: PreggerReportFormValues) {
-    console.log(values);
+  async function onSubmit(values: PreggerReportFormValues) {
+    await addPreggerReport(firestore, {
+        ...values,
+        report_date: values.report_date.toISOString(),
+    });
+
     toast({
       title: "Pregger Report Submitted!",
       description: "Your detailed report has been successfully submitted.",
@@ -179,7 +186,7 @@ export function PreggerReportForm() {
                           <Select onValueChange={field.onChange} defaultValue={field.value}>
                             <FormControl><SelectTrigger><SelectValue placeholder="Select Tape ID" /></SelectTrigger></FormControl>
                             <SelectContent>
-                              {tapeIds.map(id => <SelectItem key={id} value={id}>{id}</SelectItem>)}
+                              {tapeIds.map((id, idx) => <SelectItem key={`${id}-${idx}`} value={id}>{id}</SelectItem>)}
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -309,7 +316,3 @@ export function PreggerReportForm() {
     </Card>
   )
 }
-
-    
-
-    
