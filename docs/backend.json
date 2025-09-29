@@ -1,0 +1,245 @@
+{
+  "entities": {
+    "Department": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Department",
+      "type": "object",
+      "description": "Represents a department within North Sails.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the department."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the department (e.g., Pregger, Tapeheads)."
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ]
+    },
+    "Shift": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Shift",
+      "type": "object",
+      "description": "Represents a shift within a department.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the shift."
+        },
+        "departmentId": {
+          "type": "string",
+          "description": "Reference to Department. (Relationship: Department 1:N Shift)"
+        },
+        "shiftNumber": {
+          "type": "number",
+          "description": "The shift number (1, 2, or 3) for the day."
+        },
+        "startTime": {
+          "type": "string",
+          "description": "Start time of the shift.",
+          "format": "date-time"
+        },
+        "endTime": {
+          "type": "string",
+          "description": "End time of the shift.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "departmentId",
+        "shiftNumber",
+        "startTime",
+        "endTime"
+      ]
+    },
+    "Report": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Report",
+      "type": "object",
+      "description": "Represents a shift report submitted by an operator.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the report."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Report)"
+        },
+        "departmentId": {
+          "type": "string",
+          "description": "Reference to Department. (Relationship: Department 1:N Report)"
+        },
+        "shiftId": {
+          "type": "string",
+          "description": "Reference to Shift. (Relationship: Shift 1:N Report)"
+        },
+        "submissionTime": {
+          "type": "string",
+          "description": "Date and time when the report was submitted.",
+          "format": "date-time"
+        },
+        "data": {
+          "type": "string",
+          "description": "JSON string containing the report data specific to the department."
+        },
+        "status": {
+          "type": "string",
+          "description": "Status of the report (e.g., submitted, reviewed, finalized)."
+        },
+        "comments": {
+          "type": "string",
+          "description": "Comments made by the shift lead during review."
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "departmentId",
+        "shiftId",
+        "submissionTime",
+        "data",
+        "status"
+      ]
+    },
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user of the Shift Report Dashboard application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the user."
+        },
+        "email": {
+          "type": "string",
+          "description": "User's email address.",
+          "format": "email"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "User's display name."
+        },
+        "role": {
+          "type": "string",
+          "description": "User's role (e.g., operator, shift_lead, admin)."
+        },
+        "departmentId": {
+          "type": "string",
+          "description": "Reference to Department. (Relationship: Department 1:N User).  The department the user belongs to."
+        }
+      },
+      "required": [
+        "id",
+        "email",
+        "displayName",
+        "role"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/departments/{departmentId}",
+        "definition": {
+          "entityName": "Department",
+          "schema": {
+            "$ref": "#/backend/entities/Department"
+          },
+          "description": "Stores department information.  'departmentId' is used as the document ID.",
+          "params": [
+            {
+              "name": "departmentId",
+              "description": "The unique identifier of the department."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/departments/{departmentId}/shifts/{shiftId}",
+        "definition": {
+          "entityName": "Shift",
+          "schema": {
+            "$ref": "#/backend/entities/Shift"
+          },
+          "description": "Stores shift information for each department. 'shiftId' is used as the document ID.",
+          "params": [
+            {
+              "name": "departmentId",
+              "description": "The unique identifier of the department."
+            },
+            {
+              "name": "shiftId",
+              "description": "The unique identifier of the shift."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user information. 'userId' is used as the document ID.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/departments/{departmentId}/reports/{reportId}",
+        "definition": {
+          "entityName": "Report",
+          "schema": {
+            "$ref": "#/backend/entities/Report"
+          },
+          "description": "Stores reports for each department. Includes denormalized 'userId' and 'departmentId' for authorization independence. 'reportId' is used as the document ID.",
+          "params": [
+            {
+              "name": "departmentId",
+              "description": "The unique identifier of the department."
+            },
+            {
+              "name": "reportId",
+              "description": "The unique identifier of the report."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/roles_admin/{userId}",
+        "definition": {
+          "entityName": "AdminRole",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Indicates administrative privileges.  Existence of the document grants admin access. The content of the document is irrelevant.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to support the ShiftView application, focusing on shift reports across different departments. The structure prioritizes Authorization Independence to facilitate secure and atomic operations.  \n\nAuthorization Independence is achieved through denormalization.  Specifically, the `User.departmentId` and `User.role` are critical for authorization.  Since reports are associated with users, and access to reports depends on the user's role and department, these attributes are denormalized into the `Report` documents.\n\nThe structure is segregated to ensure homogeneous security postures, with reports separated by department and then by user. This separation simplifies security rules by ensuring consistent access requirements within each subcollection. Collaborative access, if needed in the future (e.g., shift leads reviewing reports), can be implemented using membership maps within the `Report` documents or by creating dedicated review collections with appropriate membership controls.  Global roles (`admin`) can be managed through dedicated collections like `/roles_admin/{uid}`.\n\nQAPs are supported through structural segregation and path-based ownership. List operations can be secured by limiting access based on user roles and department affiliations, without relying on filtering data within the rules themselves.\n\nThe chosen structure enables secure and scalable list operations and facilitates simple, robust, and easily debuggable security rules."
+  }
+}
