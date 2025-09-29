@@ -14,6 +14,8 @@ import { useAuth as useFirebaseAuth, useFirebase, useUser } from '@/firebase';
 import { getRoleFromEmail, UserRole } from '@/lib/roles';
 import { doc, setDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, User } from 'firebase/auth';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
 
 const users = {
   'superuser@ns.com': 'password',
@@ -38,13 +40,12 @@ export default function LoginPage() {
   const [email, setEmail] = useState('b2_supervisor@ns.com');
   const [password, setPassword] = useState('password');
   const [isLoading, setIsLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const assignRoleAndUserDoc = async (user: User) => {
     const role = getRoleFromEmail(user.email);
     if (role && user.uid) {
       try {
-        // This is the critical step: Create documents that the security rules can read.
-        // We write the role to two places for flexible rule creation.
         const roleDocRef = doc(firestore, 'roles_admin', user.uid);
         await setDoc(roleDocRef, { role: role });
         
@@ -72,34 +73,37 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setAuthError(null);
 
     try {
       const userCredential = await signInWithEmailAndPassword(firebaseAuth, email, password);
-      // Ensure role documents are set on every login for consistency
       await assignRoleAndUserDoc(userCredential.user); 
       toast({
         title: 'Login Successful',
         description: 'Welcome back!',
       });
-      // The layout effect will handle redirecting to the dashboard
     } catch (error: any) {
-      // If the user doesn't exist, create them
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+      if (error.code === 'auth/configuration-not-found') {
+        setAuthError('Email/Password sign-in is not enabled for this Firebase project. Please enable it in the Firebase Console under Authentication > Sign-in method.');
+      } else if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
         try {
           const userCredential = await createUserWithEmailAndPassword(firebaseAuth, email, password);
-          // This is the first time, so create their role and user documents
           await assignRoleAndUserDoc(userCredential.user);
           toast({
             title: 'Account Created & Logged In',
             description: 'Your user account has been automatically created.',
           });
         } catch (creationError: any) {
-          console.error("User creation error:", creationError);
-          toast({
-            title: 'Login Failed',
-            description: creationError.message || 'An unknown error occurred during account creation.',
-            variant: 'destructive',
-          });
+           if (creationError.code === 'auth/configuration-not-found') {
+                setAuthError('Email/Password sign-in is not enabled for this Firebase project. Please enable it in the Firebase Console under Authentication > Sign-in method.');
+           } else {
+              console.error("User creation error:", creationError);
+              toast({
+                title: 'Login Failed',
+                description: creationError.message || 'An unknown error occurred during account creation.',
+                variant: 'destructive',
+              });
+           }
         }
       } else {
         console.error("Login error:", error);
@@ -138,6 +142,13 @@ export default function LoginPage() {
         </CardHeader>
         <form onSubmit={handleLogin}>
             <CardContent className="space-y-4">
+            {authError && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Configuration Error</AlertTitle>
+                <AlertDescription>{authError}</AlertDescription>
+              </Alert>
+            )}
             <div className="space-y-2">
               <Label>Select a user to sign in as:</Label>
               <Select value={email} onValueChange={handleUserSelection}>
