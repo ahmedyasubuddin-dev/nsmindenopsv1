@@ -9,11 +9,11 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Badge } from './ui/badge';
 import { CheckCircle, Edit, ChevronsRight } from 'lucide-react';
-import { getTapeheadsSubmissions, type Report, type WorkItem } from '@/lib/data-store';
+import type { Report, WorkItem } from '@/lib/data-store';
 import { Progress } from './ui/progress';
 import { DatePicker } from './ui/date-picker';
 import { format, isSameDay } from 'date-fns';
-import { useCollection, useMemoFirebase } from '@/firebase';
+import { useCollection, useMemoFirebase, useFirestore } from '@/firebase';
 import { collection } from 'firebase/firestore';
 
 function SubmittedReportCard({ report, workItem, itemIndex }: { report: Report, workItem: WorkItem, itemIndex: number }) {
@@ -84,7 +84,7 @@ function SubmittedReportCard({ report, workItem, itemIndex }: { report: Report, 
 
 export function TapeheadsWorkDashboard() {
     const [date, setDate] = useState<Date | undefined>(new Date());
-    const { firestore } = useFirebase();
+    const firestore = useFirestore();
     
     const submissionsQuery = useMemoFirebase(() => collection(firestore, 'tapeheads_submissions'), [firestore]);
     const { data: reports, isLoading: loading } = useCollection<Report>(submissionsQuery);
@@ -146,3 +146,5 @@ export function TapeheadsWorkDashboard() {
         </div>
     )
 }
+
+    

@@ -10,13 +10,15 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { PageHeader } from '@/components/page-header';
-import { getTapeheadsSubmissions, getFilmsData, getGantryReportsData, getInspectionsData, getOeJobs, type InspectionSubmission, type OeJob, type FilmsReport, type GantryReport } from '@/lib/data-store';
+import type { InspectionSubmission, OeJob, FilmsReport, GantryReport } from '@/lib/data-store';
 import type { Report, WorkItem } from '@/lib/types';
 import { SailStatusCard } from '@/components/status/sail-status-card';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Layers } from 'lucide-react';
 import { useFirestore } from '@/firebase';
+import { useCollection, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
 
 interface FilmsInfo {
     status: 'Prepped' | 'In Progress' | 'No Entry';
@@ -25,19 +27,10 @@ interface FilmsInfo {
     notes?: string;
 }
 
-interface GantryInfo {
-    moldNumber: string;
-    stage: string;
-    issues?: string;
-    downtimeCaused?: boolean;
-    date: string;
-    images?: any[];
-}
-
 interface EnrichedWorkItem extends WorkItem {
   report: Report;
   filmsInfo: FilmsInfo;
-  gantryHistory: GantryInfo[];
+  gantryHistory: GantryReport[];
   qcInspection?: InspectionSubmission;
   totalPanelsForSection: number;
 }
@@ -46,52 +39,40 @@ export default function TapeheadsStatusPage() {
   const [selectedOe, setSelectedOe] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [sortBy, setSortBy] = useState<'date' | 'status'>('date');
-  const [tapeheadsSubmissions, setTapeheadsSubmissions] = useState<Report[]>([]);
-  const [filmsData, setFilmsData] = useState<FilmsReport[]>([]);
-  const [gantryReportsData, setGantryReportsData] = useState<GantryReport[]>([]);
-  const [inspectionsData, setInspectionsData] = useState<InspectionSubmission[]>([]);
-  const [oeJobs, setOeJobs] = useState<OeJob[]>([]);
-  const [loading, setLoading] = useState(true);
   const firestore = useFirestore();
 
-  // Initial data load
-  useEffect(() => {
-    const loadAllData = async () => {
-        setLoading(true);
-        try {
-            const [tapeheads, films, gantry, inspections, jobs] = await Promise.all([
-                getTapeheadsSubmissions(firestore),
-                getFilmsData(firestore),
-                getGantryReportsData(firestore),
-                getInspectionsData(firestore),
-                getOeJobs(firestore)
-            ]);
-            setTapeheadsSubmissions(tapeheads);
-            setFilmsData(films);
-            setGantryReportsData(gantry);
-            setInspectionsData(inspections);
-            setOeJobs(jobs);
+  const tapeheadsQuery = useMemoFirebase(() => collection(firestore, 'tapeheads_submissions'), [firestore]);
+  const { data: tapeheadsSubmissions, isLoading: tapeheadsLoading } = useCollection<Report>(tapeheadsQuery);
 
-            // Set default OE after data is loaded
-            if (tapeheads.length > 0) {
-                const mostRecentReport = [...tapeheads].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
-                const defaultOe = mostRecentReport.workItems?.[0]?.oeNumber;
-                if (defaultOe) {
-                    setSelectedOe(defaultOe);
-                    setSearchTerm(defaultOe);
-                }
-            }
-        } catch (error) {
-            console.error("Failed to load status page data:", error);
-        } finally {
-            setLoading(false);
+  const filmsQuery = useMemoFirebase(() => collection(firestore, 'films'), [firestore]);
+  const { data: filmsData, isLoading: filmsLoading } = useCollection<FilmsReport>(filmsQuery);
+
+  const gantryQuery = useMemoFirebase(() => collection(firestore, 'gantry_reports'), [firestore]);
+  const { data: gantryReportsData, isLoading: gantryLoading } = useCollection<GantryReport>(gantryQuery);
+
+  const inspectionsQuery = useMemoFirebase(() => collection(firestore, 'inspections'), [firestore]);
+  const { data: inspectionsData, isLoading: inspectionsLoading } = useCollection<InspectionSubmission>(inspectionsQuery);
+
+  const jobsQuery = useMemoFirebase(() => collection(firestore, 'jobs'), [firestore]);
+  const { data: oeJobs, isLoading: jobsLoading } = useCollection<OeJob>(jobsQuery);
+
+  const loading = tapeheadsLoading || filmsLoading || gantryLoading || inspectionsLoading || jobsLoading;
+
+
+  // Set default OE after data is loaded
+  useEffect(() => {
+    if (!loading && tapeheadsSubmissions && tapeheadsSubmissions.length > 0) {
+        const mostRecentReport = [...tapeheadsSubmissions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+        const defaultOe = mostRecentReport.workItems?.[0]?.oeNumber;
+        if (defaultOe && !selectedOe) {
+            setSelectedOe(defaultOe);
+            setSearchTerm(defaultOe);
         }
-    };
-    loadAllData();
-  }, [firestore]);
+    }
+  }, [loading, tapeheadsSubmissions, selectedOe]);
 
   const totalPanelsForOe = useMemo(() => {
-    if (!selectedOe) return 0;
+    if (!selectedOe || !oeJobs) return 0;
     const job = oeJobs.find(j => j.oeBase === selectedOe);
     if (!job) return 0;
     return job.sections.reduce((total, section) => {
@@ -100,7 +81,7 @@ export default function TapeheadsStatusPage() {
   }, [selectedOe, oeJobs]);
 
   const sailWorkItems = useMemo(() => {
-    if (!selectedOe) return [];
+    if (!selectedOe || !tapeheadsSubmissions) return [];
 
     const items: { [sailKey: string]: EnrichedWorkItem[] } = {};
 
@@ -112,8 +93,8 @@ export default function TapeheadsStatusPage() {
           
           // --- Find Films Department Info ---
           let filmsInfo: FilmsInfo = { status: 'No Entry' };
-          const finishedReport = filmsData.find(fr => fr.sails_finished.some(s => s.sail_number === sailNumber));
-          const startedReport = filmsData.find(fr => fr.sails_started.some(s => s.sail_number === sailNumber));
+          const finishedReport = (filmsData || []).find(fr => fr.sails_finished.some(s => s.sail_number === sailNumber));
+          const startedReport = (filmsData || []).find(fr => fr.sails_started.some(s => s.sail_number === sailNumber));
 
           if (finishedReport) {
               const finishedSail = finishedReport.sails_finished.find(s => s.sail_number === sailNumber);
@@ -133,18 +114,17 @@ export default function TapeheadsStatusPage() {
           // --- End of Films Logic ---
 
           // --- Find Gantry Department Info ---
-          const gantryHistory: GantryInfo[] = [];
-          gantryReportsData.forEach(gantryReport => {
+          const gantryHistory: GantryReport[] = [];
+          (gantryReportsData || []).forEach(gantryReport => {
               gantryReport.molds?.forEach(mold => {
                   mold.sails?.forEach(sail => {
                       if (sail.sail_number === sailNumber) {
                           gantryHistory.push({
-                              moldNumber: mold.mold_number,
-                              stage: sail.stage_of_process || 'N/A',
-                              issues: sail.issues,
-                              downtimeCaused: mold.downtime_caused,
-                              date: gantryReport.date,
-                              images: mold.images,
+                              ...gantryReport,
+                              molds: [{
+                                  ...mold,
+                                  sails: [sail]
+                              }]
                           });
                       }
                   });
@@ -155,11 +135,11 @@ export default function TapeheadsStatusPage() {
           // --- End of Gantry Logic ---
 
           // --- Find QC Inspection Info ---
-          const qcInspection = inspectionsData.find(qc => qc.oeNumber === sailNumber);
+          const qcInspection = (inspectionsData || []).find(qc => qc.oeNumber === sailNumber);
           // --- End of QC Logic ---
 
           // --- Get Total Panels for Section ---
-          const oeJob = oeJobs.find(job => job.oeBase === item.oeNumber);
+          const oeJob = (oeJobs || []).find(job => job.oeBase === item.oeNumber);
           const oeSection = oeJob?.sections.find(sec => sec.sectionId === item.section);
           const totalPanelsForSection = oeSection ? (oeSection.panelEnd - oeSection.panelStart + 1) : 0;
           // --- End of Total Panels Logic ---
@@ -268,3 +248,5 @@ export default function TapeheadsStatusPage() {
     </div>
   );
 }
+
+    
