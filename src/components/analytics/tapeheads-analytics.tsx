@@ -19,6 +19,7 @@ import { Target, Gauge, Clock, Zap, AlertTriangle } from "lucide-react"
 import type { Report } from "@/lib/types"
 import { getTapeheadsSubmissions } from "@/lib/data-store"
 import { Badge } from "../ui/badge"
+import { useFirestore } from "@/firebase"
 
 const downtimeReasonsConfig = {
     "Machine Jam": { label: 'Machine Jam', color: 'hsl(var(--chart-1))' },
@@ -55,13 +56,14 @@ export function TapeheadsAnalytics() {
     shift: 'all',
     operatorName: '',
   });
+  const firestore = useFirestore();
 
   React.useEffect(() => {
-    getTapeheadsSubmissions().then(data => {
+    getTapeheadsSubmissions(firestore).then(data => {
         setAllData(data);
         setLoading(false);
     });
-  }, []);
+  }, [firestore]);
 
   const handleFilterChange = (key: keyof typeof filters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));

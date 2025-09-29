@@ -24,7 +24,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '../ui/badge';
 import { Alert, AlertDescription } from '../ui/alert';
-import { useFirestore } from '@/firebase';
 
 const sectionSchema = z.object({
   sectionId: z.string().min(1, 'Sail # is required.').length(3, 'Must be 3 digits.'),
@@ -62,7 +61,6 @@ type OeTrackerFormValues = z.infer<typeof oeTrackerSchema>;
 
 export function FileProcessingTracker() {
   const { toast } = useToast();
-  const firestore = useFirestore();
   const [isReviewing, setIsReviewing] = useState(false);
   const [reviewData, setReviewData] = useState<OeTrackerFormValues | null>(null);
 
@@ -88,7 +86,7 @@ export function FileProcessingTracker() {
   const onFinalSubmit = async () => {
     if (!reviewData) return;
     
-    addOeJob({
+    await addOeJob({
       oeBase: reviewData.oeBase,
       sections: reviewData.sections.map(s => ({
         sectionId: s.sectionId,

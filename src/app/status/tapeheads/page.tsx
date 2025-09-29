@@ -10,12 +10,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { PageHeader } from '@/components/page-header';
-import { getTapeheadsSubmissions, getFilmsData, getGantryReportsData, getInspectionsData, getOeSection, getOeJobs, type InspectionSubmission, type OeJob, type FilmsReport, type GantryReport } from '@/lib/data-store';
+import { getTapeheadsSubmissions, getFilmsData, getGantryReportsData, getInspectionsData, getOeJobs, type InspectionSubmission, type OeJob, type FilmsReport, type GantryReport } from '@/lib/data-store';
 import type { Report, WorkItem } from '@/lib/types';
 import { SailStatusCard } from '@/components/status/sail-status-card';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Layers } from 'lucide-react';
+import { useFirestore } from '@/firebase';
 
 interface FilmsInfo {
     status: 'Prepped' | 'In Progress' | 'No Entry';
@@ -51,6 +52,7 @@ export default function TapeheadsStatusPage() {
   const [inspectionsData, setInspectionsData] = useState<InspectionSubmission[]>([]);
   const [oeJobs, setOeJobs] = useState<OeJob[]>([]);
   const [loading, setLoading] = useState(true);
+  const firestore = useFirestore();
 
   // Initial data load
   useEffect(() => {
@@ -58,11 +60,11 @@ export default function TapeheadsStatusPage() {
         setLoading(true);
         try {
             const [tapeheads, films, gantry, inspections, jobs] = await Promise.all([
-                getTapeheadsSubmissions(),
-                getFilmsData(),
-                getGantryReportsData(),
-                getInspectionsData(),
-                getOeJobs()
+                getTapeheadsSubmissions(firestore),
+                getFilmsData(firestore),
+                getGantryReportsData(firestore),
+                getInspectionsData(firestore),
+                getOeJobs(firestore)
             ]);
             setTapeheadsSubmissions(tapeheads);
             setFilmsData(films);
@@ -86,7 +88,7 @@ export default function TapeheadsStatusPage() {
         }
     };
     loadAllData();
-  }, []);
+  }, [firestore]);
 
   const totalPanelsForOe = useMemo(() => {
     if (!selectedOe) return 0;

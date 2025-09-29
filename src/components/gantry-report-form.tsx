@@ -257,7 +257,7 @@ export function GantryReportForm() {
                     <Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={() => removeMaintenance(index)}><Trash2 className="size-4" /></Button>
                  </div>
                  <FormField
-                    control={control}
+                    control={form.control}
                     name={`maintenance.${index}.images`}
                     render={({ field }) => (
                       <FormItem>

@@ -33,7 +33,6 @@ import { useRouter } from "next/navigation"
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group"
 import { getOeJobs, getTapeheadsSubmissions, addTapeheadsSubmission, updateTapeheadsSubmission, markPanelsAsCompleted } from "@/lib/data-store"
 import type { Report, WorkItem, OeJob } from "@/lib/data-store"
-import { useFirestore } from "@/firebase"
 
 const tapeIdsList = [
     "928108", "938108", "938108T", "928128", "938128T", "*938138*",
@@ -146,7 +145,6 @@ interface TapeheadsOperatorFormProps {
 export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsOperatorFormProps) {
   const { toast } = useToast();
   const router = useRouter();
-  const firestore = useFirestore();
   
   const isEditMode = !!reportToEdit;
 
@@ -321,10 +319,10 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
     };
     
     if (onFormSubmit) {
-      updateTapeheadsSubmission(reportData);
+      await updateTapeheadsSubmission(reportData);
       onFormSubmit(reportData);
     } else {
-      addTapeheadsSubmission(reportData);
+      await addTapeheadsSubmission(reportData);
       router.push('/report/tapeheads');
     }
 
@@ -418,7 +416,6 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
 
 function WorkItemCard({ index, remove, control, isEditMode }: { index: number, remove: (index: number) => void, control: any, isEditMode: boolean }) {
   const { toast } = useToast();
-  const firestore = useFirestore();
   const [availableOes, setAvailableOes] = useState<string[]>([]);
   const [oeJobs, setOeJobs] = useState<OeJob[]>([]);
   const [allSubmissions, setAllSubmissions] = useState<Report[]>([]);

@@ -24,7 +24,6 @@ import { Checkbox } from "./ui/checkbox"
 import { Separator } from "./ui/separator"
 import { addFilmsReport } from "@/lib/data-store"
 import { formatISO } from "date-fns"
-import { useFirestore } from "@/firebase"
 
 const sailEntrySchema = z.object({
   sail_number: z.string().min(1, "Sail# is required."),
@@ -170,7 +169,6 @@ function SailListSection({
 
 export function FilmsReportForm() {
   const { toast } = useToast();
-  const firestore = useFirestore();
   const form = useForm<FilmsReportFormValues>({
     resolver: zodResolver(filmsReportSchema),
     defaultValues,
@@ -191,7 +189,7 @@ export function FilmsReportForm() {
       // Storing personnel and downtime can be added here if needed in the future
     };
 
-    addFilmsReport(reportData);
+    await addFilmsReport(reportData);
 
     toast({
       title: "Films Report Submitted!",

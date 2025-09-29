@@ -13,6 +13,7 @@ import { getTapeheadsSubmissions, getFilmsData, getGantryReportsData, getGraphic
 import type { Report } from '@/lib/types';
 import { format } from 'date-fns';
 import { Separator } from '@/components/ui/separator';
+import { useFirestore } from '@/firebase';
 
 const bottleneckChartConfig = {
   count: {
@@ -38,16 +39,17 @@ export default function DashboardPage() {
     const [graphicsTasksData, setGraphicsTasksData] = useState<GraphicsTask[]>([]);
     const [inspectionsData, setInspectionsData] = useState<InspectionSubmission[]>([]);
     const [loading, setLoading] = useState(true);
+    const firestore = useFirestore();
 
     useEffect(() => {
         setIsClient(true);
         const loadData = async () => {
             try {
-                setTapeheadsSubmissions(await getTapeheadsSubmissions());
-                setFilmsData(await getFilmsData());
-                setGantryReportsData(await getGantryReportsData());
-                setGraphicsTasksData(await getGraphicsTasks());
-                setInspectionsData(await getInspectionsData());
+                setTapeheadsSubmissions(await getTapeheadsSubmissions(firestore));
+                setFilmsData(await getFilmsData(firestore));
+                setGantryReportsData(await getGantryReportsData(firestore));
+                setGraphicsTasksData(await getGraphicsTasks(firestore));
+                setInspectionsData(await getInspectionsData(firestore));
             } catch (error) {
                 console.error("Failed to load dashboard data", error);
             } finally {
@@ -55,7 +57,7 @@ export default function DashboardPage() {
             }
         };
         loadData();
-    }, []);
+    }, [firestore]);
 
     const dashboardData = useMemo(() => {
         // --- KPIs ---

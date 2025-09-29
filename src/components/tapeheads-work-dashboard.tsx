@@ -13,7 +13,7 @@ import { getTapeheadsSubmissions, type Report, type WorkItem } from '@/lib/data-
 import { Progress } from './ui/progress';
 import { DatePicker } from './ui/date-picker';
 import { format, isSameDay } from 'date-fns';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useCollection, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
 
 function SubmittedReportCard({ report, workItem, itemIndex }: { report: Report, workItem: WorkItem, itemIndex: number }) {
@@ -84,7 +84,7 @@ function SubmittedReportCard({ report, workItem, itemIndex }: { report: Report, 
 
 export function TapeheadsWorkDashboard() {
     const [date, setDate] = useState<Date | undefined>(new Date());
-    const firestore = useFirestore();
+    const { firestore } = useFirebase();
     
     const submissionsQuery = useMemoFirebase(() => collection(firestore, 'tapeheads_submissions'), [firestore]);
     const { data: reports, isLoading: loading } = useCollection<Report>(submissionsQuery);

@@ -17,8 +17,12 @@ import {
     updateDoc,
     where
 } from 'firebase/firestore';
-import { addDocumentNonBlocking, deleteDocumentNonBlocking, setDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
-import { useFirestore } from '@/firebase';
+import { getSdks, initializeFirebase } from '@/firebase';
+
+// Since this file is marked with 'use server', we can initialize Firebase services here.
+// This instance will be used for all server-side data operations.
+const { firestore } = initializeFirebase();
+
 
 //_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 //
@@ -144,7 +148,6 @@ export interface InspectionSubmission {
 }
 
 export async function addOeJob(job: { oeBase: string, sections: Array<{ sectionId: string, panelStart: number, panelEnd: number }> }): Promise<void> {
-    const firestore = useFirestore();
     const newJob = {
         oeBase: job.oeBase,
         status: 'pending',
@@ -156,7 +159,6 @@ export async function addOeJob(job: { oeBase: string, sections: Array<{ sectionI
 
 
 export async function addFilmsReport(report: Omit<FilmsReport, 'id'>): Promise<void> {
-    const firestore = useFirestore();
     const newReport = {
         id: `film_rpt_${Date.now()}`,
         ...report,
@@ -166,7 +168,6 @@ export async function addFilmsReport(report: Omit<FilmsReport, 'id'>): Promise<v
 }
 
 export async function setGraphicsTasks(tasks: GraphicsTask[]): Promise<void> {
-    const firestore = useFirestore();
     // This is inefficient for individual updates, but fine for a full replacement.
     // In a real app, you'd update individual task documents.
     for (const task of tasks) {
@@ -177,7 +178,6 @@ export async function setGraphicsTasks(tasks: GraphicsTask[]): Promise<void> {
 
 
 export async function markPanelsAsCompleted(oeBase: string, sectionId: string, panels: string[]): Promise<void> {
-    const firestore = useFirestore();
     const jobsQuery = query(collection(firestore, 'jobs'), where('oeBase', '==', oeBase));
     const querySnapshot = await getDocs(jobsQuery);
 
@@ -216,19 +216,16 @@ export async function markPanelsAsCompleted(oeBase: string, sectionId: string, p
 }
 
 export async function addTapeheadsSubmission(report: Report): Promise<void> {
-    const firestore = useFirestore();
     const submissionRef = doc(firestore, 'tapeheads_submissions', report.id);
     await setDoc(submissionRef, report, {});
 }
 
 export async function updateTapeheadsSubmission(updatedReport: Report): Promise<void> {
-    const firestore = useFirestore();
     const submissionRef = doc(firestore, 'tapeheads_submissions', updatedReport.id);
     await updateDoc(submissionRef, { ...updatedReport });
 }
 
 export async function deleteTapeheadsSubmission(id: string): Promise<void> {
-    const firestore = useFirestore();
     const submissionRef = doc(firestore, 'tapeheads_submissions', id);
     await deleteDoc(submissionRef);
 }
@@ -237,7 +234,6 @@ export async function deleteTapeheadsSubmission(id: string): Promise<void> {
 // In a real app with server-side rendering, you might fetch this data in Server Components.
 
 export async function getOeJobs(): Promise<OeJob[]> {
-    const firestore = useFirestore();
     const snapshot = await getDocs(collection(firestore, 'jobs'));
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as OeJob));
 }
@@ -249,37 +245,31 @@ export async function getOeSection(oeBase: string, sectionId: string): Promise<O
 }
 
 export async function getTapeheadsSubmissions(): Promise<Report[]> {
-    const firestore = useFirestore();
     const snapshot = await getDocs(collection(firestore, 'tapeheads_submissions'));
     return snapshot.docs.map(doc => doc.data() as Report);
 }
 
 export async function getFilmsData(): Promise<FilmsReport[]> {
-    const firestore = useFirestore();
     const snapshot = await getDocs(collection(firestore, 'films'));
     return snapshot.docs.map(doc => doc.data() as FilmsReport);
 }
 
 export async function getGantryReportsData(): Promise<GantryReport[]> {
-    const firestore = useFirestore();
     const snapshot = await getDocs(collection(firestore, 'gantry_reports'));
     return snapshot.docs.map(doc => doc.data() as GantryReport);
 }
 
 export async function getGraphicsTasks(): Promise<GraphicsTask[]> {
-    const firestore = useFirestore();
     const snapshot = await getDocs(collection(firestore, 'graphics_tasks'));
     return snapshot.docs.map(doc => doc.data() as GraphicsTask);
 }
 
 export async function getInspectionsData(): Promise<InspectionSubmission[]> {
-    const firestore = useFirestore();
     const snapshot = await getDocs(collection(firestore, 'inspections'));
     return snapshot.docs.map(doc => doc.data() as InspectionSubmission);
 }
 
 export async function getPreggerReportsData(): Promise<PreggerReport[]> {
-    const firestore = useFirestore();
     const snapshot = await getDocs(collection(firestore, 'pregger_reports'));
     return snapshot.docs.map(doc => doc.data() as PreggerReport);
 }
