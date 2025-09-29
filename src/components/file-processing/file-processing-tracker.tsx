@@ -88,7 +88,7 @@ export function FileProcessingTracker() {
   const onFinalSubmit = async () => {
     if (!reviewData) return;
     
-    addOeJob(firestore, {
+    addOeJob({
       oeBase: reviewData.oeBase,
       sections: reviewData.sections.map(s => ({
         sectionId: s.sectionId,

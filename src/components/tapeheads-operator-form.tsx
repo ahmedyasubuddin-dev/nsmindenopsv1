@@ -279,7 +279,7 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
     // Logic to update panel statuses
     for (const item of values.workItems) {
         if (item.endOfShiftStatus === 'Completed') {
-            await markPanelsAsCompleted(firestore, item.oeNumber, item.section, item.panelsWorkedOn);
+            await markPanelsAsCompleted(item.oeNumber, item.section, item.panelsWorkedOn);
         }
     }
 
@@ -321,10 +321,10 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
     };
     
     if (onFormSubmit) {
-      updateTapeheadsSubmission(firestore, reportData);
+      updateTapeheadsSubmission(reportData);
       onFormSubmit(reportData);
     } else {
-      addTapeheadsSubmission(firestore, reportData);
+      addTapeheadsSubmission(reportData);
       router.push('/report/tapeheads');
     }
 
@@ -435,8 +435,8 @@ function WorkItemCard({ index, remove, control, isEditMode }: { index: number, r
   const { fields: nestedPanelFields, append: appendNestedPanel, remove: removeNestedPanel } = useFieldArray({ control: control, name: `workItems.${index}.nestedPanels` });
 
   useEffect(() => {
-    getTapeheadsSubmissions(firestore).then(setAllSubmissions);
-  }, [firestore]);
+    getTapeheadsSubmissions().then(setAllSubmissions);
+  }, []);
 
   useEffect(() => {
     if (!watchOeNumber || !watchSection || !watchPanelsWorkedOn || watchPanelsWorkedOn.length === 0 || isEditMode) {
@@ -465,7 +465,7 @@ function WorkItemCard({ index, remove, control, isEditMode }: { index: number, r
   }, [watchOeNumber, watchSection, watchPanelsWorkedOn, toast, isEditMode, allSubmissions]);
 
   const handleOeDropdownOpen = async () => {
-    const jobs = await getOeJobs(firestore);
+    const jobs = await getOeJobs();
     setOeJobs(jobs);
     setAvailableOes([...new Set(jobs.map(j => j.oeBase))]);
   };
@@ -565,7 +565,3 @@ function WorkItemCard({ index, remove, control, isEditMode }: { index: number, r
     </Card>
   );
 }
-
-    
-
-    

@@ -4,6 +4,7 @@
 import { createContext, useContext } from 'react';
 import type { ReactNode } from 'react';
 import type { UserRole } from '@/lib/roles';
+import { useFirestore } from '@/firebase';
 
 interface AuthContextType {
   isAuthenticated: boolean;

@@ -191,7 +191,7 @@ export function FilmsReportForm() {
       // Storing personnel and downtime can be added here if needed in the future
     };
 
-    addFilmsReport(firestore, reportData);
+    addFilmsReport(reportData);
 
     toast({
       title: "Films Report Submitted!",
