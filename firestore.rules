@@ -1,77 +1,78 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper Functions to get user roles and check permissions
-    function getUserRole() {
-      return get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.role;
-    }
-
+    // Helper functions to check user roles
     function isSuperuser() {
-      return getUserRole() == 'Superuser';
+      return get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.role == 'Superuser';
     }
     
-    function isB2Supervisor() {
-        return getUserRole() == 'B2 Supervisor';
-    }
-
-    function isB1Supervisor() {
-        return getUserRole() == 'B1 Supervisor';
-    }
-    
-    function isQualityManager() {
-        return getUserRole() == 'Quality Manager';
-    }
-
     function isManagement() {
-        return getUserRole() == 'Management';
+      return get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.role in ['Superuser', 'Management', 'B1 Supervisor', 'B2 Supervisor', 'Quality Manager'];
     }
 
-    function isTapeheadLead() {
-        return getUserRole() == 'Tapehead Lead';
+    function canViewAnalytics() {
+       return get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.role in ['Superuser', 'Management', 'B1 Supervisor', 'B2 Supervisor', 'Quality Manager'];
     }
 
-    // Rules for each collection
-    match /jobs/{jobId} {
-      allow read, write: if isSuperuser() || isManagement() || isB1Supervisor() || isB2Supervisor() || isQualityManager();
-    }
-    
-    match /inspections/{inspectionId} {
-        allow read, write: if isSuperuser() || isQualityManager();
+    function canViewStatus() {
+        return request.auth != null; // Any authenticated user can view status
     }
 
-    match /tapeheads-submissions/{reportId} {
-      allow read, write: if isSuperuser() || isB2Supervisor() || isTapeheadLead() || request.auth.uid == resource.data.userId;
-    }
-
-    match /gantry-reports/{reportId} {
-        allow read, write: if isSuperuser() || isB1Supervisor() || getUserRole() == 'Gantry Lead' || request.auth.uid == resource.data.userId;
-    }
-
-    match /pregger-reports/{reportId} {
-        allow read, write: if isSuperuser() || isB2Supervisor() || getUserRole() == 'Pregger Lead' || request.auth.uid == resource.data.userId;
-    }
-
-    match /films/{reportId} {
-        allow read, write: if isSuperuser() || isB1Supervisor() || getUserRole() == 'Films Lead' || request.auth.uid == resource.data.userId;
-    }
-
-    match /graphics-tasks/{taskId} {
-        allow read, write: if isSuperuser() || isB1Supervisor() || getUserRole() == 'Graphics Lead' || request.auth.uid == resource.data.userId;
-    }
-    
-    // Default-allow for any authenticated user for collections that all roles can access or write to.
-    match /{path=**} {
-      allow read, write: if request.auth != null;
-    }
-
-    // Secure the roles_admin collection: only Superusers can modify roles
+    // Rules for the roles_admin collection
     match /roles_admin/{userId} {
       allow read: if request.auth != null;
+      // Only Superusers can create, update, or delete roles.
       allow write: if isSuperuser();
+    }
+
+    // Rules for jobs collection
+    match /jobs/{jobId} {
+      allow read: if request.auth != null;
+      // Allow Superusers or users with file-processing permissions to create/update jobs
+      allow write: if get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.role in ['Superuser'];
+    }
+
+    // Rules for Tapeheads Submissions
+    match /tapeheads-submissions/{reportId} {
+        allow read: if get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.role in ['Superuser', 'B2 Supervisor', 'Tapehead Lead', 'Management', 'Quality Manager'];
+        allow write: if get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.role in ['Superuser', 'B2 Supervisor', 'Tapehead Operator', 'Tapehead Lead'];
+    }
+    
+    // Rules for Gantry Reports
+    match /gantry-reports/{reportId} {
+        allow read: if get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.role in ['Superuser', 'B1 Supervisor', 'Gantry Lead', 'Management', 'Quality Manager'];
+        allow write: if get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.role in ['Superuser', 'B1 Supervisor', 'Gantry Lead'];
+    }
+
+    // Rules for Films Reports
+    match /films/{reportId} {
+        allow read: if get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.role in ['Superuser', 'B1 Supervisor', 'Films Lead', 'Management', 'Quality Manager'];
+        allow write: if get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.role in ['Superuser', 'B1 Supervisor', 'Films Lead'];
+    }
+
+    // Rules for Graphics Tasks
+    match /graphics-tasks/{taskId} {
+        allow read: if get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.role in ['Superuser', 'B1 Supervisor', 'Graphics Lead', 'Management', 'Quality Manager'];
+        allow write: if get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.role in ['Superuser', 'B1 Supervisor', 'Graphics Lead'];
+    }
+
+    // Rules for Pregger Reports
+    match /pregger-reports/{reportId} {
+         allow read: if get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.role in ['Superuser', 'B2 Supervisor', 'Pregger Lead', 'Management', 'Quality Manager'];
+         allow write: if get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.role in ['Superuser', 'B2 Supervisor', 'Pregger Lead'];
+    }
+    
+    // Rules for QC Inspections
+    match /inspections/{inspectionId} {
+         allow read, write: if get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.role in ['Superuser', 'Quality Manager'];
+    }
+
+    // Fallback rule for any other collection
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
-
-    

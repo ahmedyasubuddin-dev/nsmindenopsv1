@@ -10,8 +10,10 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Logo } from '@/components/icons';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useAuth as useFirebaseAuth, useUser } from '@/firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { useAuth as useFirebaseAuth, useFirebase, useUser } from '@/firebase';
+import { getRoleFromEmail, UserRole } from '@/lib/roles';
+import { doc, setDoc } from 'firebase/firestore';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, User } from 'firebase/auth';
 
 const users = {
   'superuser@ns.com': 'password',
@@ -35,26 +37,46 @@ export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
   const firebaseAuth = useFirebaseAuth();
+  const { firestore } = useFirebase();
   const { user, isUserLoading } = useUser();
   const [email, setEmail] = useState('b2_supervisor@ns.com');
   const [password, setPassword] = useState('password');
   const [isLoading, setIsLoading] = useState(false);
+
+  const assignRoleToUser = async (user: User) => {
+    const role = getRoleFromEmail(user.email);
+    if (role && user.uid) {
+      try {
+        const roleDocRef = doc(firestore, 'roles_admin', user.uid);
+        await setDoc(roleDocRef, { role: role });
+        console.log(`Role '${role}' assigned to user ${user.uid}`);
+      } catch (error) {
+        console.error("Error assigning role:", error);
+        toast({
+          title: 'Role Assignment Failed',
+          description: 'Could not set the user role in the database.',
+          variant: 'destructive',
+        });
+      }
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      await signInWithEmailAndPassword(firebaseAuth, email, password);
+      const userCredential = await signInWithEmailAndPassword(firebaseAuth, email, password);
+      await assignRoleToUser(userCredential.user);
       toast({
         title: 'Login Successful',
         description: 'Welcome back!',
       });
     } catch (error: any) {
-        // If user not found, create the user and sign in
         if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
              try {
-                await createUserWithEmailAndPassword(firebaseAuth, email, password);
+                const userCredential = await createUserWithEmailAndPassword(firebaseAuth, email, password);
+                await assignRoleToUser(userCredential.user);
                 toast({
                     title: 'Account Created',
                     description: 'Your user account has been created and you are now signed in.',
@@ -81,7 +103,6 @@ export default function LoginPage() {
   };
   
   if (isUserLoading || user) {
-    // Prevent login page from flashing if user is already authenticated and redirecting
     return <div className="flex h-screen items-center justify-center">Loading...</div>;
   }
 
