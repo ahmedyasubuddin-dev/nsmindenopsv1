@@ -13,7 +13,7 @@ import { type FilmsReport, type GantryReport, type GraphicsTask, type Inspection
 import type { Report } from '@/lib/types';
 import { format } from 'date-fns';
 import { Separator } from '@/components/ui/separator';
-import { useCollection, useFirebase, useMemoFirebase, useAuth as useFirebaseAuth } from '@/firebase';
+import { useCollection, useFirebase, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
 
 const bottleneckChartConfig = {
@@ -34,7 +34,7 @@ type ActivityItem = {
 
 export default function DashboardPage() {
     const { firestore } = useFirebase();
-    const { isUserLoading } = useFirebaseAuth();
+    const { isUserLoading } = useUser();
     const [isClient, setIsClient] = useState(false);
 
     const tapeheadsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'tapeheads-submissions')), [firestore, isUserLoading]);
@@ -52,7 +52,7 @@ export default function DashboardPage() {
     const inspectionsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'inspections')), [firestore, isUserLoading]);
     const { data: inspectionsData, isLoading: isLoadingInspections } = useCollection<InspectionSubmission>(inspectionsQuery);
 
-    const loading = isLoadingTapeheads || isLoadingFilms || isLoadingGantry || isLoadingGraphics || isLoadingInspections;
+    const loading = isLoadingTapeheads || isLoadingFilms || isLoadingGantry || isLoadingGraphics || isLoadingInspections || isUserLoading;
 
     useEffect(() => {
         setIsClient(true);
@@ -268,5 +268,3 @@ export default function DashboardPage() {
     </div>
   )
 }
-
-    

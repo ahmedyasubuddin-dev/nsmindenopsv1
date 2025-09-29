@@ -8,9 +8,10 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/use-auth';
 import { Logo } from '@/components/icons';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useAuth as useFirebaseAuth, useUser } from '@/firebase';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 
 const users = {
   'superuser@ns.com': 'password',
@@ -33,7 +34,8 @@ const users = {
 export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { login, isAuthenticated } = useAuth();
+  const firebaseAuth = useFirebaseAuth();
+  const { user, isUserLoading } = useUser();
   const [email, setEmail] = useState('b2_supervisor@ns.com');
   const [password, setPassword] = useState('password');
   const [isLoading, setIsLoading] = useState(false);
@@ -43,27 +45,17 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      if (users[email as keyof typeof users] && users[email as keyof typeof users] === password) {
-        login(email);
-        toast({
-          title: 'Login Successful',
-          description: 'Welcome back!',
-        });
-        // The redirect is now handled by the layout effect
-      } else {
-        toast({
-          title: 'Invalid Credentials',
-          description: 'Please check your email and password.',
-          variant: 'destructive',
-        });
-      }
-    } catch (error) {
+      await signInWithEmailAndPassword(firebaseAuth, email, password);
       toast({
-        title: 'An Error Occurred',
-        description: 'Could not process your login request.',
+        title: 'Login Successful',
+        description: 'Welcome back!',
+      });
+      // The redirect is now handled by the layout effect
+    } catch (error) {
+      console.error(error);
+      toast({
+        title: 'Invalid Credentials',
+        description: 'Please check your email and password.',
         variant: 'destructive',
       });
     } finally {
@@ -71,7 +63,7 @@ export default function LoginPage() {
     }
   };
   
-  if (isAuthenticated) {
+  if (isUserLoading || user) {
     // Prevent login page from flashing if user is already authenticated and redirecting
     return <div className="flex h-screen items-center justify-center">Loading...</div>;
   }

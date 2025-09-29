@@ -18,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Target, Gauge, Clock, Zap, AlertTriangle } from "lucide-react"
 import type { Report } from "@/lib/types"
 import { Badge } from "../ui/badge"
-import { useCollection, useFirebase, useMemoFirebase, useAuth as useFirebaseAuth } from "@/firebase"
+import { useCollection, useFirebase, useMemoFirebase, useUser } from "@/firebase"
 import { collection, query } from "firebase/firestore"
 
 const downtimeReasonsConfig = {
@@ -51,7 +51,7 @@ const calculateHours = (startTimeStr?: string, endTimeStr?: string): number => {
 
 export function TapeheadsAnalytics() {
   const { firestore } = useFirebase();
-  const { isUserLoading } = useFirebaseAuth();
+  const { isUserLoading } = useUser();
   const [filters, setFilters] = React.useState({
     shift: 'all',
     operatorName: '',
@@ -74,6 +74,7 @@ export function TapeheadsAnalytics() {
   }, [allData, filters]);
   
   const kpiData = React.useMemo(() => {
+    if (!data) return { totalMeters: '0', averageMpmh: '0 m/hr', totalDowntime: '0 min', totalSpinOuts: 0 };
     const totalMeters = data.reduce((acc, report) => acc + (report.total_meters || 0), 0);
     const totalHours = data.reduce((acc, report) => acc + calculateHours(report.shiftStartTime, report.shiftEndTime), 0);
     const totalDowntime = data.reduce((acc, report) => {
@@ -93,6 +94,7 @@ export function TapeheadsAnalytics() {
   }, [data]);
   
   const productionByDay = React.useMemo(() => {
+    if (!data) return [];
     const dailyData: { [key: string]: { date: string, meters: number } } = {};
     data.forEach(report => {
       const date = new Date(report.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -105,6 +107,7 @@ export function TapeheadsAnalytics() {
   }, [data]);
 
   const downtimeByReason = React.useMemo(() => {
+    if (!data) return [];
     const reasonData: { [key: string]: number } = { "Machine Jam": 0, "Material Shortage": 0, "Spin Out": 0, "Other": 0 };
     data.forEach(report => {
         (report.workItems || []).forEach(item => {
@@ -121,6 +124,7 @@ export function TapeheadsAnalytics() {
   }, [data]);
 
    const mpmhByShift = React.useMemo(() => {
+    if (!data) return [];
     const shiftData: { [key: string]: { totalMeters: number, totalHours: number } } = { '1': { totalMeters: 0, totalHours: 0 }, '2': { totalMeters: 0, totalHours: 0 }, '3': { totalMeters: 0, totalHours: 0 } };
     data.forEach(report => {
         const shiftKey = String(report.shift);
@@ -136,6 +140,7 @@ export function TapeheadsAnalytics() {
   }, [data]);
 
   const thPerformance = React.useMemo(() => {
+    if (!data) return [];
     const thData: { [key: string]: { totalHours: number, totalMeters: number, spinOuts: number, operators: Set<string> } } = {};
     
     data.forEach(report => {
@@ -160,10 +165,11 @@ export function TapeheadsAnalytics() {
   }, [data]);
   
     const allIssues = React.useMemo(() => {
+        if (!data) return [];
         return data.flatMap(report => (report.workItems || []).flatMap(item => (item.issues || []).map(issue => ({...issue, report, item}))));
     }, [data]);
 
-  if (loading) {
+  if (loading || isUserLoading) {
     return <p>Loading analytics...</p>;
   }
 
@@ -300,5 +306,3 @@ export function TapeheadsAnalytics() {
     </div>
   )
 }
-
-    

@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import * as React from "react";
@@ -62,8 +61,9 @@ import {
 import { Logo } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import { useAppTitle } from "./app-title-context";
-import { useAuth } from "@/hooks/use-auth";
-import { hasPermission } from "@/lib/roles";
+import { hasPermission, getRoleFromEmail, UserRole } from "@/lib/roles";
+import { useAuth, useUser } from "@/firebase";
+import { signOut } from "firebase/auth";
 
 const departments = [
   { name: 'Pregger', href: '/report/pregger', icon: Building2, permission: 'nav:report:pregger' },
@@ -106,8 +106,15 @@ function useTheme() {
 
 
 function UserNav() {
-  const { user, logout } = useAuth();
+  const { user } = useUser();
+  const firebaseAuth = useAuth();
   const { setTheme } = useTheme();
+
+  const handleLogout = async () => {
+      await signOut(firebaseAuth);
+  };
+  
+  const role = getRoleFromEmail(user?.email || null);
   
   return (
     <DropdownMenu>
@@ -122,9 +129,9 @@ function UserNav() {
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{user.role || 'User'}</p>
+            <p className="text-sm font-medium leading-none">{role || 'User'}</p>
             <p className="text-xs leading-none text-muted-foreground">
-              {user.email}
+              {user?.email}
             </p>
           </div>
         </DropdownMenuLabel>
@@ -150,7 +157,7 @@ function UserNav() {
           </DropdownMenuPortal>
         </DropdownMenuSub>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={logout}>
+        <DropdownMenuItem onClick={handleLogout}>
             <LogOut className="mr-2 h-4 w-4" />
             Log out
         </DropdownMenuItem>
@@ -162,8 +169,8 @@ function UserNav() {
 function MainSidebar() {
   const pathname = usePathname();
   const { title } = useAppTitle();
-  const { user } = useAuth();
-  const { role } = user;
+  const { user } = useUser();
+  const role = getRoleFromEmail(user?.email || null);
 
   const [isReportsOpen, setReportsOpen] = React.useState(pathname.startsWith('/report'));
   const [isLeadFuncsOpen, setLeadFuncsOpen] = React.useState(
@@ -265,8 +272,8 @@ function MainSidebar() {
             <AvatarFallback>SL</AvatarFallback>
           </Avatar>
           <div className="flex flex-col">
-            <span className="text-sm font-medium text-sidebar-foreground">{user.role || 'User'}</span>
-            <span className="text-xs text-muted-foreground">{user.email}</span>
+            <span className="text-sm font-medium text-sidebar-foreground">{role || 'User'}</span>
+            <span className="text-xs text-muted-foreground">{user?.email}</span>
           </div>
         </div>
       </SidebarFooter>

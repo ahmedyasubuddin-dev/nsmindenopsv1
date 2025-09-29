@@ -141,10 +141,12 @@ export async function getOeJobs(firestore: Firestore): Promise<OeJob[]> {
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as OeJob));
 }
 
-export async function addGraphicsTask(firestore: Firestore, task: GraphicsTask): Promise<void> {
-    const docRef = doc(firestore, 'graphics-tasks', task.id);
-    await setDocumentNonBlocking(docRef, task, { merge: true });
+export async function addGraphicsTask(firestore: Firestore, task: Omit<GraphicsTask, 'id'>): Promise<string> {
+    const newDocRef = doc(collection(firestore, 'graphics-tasks'));
+    await setDocumentNonBlocking(newDocRef, { ...task, id: newDocRef.id });
+    return newDocRef.id;
 }
+
 
 export async function updateGraphicsTask(firestore: Firestore, task: GraphicsTask): Promise<void> {
     const docRef = doc(firestore, 'graphics-tasks', task.id);
@@ -262,5 +264,5 @@ export async function updateTapeheadsSubmission(firestore: Firestore, updatedRep
 
 export async function deleteTapeheadsSubmission(firestore: Firestore, id: string): Promise<void> {
     const docRef = doc(firestore, 'tapeheads-submissions', id);
-    deleteDocumentNonBlocking(docRef);
+    await deleteDocumentNonBlocking(docRef);
 }

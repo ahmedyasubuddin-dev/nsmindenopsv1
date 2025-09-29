@@ -13,7 +13,7 @@ import type { Report, WorkItem } from '@/lib/data-store';
 import { Progress } from './ui/progress';
 import { DatePicker } from './ui/date-picker';
 import { format, isSameDay } from 'date-fns';
-import { useCollection, useFirebase, useMemoFirebase, useAuth as useFirebaseAuth } from '@/firebase';
+import { useCollection, useFirebase, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
 
 function SubmittedReportCard({ report, workItem, itemIndex }: { report: Report, workItem: WorkItem, itemIndex: number }) {
@@ -84,7 +84,7 @@ function SubmittedReportCard({ report, workItem, itemIndex }: { report: Report, 
 
 export function TapeheadsWorkDashboard() {
     const { firestore } = useFirebase();
-    const { isUserLoading } = useFirebaseAuth();
+    const { isUserLoading } = useUser();
     const [date, setDate] = useState<Date | undefined>(new Date());
 
     const reportsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'tapeheads-submissions')), [firestore, isUserLoading]);
@@ -107,7 +107,7 @@ export function TapeheadsWorkDashboard() {
         });
     }, [date, reports]);
     
-    if (loading) {
+    if (loading || isUserLoading) {
         return <div>Loading dashboard...</div>;
     }
 
@@ -147,5 +147,3 @@ export function TapeheadsWorkDashboard() {
         </div>
     )
 }
-
-    

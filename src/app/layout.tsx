@@ -7,69 +7,31 @@ import { Toaster } from "@/components/ui/toaster"
 import { AppTitleProvider } from '@/components/app-title-context';
 import { usePathname, useRouter } from 'next/navigation';
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import Cookies from 'js-cookie';
-import { AuthContext, useAuth } from '@/hooks/use-auth';
 import type { UserRole } from '@/lib/roles';
 import { getRoleFromEmail } from '@/lib/roles';
-import { FirebaseClientProvider } from '@/firebase';
+import { FirebaseClientProvider, useUser } from '@/firebase';
 
 const APP_TITLE = 'SRD: Minden Operations';
 
-function AuthProvider({ children }: { children: ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [user, setUser] = useState<{ email: string | null; role: UserRole | null }>({ email: null, role: null });
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const userCookie = Cookies.get('auth_user');
-    if (userCookie) {
-      const role = getRoleFromEmail(userCookie);
-      setIsAuthenticated(true);
-      setUser({ email: userCookie, role });
-    } else {
-      setIsAuthenticated(false);
-      setUser({ email: null, role: null });
-    }
-    setIsLoading(false);
-  }, []);
-
-  const login = (email: string) => {
-    const role = getRoleFromEmail(email);
-    Cookies.set('auth_user', email, { expires: 7 });
-    setIsAuthenticated(true);
-    setUser({ email, role });
-  };
-
-  const logout = () => {
-    Cookies.remove('auth_user');
-    setIsAuthenticated(false);
-    setUser({ email: null, role: null });
-  };
-
-  return (
-    <AuthContext.Provider value={{ isAuthenticated, user, isLoading, login, logout }}>
-      {children}
-    </AuthContext.Provider>
-  );
-};
-
-
 function AppContent({ children }: { children: ReactNode }) {
-  const {isAuthenticated, isLoading} = useAuth();
+  const { user, isUserLoading } = useUser();
   const router = useRouter();
   const pathname = usePathname();
   
   useEffect(() => {
-    if (!isLoading) {
+    if (!isUserLoading) {
+      const isAuthenticated = !!user;
       if (isAuthenticated && pathname === '/login') {
          router.push('/dashboard');
       } else if (!isAuthenticated && pathname !== '/login') {
         router.push('/login');
       }
     }
-  }, [isAuthenticated, isLoading, pathname, router]);
+  }, [user, isUserLoading, pathname, router]);
   
-  if (isLoading || (!isAuthenticated && pathname !== '/login') || (isAuthenticated && pathname === '/login')) {
+  const isAuthenticated = !!user;
+
+  if (isUserLoading || (!isAuthenticated && pathname !== '/login') || (isAuthenticated && pathname === '/login')) {
     return <div className="flex h-screen items-center justify-center">Loading...</div>;
   }
 
@@ -100,13 +62,11 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased">
         <FirebaseClientProvider>
-          <AuthProvider>
-              <AppTitleProvider title={APP_TITLE}>
-                  <AppContent>
-                    {children}
-                  </AppContent>
-              </AppTitleProvider>
-            </AuthProvider>
+          <AppTitleProvider title={APP_TITLE}>
+              <AppContent>
+                {children}
+              </AppContent>
+          </AppTitleProvider>
         </FirebaseClientProvider>
         <Toaster />
       </body>

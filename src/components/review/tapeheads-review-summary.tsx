@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -21,7 +20,7 @@ import { Edit, Trash2 } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 import { TapeheadsOperatorForm } from '../tapeheads-operator-form';
-import { useCollection, useFirebase, useMemoFirebase, useAuth as useFirebaseAuth } from '@/firebase';
+import { useCollection, useFirebase, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
 
 const reviewSchema = z.object({
@@ -93,7 +92,7 @@ function OperatorSubmissionCard({ report, onDelete, onEdit }: { report: Report, 
 export function TapeheadsReviewSummary() {
   const { toast } = useToast();
   const { firestore } = useFirebase();
-  const { isUserLoading } = useFirebaseAuth();
+  const { isUserLoading } = useUser();
   const [isLoading, setIsLoading] = useState(false);
   const [aiSummary, setAiSummary] = useState('');
   const [isEditDialogOpen, setEditDialogOpen] = useState(false);
@@ -245,7 +244,7 @@ export function TapeheadsReviewSummary() {
             </CardContent>
           </Card>
 
-          {isLoadingSubmissions ? (<p>Loading submissions...</p>) : submissions && submissions.length > 0 && summaryStats && (
+          {isLoadingSubmissions || isUserLoading ? (<p>Loading submissions...</p>) : submissions && submissions.length > 0 && summaryStats ? (
             <div className="space-y-6">
                  <Card>
                     <CardHeader>
@@ -309,11 +308,15 @@ export function TapeheadsReviewSummary() {
                     </CardFooter>
                 </Card>
             </div>
+          ) : (
+            <Card>
+              <CardContent className="p-6 text-center text-muted-foreground">
+                { !isLoadingSubmissions && !isUserLoading && <p>No submissions found for this date and shift.</p> }
+              </CardContent>
+            </Card>
           )}
         </form>
       </Form>
     </div>
   );
 }
-
-    

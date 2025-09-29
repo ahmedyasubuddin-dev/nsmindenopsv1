@@ -16,7 +16,7 @@ import { SailStatusCard } from '@/components/status/sail-status-card';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Layers } from 'lucide-react';
-import { useCollection, useFirebase, useMemoFirebase, useAuth as useFirebaseAuth } from '@/firebase';
+import { useCollection, useFirebase, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
 
 interface FilmsInfo {
@@ -45,7 +45,7 @@ interface EnrichedWorkItem extends WorkItem {
 
 export default function TapeheadsStatusPage() {
   const { firestore } = useFirebase();
-  const { isUserLoading } = useFirebaseAuth();
+  const { isUserLoading } = useUser();
   const [selectedOe, setSelectedOe] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [sortBy, setSortBy] = useState<'date' | 'status'>('date');
@@ -65,7 +65,7 @@ export default function TapeheadsStatusPage() {
   const jobsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'jobs')), [firestore, isUserLoading]);
   const { data: oeJobs, isLoading: isLoadingJobs } = useCollection<OeJob>(jobsQuery);
   
-  const loading = isLoadingTapeheads || isLoadingFilms || isLoadingGantry || isLoadingInspections || isLoadingJobs;
+  const loading = isLoadingTapeheads || isLoadingFilms || isLoadingGantry || isLoadingInspections || isLoadingJobs || isUserLoading;
 
   useEffect(() => {
     if (!loading && tapeheadsSubmissions && tapeheadsSubmissions.length > 0 && !selectedOe) {
@@ -243,5 +243,3 @@ export default function TapeheadsStatusPage() {
     </div>
   );
 }
-
-    
