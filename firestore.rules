@@ -1,8 +1,91 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
+
+    function isAuthed() {
+      return request.auth != null;
+    }
+
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isSuperuser() {
+      return isAuthed() && getUserRole() == 'Superuser';
+    }
+
+    function isSupervisor() {
+      let role = getUserRole();
+      return isAuthed() && (role == 'B1 Supervisor' || role == 'B2 Supervisor' || isSuperuser());
+    }
+
+    function isTapeheadLead() {
+       let role = getUserRole();
+       return isAuthed() && (role == 'Tapehead Lead' || isSupervisor());
+    }
+
+    function isLead() {
+        let role = getUserRole();
+        return isAuthed() && (
+            role == 'Pregger Lead' ||
+            role == 'Tapehead Lead' ||
+            role == 'Gantry Lead' ||
+            role == 'Films Lead' ||
+            role == 'Graphics Lead' ||
+            isSupervisor()
+        );
+    }
+    
+    function isQualityManager() {
+        return isAuthed() && (getUserRole() == 'Quality Manager' || isSuperuser());
+    }
+    
+    function isManagement() {
+       return isAuthed() && (getUserRole() == 'Management' || isSuperuser());
+    }
+
+    match /users/{userId} {
+      allow read: if isAuthed();
+      allow write: if isAuthed() && request.auth.uid == userId;
+    }
+
+    match /roles_admin/{userId} {
+        allow read: if isAuthed() && request.auth.uid == userId;
+        allow write: if isSuperuser(); // Only superusers can change roles
+    }
+
+    match /jobs/{jobId} {
+      allow read, write: if isAuthed();
+    }
+    
+    match /tapeheads-submissions/{reportId} {
+      allow read: if isSupervisor() || isTapeheadLead();
+      allow write: if isAuthed();
+    }
+    
+    match /films/{reportId} {
+       allow read, write: if isAuthed();
+    }
+    
+    match /gantry-reports/{reportId} {
+        allow read, write: if isAuthed();
+    }
+    
+    match /pregger-reports/{reportId} {
+        allow read, write: if isAuthed();
+    }
+
+    match /graphics-tasks/{taskId} {
+      allow read, write: if isAuthed();
+    }
+
+    match /inspections/{inspectionId} {
+      allow read, write: if isQualityManager() || isSuperuser();
+    }
+
+    // Default deny
+    match /{path=**} {
+      allow read, write: if false;
     }
   }
 }
