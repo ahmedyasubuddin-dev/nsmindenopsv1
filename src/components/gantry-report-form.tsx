@@ -31,8 +31,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ImageUpload } from "./image-upload"
 import { Switch } from "./ui/switch"
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert"
-import { getFilmsData, type FilmsReport, addGantryReport } from "@/lib/data-store"
-import { useCollection, useFirebase, useMemoFirebase } from "@/firebase"
+import { addGantryReport, type FilmsReport } from "@/lib/data-store"
+import { useCollection, useFirebase, useMemoFirebase, useAuth as useFirebaseAuth } from "@/firebase"
 import { collection, query } from "firebase/firestore"
 
 const stageOfProcessOptions = [
@@ -301,7 +301,12 @@ export function GantryReportForm() {
 
 function MoldField({ moldIndex, control, removeMold }: { moldIndex: number, control: any, removeMold: (index: number) => void }) {
   const firestore = useFirestore();
-  const filmsQuery = useMemoFirebase(() => query(collection(firestore, 'films')), [firestore]);
+  const { isUserLoading } = useFirebaseAuth();
+
+  const filmsQuery = useMemoFirebase(() => {
+    if (isUserLoading) return null;
+    return query(collection(firestore, 'films'))
+  }, [firestore, isUserLoading]);
   const { data: filmsData, isLoading: isLoadingFilms } = useCollection<FilmsReport>(filmsQuery);
 
   const { fields: sailFields, append: appendSail, remove: removeSail } = useFieldArray({

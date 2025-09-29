@@ -18,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Factory, TrendingUp, Clock, Zap } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../ui/accordion"
 import { Badge } from "../ui/badge"
-import { useCollection, useFirebase, useMemoFirebase } from "@/firebase"
+import { useCollection, useFirebase, useMemoFirebase, useAuth as useFirebaseAuth } from "@/firebase"
 import type { PreggerReport } from "@/lib/data-store"
 import { collection, query } from "firebase/firestore"
 
@@ -41,7 +41,12 @@ const CustomLegend = () => {
 
 export function PreggerAnalytics() {
   const { firestore } = useFirebase();
-  const preggerQuery = useMemoFirebase(() => query(collection(firestore, 'pregger-reports')), [firestore]);
+  const { isUserLoading } = useFirebaseAuth();
+
+  const preggerQuery = useMemoFirebase(() => {
+    if (isUserLoading) return null;
+    return query(collection(firestore, 'pregger-reports'))
+  }, [firestore, isUserLoading]);
   const { data: allData, isLoading: loading } = useCollection<PreggerReport>(preggerQuery);
 
   const [filters, setFilters] = React.useState({
@@ -112,7 +117,7 @@ export function PreggerAnalytics() {
     return Object.entries(reasonData).map(([name, value]) => ({ name, value }));
   }, [data]);
 
-  if (loading) {
+  if (loading || isUserLoading) {
     return <p>Loading analytics...</p>;
   }
 

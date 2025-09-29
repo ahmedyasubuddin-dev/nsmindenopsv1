@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Factory, TrendingUp, CheckCircle, AlertTriangle, Users } from "lucide-react"
-import { useCollection, useFirebase, useMemoFirebase } from "@/firebase"
+import { useCollection, useFirebase, useMemoFirebase, useAuth as useFirebaseAuth } from "@/firebase"
 import type { GantryReport } from "@/lib/data-store"
 import { collection, query } from "firebase/firestore"
 
@@ -48,7 +48,12 @@ const issueTypesConfig: ChartConfig = {
 
 export function GantryAnalytics() {
   const { firestore } = useFirebase();
-  const gantryQuery = useMemoFirebase(() => query(collection(firestore, 'gantry-reports')), [firestore]);
+  const { isUserLoading } = useFirebaseAuth();
+
+  const gantryQuery = useMemoFirebase(() => {
+    if (isUserLoading) return null;
+    return query(collection(firestore, 'gantry-reports'))
+  }, [firestore, isUserLoading]);
   const { data: allReports, isLoading: loading } = useCollection<GantryReport>(gantryQuery);
 
   const [filters, setFilters] = React.useState({
@@ -218,7 +223,7 @@ export function GantryAnalytics() {
         return Object.entries(stageCounts).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value);
     }, [allSails]);
 
-  if (loading) {
+  if (loading || isUserLoading) {
     return <p>Loading analytics...</p>;
   }
 
