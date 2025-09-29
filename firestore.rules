@@ -4,73 +4,101 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions to check user roles
-    function isSuperuser() {
-      return get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.role == 'Superuser';
+    // Helper Functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function getUserRole() {
+      return get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.role;
+    }
+
+    // Role Checks
+    function isSuperuser() { return getUserRole() == 'Superuser'; }
+    function isB2Supervisor() { return getUserRole() == 'B2 Supervisor'; }
+    function isB1Supervisor() { return getUserRole() == 'B1 Supervisor'; }
+    function isQualityManager() { return getUserRole() == 'Quality Manager'; }
+    function isManagement() { return getUserRole() == 'Management'; }
+    function isPreggerLead() { return getUserRole() == 'Pregger Lead'; }
+    function isTapeheadOperator() { return getUserRole() == 'Tapehead Operator'; }
+    function isTapeheadLead() { return getUserRole() == 'Tapehead Lead'; }
+    function isGantryLead() { return getUserRole() == 'Gantry Lead'; }
+    function isFilmsLead() { return getUserRole() == 'Films Lead'; }
+    function isGraphicsLead() { return getUserRole() == 'Graphics Lead'; }
+    
+    // Permission Groups
+    function canViewAllAnalytics() {
+      return isSuperuser() || isB1Supervisor() || isB2Supervisor() || isQualityManager() || isManagement();
     }
     
-    function isManagement() {
-      return get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.role in ['Superuser', 'Management', 'B1 Supervisor', 'B2 Supervisor', 'Quality Manager'];
+    function canViewSailStatus() {
+      return isSuperuser() || isB1Supervisor() || isB2Supervisor() || isQualityManager() || isManagement() || isPreggerLead() || isTapeheadLead() || isGantryLead() || isFilmsLead() || isGraphicsLead();
     }
 
-    function canViewAnalytics() {
-       return get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.role in ['Superuser', 'Management', 'B1 Supervisor', 'B2 Supervisor', 'Quality Manager'];
-    }
-
-    function canViewStatus() {
-        return request.auth != null; // Any authenticated user can view status
-    }
-
-    // Rules for the roles_admin collection
+    // Collection: roles_admin
+    // Stores user roles. Only the user can read their own role.
+    // Writes are disabled from client, should be managed by admin SDK.
+    // For this app, we allow users to write their own role document upon first login.
     match /roles_admin/{userId} {
-      allow read: if request.auth != null;
-      // Only Superusers can create, update, or delete roles.
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow write: if isSignedIn() && request.auth.uid == userId; // Allow user to set their own role initially
+      allow delete: if false; // Prevent deletion
+    }
+
+    // Collection: jobs
+    // All authenticated users can read, only superusers can write.
+    match /jobs/{jobId} {
+      allow read: if isSignedIn();
       allow write: if isSuperuser();
     }
 
-    // Rules for jobs collection
-    match /jobs/{jobId} {
-      allow read: if request.auth != null;
-      // Allow Superusers or users with file-processing permissions to create/update jobs
-      allow write: if get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.role in ['Superuser'];
-    }
-
-    // Rules for Tapeheads Submissions
+    // Collection: tapeheads-submissions
+    // Can be read by supervisors, management, and tapehead leads/operators.
+    // Can be written by tapehead operators and leads.
     match /tapeheads-submissions/{reportId} {
-        allow read: if get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.role in ['Superuser', 'B2 Supervisor', 'Tapehead Lead', 'Management', 'Quality Manager'];
-        allow write: if get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.role in ['Superuser', 'B2 Supervisor', 'Tapehead Operator', 'Tapehead Lead'];
-    }
-    
-    // Rules for Gantry Reports
-    match /gantry-reports/{reportId} {
-        allow read: if get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.role in ['Superuser', 'B1 Supervisor', 'Gantry Lead', 'Management', 'Quality Manager'];
-        allow write: if get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.role in ['Superuser', 'B1 Supervisor', 'Gantry Lead'];
+      allow read: if isSignedIn() && (isSuperuser() || isB1Supervisor() || isB2Supervisor() || isManagement() || isTapeheadLead() || isTapeheadOperator() || isQualityManager());
+      allow write: if isSignedIn() && (isTapeheadOperator() || isTapeheadLead() || isB2Supervisor() || isSuperuser());
     }
 
-    // Rules for Films Reports
+    // Collection: films
+    // Can be read by supervisors, management, and relevant leads.
+    // Can be written by films leads.
     match /films/{reportId} {
-        allow read: if get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.role in ['Superuser', 'B1 Supervisor', 'Films Lead', 'Management', 'Quality Manager'];
-        allow write: if get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.role in ['Superuser', 'B1 Supervisor', 'Films Lead'];
+      allow read: if isSignedIn() && (canViewAllAnalytics() || isFilmsLead());
+      allow write: if isSignedIn() && (isFilmsLead() || isB1Supervisor() || isSuperuser());
     }
 
-    // Rules for Graphics Tasks
-    match /graphics-tasks/{taskId} {
-        allow read: if get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.role in ['Superuser', 'B1 Supervisor', 'Graphics Lead', 'Management', 'Quality Manager'];
-        allow write: if get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.role in ['Superuser', 'B1 Supervisor', 'Graphics Lead'];
-    }
-
-    // Rules for Pregger Reports
-    match /pregger-reports/{reportId} {
-         allow read: if get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.role in ['Superuser', 'B2 Supervisor', 'Pregger Lead', 'Management', 'Quality Manager'];
-         allow write: if get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.role in ['Superuser', 'B2 Supervisor', 'Pregger Lead'];
+    // Collection: gantry-reports
+    // Can be read by supervisors, management, and relevant leads.
+    // Can be written by gantry leads.
+    match /gantry-reports/{reportId} {
+      allow read: if isSignedIn() && (canViewAllAnalytics() || isGantryLead());
+      allow write: if isSignedIn() && (isGantryLead() || isB1Supervisor() || isSuperuser());
     }
     
-    // Rules for QC Inspections
-    match /inspections/{inspectionId} {
-         allow read, write: if get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.role in ['Superuser', 'Quality Manager'];
+    // Collection: pregger-reports
+    // Can be read by supervisors, management, and relevant leads.
+    // Can be written by pregger leads.
+    match /pregger-reports/{reportId} {
+      allow read: if isSignedIn() && (canViewAllAnalytics() || isPreggerLead());
+      allow write: if isSignedIn() && (isPreggerLead() || isB2Supervisor() || isSuperuser());
     }
-
-    // Fallback rule for any other collection
+    
+    // Collection: graphics-tasks
+    // Can be read by supervisors, management, and relevant leads.
+    // Can be written by graphics leads.
+    match /graphics-tasks/{taskId} {
+      allow read: if isSignedIn() && (canViewAllAnalytics() || isGraphicsLead());
+      allow write: if isSignedIn() && (isGraphicsLead() || isB1Supervisor() || isSuperuser());
+    }
+    
+    // Collection: inspections
+    // Can be read and written only by Quality Managers and Superusers.
+    match /inspections/{inspectionId} {
+       allow read, write: if isSignedIn() && (isQualityManager() || isSuperuser());
+    }
+    
+    // Default deny all other collections
     match /{document=**} {
       allow read, write: if false;
     }

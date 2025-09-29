@@ -67,36 +67,39 @@ export default function LoginPage() {
 
     try {
       const userCredential = await signInWithEmailAndPassword(firebaseAuth, email, password);
-      await assignRoleToUser(userCredential.user);
+      // Ensure role is assigned on every login in case it was missed
+      await assignRoleToUser(userCredential.user); 
       toast({
         title: 'Login Successful',
         description: 'Welcome back!',
       });
+      // No need to call router.push, the layout effect will handle it
     } catch (error: any) {
-        if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-             try {
-                const userCredential = await createUserWithEmailAndPassword(firebaseAuth, email, password);
-                await assignRoleToUser(userCredential.user);
-                toast({
-                    title: 'Account Created',
-                    description: 'Your user account has been created and you are now signed in.',
-                });
-             } catch (creationError: any) {
-                 console.error("User creation error:", creationError);
-                 toast({
-                    title: 'Login Failed',
-                    description: creationError.message || 'An unknown error occurred during account creation.',
-                    variant: 'destructive',
-                });
-             }
-        } else {
-            console.error(error);
-            toast({
-                title: 'Invalid Credentials',
-                description: 'Please check your email and password.',
-                variant: 'destructive',
-            });
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+        // If user doesn't exist, create them and then assign the role
+        try {
+          const userCredential = await createUserWithEmailAndPassword(firebaseAuth, email, password);
+          await assignRoleToUser(userCredential.user);
+          toast({
+            title: 'Account Created & Logged In',
+            description: 'Your user account has been automatically created.',
+          });
+        } catch (creationError: any) {
+          console.error("User creation error:", creationError);
+          toast({
+            title: 'Login Failed',
+            description: creationError.message || 'An unknown error occurred during account creation.',
+            variant: 'destructive',
+          });
         }
+      } else {
+        console.error("Login error:", error);
+        toast({
+          title: 'Login Failed',
+          description: error.message || 'An unknown error occurred.',
+          variant: 'destructive',
+        });
+      }
     } finally {
       setIsLoading(false);
     }
