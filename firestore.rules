@@ -1,65 +1,8 @@
-
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper functions
-    function isAuthed() {
-      return request.auth != null;
-    }
-
-    // By default, deny all reads and writes
     match /{document=**} {
-      allow read, write: if false;
-    }
-
-    // Allow users to read and write their own user document
-    match /users/{userId} {
-      allow read, write: if isAuthed() && request.auth.uid == userId;
-    }
-
-    // Secure the roles_admin collection
-    match /roles_admin/{userId} {
-      allow read: if isAuthed() && request.auth.uid == userId;
-      // For this app, we trust the client to set the role on login.
-      // In a production app with more complex role management, you'd restrict this write
-      // to an existing admin role.
-      allow write: if isAuthed();
-    }
-    
-    // Allow any authenticated user to read and write to the main data collections.
-    // This is a safe and simple starting point for an internal-only application.
-    // More granular rules can be added later if needed.
-    match /jobs/{jobId} {
-      allow read, write: if isAuthed();
-    }
-    match /departments/{departmentId} {
-       allow read, write: if isAuthed();
-    }
-    match /departments/{departmentId}/shifts/{shiftId} {
-       allow read, write: if isAuthed();
-    }
-    match /departments/{departmentId}/reports/{reportId} {
-       allow read, write: if isAuthed();
-    }
-    match /films/{reportId} {
-       allow read, write: if isAuthed();
-    }
-    match /tapeheads-submissions/{reportId} {
-       allow read, write: if isAuthed();
-    }
-    match /gantry-reports/{reportId} {
-       allow read, write: if isAuthed();
-    }
-    match /pregger-reports/{reportId} {
-       allow read, write: if isAuthed();
-    }
-    match /graphics-tasks/{taskId} {
-       allow read, write: if isAuthed();
-    }
-    match /inspections/{inspectionId} {
-       allow read, write: if isAuthed();
+      allow read, write: if true;
     }
   }
 }
