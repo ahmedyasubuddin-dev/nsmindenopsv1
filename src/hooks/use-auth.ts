@@ -2,15 +2,15 @@
 "use client";
 
 import { createContext, useContext } from 'react';
-import type { ReactNode } from 'react';
 import type { UserRole } from '@/lib/roles';
-import { useFirestore } from '@/firebase';
+
+// This file only defines the types and context for the *application's* auth state,
+// which is managed in the layout file. The actual Firebase logic is in layout.tsx.
 
 interface AuthContextType {
   isAuthenticated: boolean;
   user: { email: string | null; role: UserRole | null };
   isLoading: boolean;
-  login: (email: string) => void;
   logout: () => void;
 }
 

@@ -8,9 +8,12 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/use-auth';
+import { useAuth as useAppAuth } from '@/hooks/use-auth';
 import { Logo } from '@/components/icons';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { initiateEmailSignIn } from '@/firebase';
+import { useAuth as useFirebaseAuth } from '@/firebase';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 
 const users = {
   'superuser@ns.com': 'password',
@@ -24,7 +27,6 @@ const users = {
   'gantry_lead@ns.com': 'password',
   'films_lead@ns.com': 'password',
   'graphics_lead@ns.com': 'password',
-  // Old users for compatibility
   'lead@ns.com': 'GavinKilledFishes',
   'operator@ns.com': 'GavinKilledFishes',
   'head@ns.com': 'GavinKilledFishes',
@@ -33,7 +35,9 @@ const users = {
 export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { login, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAppAuth();
+  const firebaseAuth = useFirebaseAuth();
+
   const [email, setEmail] = useState('b2_supervisor@ns.com');
   const [password, setPassword] = useState('password');
   const [isLoading, setIsLoading] = useState(false);
@@ -43,27 +47,21 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      if (users[email as keyof typeof users] && users[email as keyof typeof users] === password) {
-        login(email);
-        toast({
-          title: 'Login Successful',
-          description: 'Welcome back!',
-        });
-        // The redirect is now handled by the layout effect
-      } else {
-        toast({
-          title: 'Invalid Credentials',
-          description: 'Please check your email and password.',
-          variant: 'destructive',
-        });
-      }
-    } catch (error) {
+      await signInWithEmailAndPassword(firebaseAuth, email, password);
       toast({
-        title: 'An Error Occurred',
-        description: 'Could not process your login request.',
+        title: 'Login Successful',
+        description: 'Welcome back!',
+      });
+      // The redirect is now handled by the layout effect
+    } catch (error: any) {
+      console.error("Firebase Auth Error:", error);
+      let description = 'Could not process your login request.';
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        description = 'Invalid credentials. Please check your email and password.';
+      }
+      toast({
+        title: 'Authentication Failed',
+        description,
         variant: 'destructive',
       });
     } finally {

@@ -63,7 +63,7 @@ import { Logo } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import { useAppTitle } from "./app-title-context";
 import { useAuth } from "@/hooks/use-auth";
-import { hasPermission } from "@/lib/roles";
+import { hasPermission, UserRole } from "@/lib/roles";
 
 const departments = [
   { name: 'Pregger', href: '/report/pregger', icon: Building2, permission: 'nav:report:pregger' },
@@ -171,7 +171,7 @@ function MainSidebar() {
   );
   const [isDeptAnalyticsOpen, setDeptAnalyticsOpen] = React.useState(pathname.startsWith('/analytics'));
 
-  const can = (permission: Permission) => hasPermission(role, permission);
+  const can = (permission: Permission) => hasPermission(role as UserRole, permission);
   
   const visibleReportDepts = departments.filter(dept => can(dept.permission));
   const visibleAnalyticsDepts = analyticsDepartments.filter(dept => can(dept.permission));

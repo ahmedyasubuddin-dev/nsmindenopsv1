@@ -7,47 +7,57 @@ import { Toaster } from "@/components/ui/toaster"
 import { AppTitleProvider } from '@/components/app-title-context';
 import { usePathname, useRouter } from 'next/navigation';
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import Cookies from 'js-cookie';
-import { AuthContext, useAuth } from '@/hooks/use-auth';
 import type { UserRole } from '@/lib/roles';
 import { getRoleFromEmail } from '@/lib/roles';
-import { FirebaseClientProvider } from '@/firebase';
+import { FirebaseClientProvider, useUser, useAuth as useFirebaseAuth } from '@/firebase'; // Renamed to avoid naming conflict
+import { onAuthStateChanged, User } from 'firebase/auth';
 
 const APP_TITLE = 'SRD: Minden Operations';
 
+interface AppAuthContextType {
+  isAuthenticated: boolean;
+  user: { email: string | null; role: UserRole | null };
+  isLoading: boolean;
+  logout: () => void;
+}
+
+export const AuthContext = createContext<AppAuthContextType | undefined>(undefined);
+
+export const useAuth = (): AppAuthContextType => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
+
 function AuthProvider({ children }: { children: ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<{ email: string | null; role: UserRole | null }>({ email: null, role: null });
   const [isLoading, setIsLoading] = useState(true);
+  const firebaseAuth = useFirebaseAuth();
 
   useEffect(() => {
-    const userCookie = Cookies.get('auth_user');
-    if (userCookie) {
-      const role = getRoleFromEmail(userCookie);
-      setIsAuthenticated(true);
-      setUser({ email: userCookie, role });
-    } else {
-      setIsAuthenticated(false);
-      setUser({ email: null, role: null });
-    }
-    setIsLoading(false);
-  }, []);
+    const unsubscribe = onAuthStateChanged(firebaseAuth, (firebaseUser: User | null) => {
+      if (firebaseUser) {
+        const role = getRoleFromEmail(firebaseUser.email);
+        setUser({ email: firebaseUser.email, role });
+      } else {
+        setUser({ email: null, role: null });
+      }
+      setIsLoading(false);
+    });
 
-  const login = (email: string) => {
-    const role = getRoleFromEmail(email);
-    Cookies.set('auth_user', email, { expires: 7 });
-    setIsAuthenticated(true);
-    setUser({ email, role });
-  };
+    return () => unsubscribe();
+  }, [firebaseAuth]);
 
   const logout = () => {
-    Cookies.remove('auth_user');
-    setIsAuthenticated(false);
-    setUser({ email: null, role: null });
+    firebaseAuth.signOut();
   };
+  
+  const isAuthenticated = !isLoading && user.email !== null;
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, user, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, user, isLoading, logout }}>
       {children}
     </AuthContext.Provider>
   );
