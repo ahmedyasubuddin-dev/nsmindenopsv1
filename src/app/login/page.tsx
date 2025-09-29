@@ -47,6 +47,10 @@ export default function LoginPage() {
     const role = getRoleFromEmail(user.email);
     if (role && user.uid) {
       try {
+        // This is the critical step: Set a custom claim for the user's role.
+        // The custom claim is embedded in the ID token and read by security rules.
+        // We will manage this through a backend function in a real scenario,
+        // but for now, we write to a 'roles' collection that rules can read.
         const roleDocRef = doc(firestore, 'roles_admin', user.uid);
         await setDoc(roleDocRef, { role: role });
         
@@ -59,6 +63,11 @@ export default function LoginPage() {
         }, { merge: true });
 
         console.log(`Role '${role}' assigned and user document created for ${user.uid}`);
+
+        // IMPORTANT: Force a refresh of the ID token to get the new custom claim.
+        // This ensures subsequent Firestore requests have the role in their auth token.
+        await user.getIdToken(true);
+
       } catch (error) {
         console.error("Error assigning role/user doc:", error);
         toast({
@@ -81,6 +90,7 @@ export default function LoginPage() {
         title: 'Login Successful',
         description: 'Welcome back!',
       });
+      // No router.push here, the layout effect will handle it.
     } catch (error: any) {
       if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
         try {

@@ -13,61 +13,63 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.role;
     }
 
-    function isNSRole(allowedRoles) {
-      return isAuthed() && getUserRole() in allowedRoles;
+    function isRole(role) {
+      return isAuthed() && getUserRole() == role;
     }
     
-    // Rules for Collections
-
+    function isAnyRole(roles) {
+      return isAuthed() && getUserRole() in roles;
+    }
+    
+    // Collection-level access rules
+    
+    // Only admins can write roles, but any authenticated user can read their OWN role.
+    match /roles_admin/{userId} {
+      allow read: if isAuthed() && request.auth.uid == userId;
+      allow write: if isRole('Superuser'); // Protect role assignments
+    }
+    
+    // Only authenticated users can see other users' basic info
     match /users/{userId} {
       allow read: if isAuthed();
-      allow write: if isAuthed() && request.auth.uid == userId; // Users can update their own profile
+      allow write: if isAuthed() && request.auth.uid == userId; // Users can update their own info
     }
-
-    match /roles_admin/{userId} {
-      allow read: if isAuthed() && request.auth.uid == userId; // Users can read their own role
-      allow write: if isNSRole(['Superuser']); // Only Superusers can change roles
-    }
-
+    
+    // Jobs can be read by anyone authenticated, written by leads/supervisors
     match /jobs/{jobId} {
-        allow read: if isNSRole(['Superuser', 'B2 Supervisor', 'B1 Supervisor', 'Quality Manager', 'Management', 'Pregger Lead', 'Tapehead Operator', 'Tapehead Lead', 'Gantry Lead', 'Films Lead', 'Graphics Lead']);
-        allow write: if isNSRole(['Superuser', 'Tapehead Lead']);
+        allow read: if isAuthed();
+        allow write: if isAnyRole(['Superuser', 'B1 Supervisor', 'B2 Supervisor', 'Tapehead Lead']);
     }
 
+    // Tapeheads: Operators can write, supervisors can read/review.
     match /tapeheads-submissions/{reportId} {
-      allow read: if isNSRole(['Superuser', 'B2 Supervisor', 'Tapehead Lead', 'Tapehead Operator', 'Quality Manager', 'Management']);
-      allow create: if isAuthed();
-      allow update, delete: if isAuthed() && (request.auth.uid == resource.data.userId || isNSRole(['Superuser', 'B2 Supervisor', 'Tapehead Lead']));
-    }
-
-    match /films/{reportId} {
-        allow read: if isNSRole(['Superuser', 'B1 Supervisor', 'Films Lead', 'Quality Manager', 'Management']);
-        allow write: if isNSRole(['Superuser', 'Films Lead']);
+      allow read: if isAnyRole(['Superuser', 'B2 Supervisor', 'Tapehead Lead']);
+      allow write: if isAnyRole(['Superuser', 'Tapehead Operator', 'Tapehead Lead']);
     }
     
+    // Gantry: Leads/Supervisors only
     match /gantry-reports/{reportId} {
-        allow read: if isNSRole(['Superuser', 'B1 Supervisor', 'Gantry Lead', 'Quality Manager', 'Management']);
-        allow write: if isNSRole(['Superuser', 'Gantry Lead']);
-    }
-
-    match /pregger-reports/{reportId} {
-        allow read: if isNSRole(['Superuser', 'B2 Supervisor', 'Pregger Lead', 'Quality Manager', 'Management']);
-        allow write: if isNSRole(['Superuser', 'Pregger Lead']);
-    }
-
-    match /graphics-tasks/{taskId} {
-        allow read: if isNSRole(['Superuser', 'B1 Supervisor', 'Graphics Lead', 'Quality Manager', 'Management']);
-        allow write: if isNSRole(['Superuser', 'Graphics Lead']);
-    }
-
-    match /inspections/{inspectionId} {
-        allow read: if isNSRole(['Superuser', 'Quality Manager', 'Management']);
-        allow write: if isNSRole(['Superuser', 'Quality Manager']);
+      allow read, write: if isAnyRole(['Superuser', 'B1 Supervisor', 'Gantry Lead']);
     }
     
-    // Default deny all other paths
-    match /{path=**} {
-      allow read, write: if false;
+    // Films: Leads/Supervisors only
+    match /films/{reportId} {
+       allow read, write: if isAnyRole(['Superuser', 'B1 Supervisor', 'Films Lead']);
+    }
+
+    // Graphics: Leads/Supervisors only
+    match /graphics-tasks/{taskId} {
+      allow read, write: if isAnyRole(['Superuser', 'B1 Supervisor', 'Graphics Lead']);
+    }
+    
+    // Inspections: QC, Management, and Supervisors
+    match /inspections/{inspectionId} {
+      allow read, write: if isAnyRole(['Superuser', 'Quality Manager', 'Management', 'B1 Supervisor', 'B2 Supervisor']);
+    }
+    
+    // Pregger: Leads/Supervisors only
+    match /pregger-reports/{reportId} {
+        allow read, write: if isAnyRole(['Superuser', 'B2 Supervisor', 'Pregger Lead']);
     }
   }
 }

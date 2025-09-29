@@ -6,9 +6,7 @@ import { AppLayout } from '@/components/app-layout';
 import { Toaster } from "@/components/ui/toaster"
 import { AppTitleProvider } from '@/components/app-title-context';
 import { usePathname, useRouter } from 'next/navigation';
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import type { UserRole } from '@/lib/roles';
-import { getRoleFromEmail } from '@/lib/roles';
+import React, { useEffect, ReactNode } from 'react';
 import { FirebaseClientProvider, useUser } from '@/firebase';
 
 const APP_TITLE = 'SRD: Minden Operations';
@@ -31,14 +29,18 @@ function AppContent({ children }: { children: ReactNode }) {
   
   const isAuthenticated = !!user;
 
+  // This is the gatekeeper. It shows a loading screen until Firebase has determined the auth state.
+  // It also handles redirecting between login/dashboard pages.
   if (isUserLoading || (!isAuthenticated && pathname !== '/login') || (isAuthenticated && pathname === '/login')) {
     return <div className="flex h-screen items-center justify-center">Loading...</div>;
   }
 
+  // If we are on the login page, render it without the main AppLayout
   if (pathname === '/login') {
      return <>{children}</>;
   }
-
+  
+  // If authenticated and not on the login page, render the main AppLayout
   return (
       <AppLayout>
         {children}
