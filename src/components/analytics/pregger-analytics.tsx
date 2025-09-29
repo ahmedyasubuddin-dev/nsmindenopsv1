@@ -18,8 +18,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Factory, TrendingUp, Clock, Zap } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../ui/accordion"
 import { Badge } from "../ui/badge"
-import { getPreggerReportsData } from "@/lib/data-store"
 import type { PreggerReport } from "@/lib/types"
+import { useFirestore } from "@/firebase"
+import { collection, getDocs } from "firebase/firestore"
 
 const productionChartConfig = {
   shift1: { label: "Shift 1", color: "hsl(var(--chart-1))" },
@@ -41,6 +42,7 @@ const CustomLegend = () => {
 export function PreggerAnalytics() {
   const [allData, setAllData] = React.useState<PreggerReport[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const firestore = useFirestore();
   const [filters, setFilters] = React.useState({
     dateFrom: '2023-10-25',
     dateTo: '2023-10-27',
@@ -49,13 +51,15 @@ export function PreggerAnalytics() {
 
   React.useEffect(() => {
     async function fetchData() {
+        if (!firestore) return;
         setLoading(true);
-        const data = await getPreggerReportsData();
+        const snapshot = await getDocs(collection(firestore, 'pregger_reports'));
+        const data = snapshot.docs.map(doc => doc.data() as PreggerReport);
         setAllData(data);
         setLoading(false);
     }
     fetchData();
-  }, []);
+  }, [firestore]);
 
   const handleFilterChange = (key: keyof typeof filters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));

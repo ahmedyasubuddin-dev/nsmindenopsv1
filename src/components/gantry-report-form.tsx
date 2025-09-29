@@ -31,7 +31,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ImageUpload } from "./image-upload"
 import { Switch } from "./ui/switch"
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert"
-import { getFilmsData, type FilmsReport } from "@/lib/data-store"
+import type { FilmsReport } from "@/lib/data-store"
+import { useFirestore } from "@/firebase"
+import { collection, getDocs } from "firebase/firestore"
 
 const stageOfProcessOptions = [
     "RF Smart Mold Adjust", "Grid Base Film Installation", "Panel Installation", 
@@ -297,6 +299,7 @@ function MoldField({ moldIndex, control, removeMold }: { moldIndex: number, cont
     control,
     name: `molds.${moldIndex}.sails`
   });
+  const firestore = useFirestore();
 
   const downtimeCaused = useWatch({
       control,
@@ -316,8 +319,13 @@ function MoldField({ moldIndex, control, removeMold }: { moldIndex: number, cont
   const [filmsData, setFilmsData] = React.useState<FilmsReport[]>([]);
   
   React.useEffect(() => {
-    getFilmsData().then(setFilmsData);
-  }, []);
+    async function fetchData() {
+        if (!firestore) return;
+        const snapshot = await getDocs(collection(firestore, 'films'));
+        setFilmsData(snapshot.docs.map(doc => doc.data() as FilmsReport));
+    }
+    fetchData();
+  }, [firestore]);
 
   const sailsReadyForGantry = React.useMemo(() => {
     const finishedSails = filmsData.flatMap(report => report.sails_finished.map(sail => sail.sail_number));
@@ -471,5 +479,3 @@ function MoldField({ moldIndex, control, removeMold }: { moldIndex: number, cont
     </Card>
   )
 }
-
-    

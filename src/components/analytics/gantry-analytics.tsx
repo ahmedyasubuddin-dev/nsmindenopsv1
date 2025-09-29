@@ -14,8 +14,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Factory, TrendingUp, CheckCircle, AlertTriangle, Users } from "lucide-react"
-import { getGantryReportsData } from "@/lib/data-store"
 import type { GantryReport } from "@/lib/types"
+import { useFirestore } from "@/firebase"
+import { collection, getDocs } from "firebase/firestore"
 
 const classifySailType = (sailNumber?: string): 'Sail' | 'Panel' | 'Scarf' => {
   if (!sailNumber || sailNumber.length < 3) return 'Scarf';
@@ -48,6 +49,7 @@ const issueTypesConfig: ChartConfig = {
 export function GantryAnalytics() {
   const [allReports, setAllReports] = React.useState<GantryReport[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const firestore = useFirestore();
   const [filters, setFilters] = React.useState({
     shift: "all",
     dateRange: "30",
@@ -56,13 +58,15 @@ export function GantryAnalytics() {
 
   React.useEffect(() => {
     async function fetchData() {
+        if (!firestore) return;
         setLoading(true);
-        const data = await getGantryReportsData();
+        const snapshot = await getDocs(collection(firestore, 'gantry_reports'));
+        const data = snapshot.docs.map(doc => ({...doc.data(), date: new Date(doc.data().date) } as GantryReport));
         setAllReports(data);
         setLoading(false);
     }
     fetchData();
-  }, []);
+  }, [firestore]);
 
   const handleFilterChange = (key: keyof typeof filters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));

@@ -25,8 +25,10 @@ import { GraphicsKanbanBoard } from "./graphics/graphics-kanban-board"
 import type { GraphicsTask as Task } from "@/lib/types"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "./ui/dialog"
 import { sendShippingNotification } from "@/ai/flows/send-notification-flow"
-import { getGraphicsTasks, setGraphicsTasks } from "@/lib/data-store"
+import { setGraphicsTasks } from "@/lib/data-store"
 import { PageHeader } from "@/components/page-header"
+import { useFirestore } from "@/firebase"
+import { collection, getDocs } from "firebase/firestore"
 
 
 const personnelSchema = z.object({
@@ -78,6 +80,7 @@ function Section({ title, description, children, actions }: { title: string, des
 export function GraphicsReportForm() {
     const { toast } = useToast();
     const [tasks, setTasks] = useState<Task[]>([]);
+    const firestore = useFirestore();
     const [notifiedTags, setNotifiedTags] = useState<Set<string>>(new Set());
     const [loading, setLoading] = useState(true);
 
@@ -99,13 +102,14 @@ export function GraphicsReportForm() {
 
     useEffect(() => {
         async function fetchData() {
+            if (!firestore) return;
             setLoading(true);
-            const tasks = await getGraphicsTasks();
-            setTasks(tasks);
+            const snapshot = await getDocs(collection(firestore, 'graphics_tasks'));
+            setTasks(snapshot.docs.map(doc => doc.data() as Task));
             setLoading(false);
         }
         fetchData();
-    }, []);
+    }, [firestore]);
     
      useEffect(() => {
         const checkFinishedTags = async () => {

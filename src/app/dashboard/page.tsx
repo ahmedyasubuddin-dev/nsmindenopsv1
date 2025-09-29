@@ -93,7 +93,7 @@ export default function DashboardPage() {
         const qualityAlerts = (inspectionsData || []).filter(i => i.status !== 'Pass').length;
         
         const totalDowntimeMinutes = (gantryReportsData || [])
-            .reduce((sum, r) => sum + (r.downtime?.reduce((dSum, d) => dSum + d.duration, 0) || 0), 0);
+            .reduce((sum, r) => r.downtime?.reduce((dSum, d) => dSum + d.duration, 0) || 0, 0);
         
         // --- Activity Feed ---
         const tapeheadsActivity: ActivityItem[] = (tapeheadsSubmissions || []).flatMap(r => 
@@ -281,5 +281,3 @@ export default function DashboardPage() {
     </div>
   )
 }
-
-    

@@ -17,8 +17,9 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Target, Gauge, Clock, Zap, AlertTriangle } from "lucide-react"
 import type { Report } from "@/lib/types"
-import { getTapeheadsSubmissions } from "@/lib/data-store"
 import { Badge } from "../ui/badge"
+import { useFirestore } from "@/firebase"
+import { collection, getDocs } from "firebase/firestore"
 
 const downtimeReasonsConfig = {
     "Machine Jam": { label: 'Machine Jam', color: 'hsl(var(--chart-1))' },
@@ -51,6 +52,7 @@ const calculateHours = (startTimeStr?: string, endTimeStr?: string): number => {
 export function TapeheadsAnalytics() {
   const [allData, setAllData] = React.useState<Report[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const firestore = useFirestore();
   const [filters, setFilters] = React.useState({
     shift: 'all',
     operatorName: '',
@@ -58,13 +60,15 @@ export function TapeheadsAnalytics() {
 
   React.useEffect(() => {
     async function fetchData() {
+        if (!firestore) return;
         setLoading(true);
-        const data = await getTapeheadsSubmissions();
+        const snapshot = await getDocs(collection(firestore, 'tapeheads_submissions'));
+        const data = snapshot.docs.map(doc => ({...doc.data(), date: (doc.data().date as any).toDate() } as Report));
         setAllData(data);
         setLoading(false);
     }
     fetchData();
-  }, []);
+  }, [firestore]);
 
   const handleFilterChange = (key: keyof typeof filters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));

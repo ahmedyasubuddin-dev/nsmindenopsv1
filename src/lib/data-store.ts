@@ -102,43 +102,7 @@ export async function deleteTapeheadsSubmission(id: string): Promise<void> {
     await deleteDoc(submissionRef);
 }
 
-export async function getOeJobs(): Promise<OeJob[]> {
-    const snapshot = await getDocs(collection(firestore, 'jobs'));
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as OeJob));
-}
+// These functions are for client-side use where the firestore instance is passed in.
+// We are keeping them separate to avoid confusion with server-side only functions.
 
-export async function getOeSection(oeBase: string, sectionId: string): Promise<OeJob['sections'][0] | null> {
-    const jobs = await getOeJobs();
-    const job = jobs.find(j => j.oeBase === oeBase);
-    return job?.sections.find(s => s.sectionId === sectionId) || null;
-}
-
-export async function getTapeheadsSubmissions(): Promise<Report[]> {
-    const snapshot = await getDocs(collection(firestore, 'tapeheads_submissions'));
-    return snapshot.docs.map(doc => ({...doc.data(), date: (doc.data().date as any).toDate() } as Report));
-}
-
-export async function getFilmsData(): Promise<FilmsReport[]> {
-    const snapshot = await getDocs(collection(firestore, 'films'));
-    return snapshot.docs.map(doc => doc.data() as FilmsReport);
-}
-
-export async function getGantryReportsData(): Promise<GantryReport[]> {
-    const snapshot = await getDocs(collection(firestore, 'gantry_reports'));
-     return snapshot.docs.map(doc => ({...doc.data(), date: new Date(doc.data().date) } as GantryReport));
-}
-
-export async function getGraphicsTasks(): Promise<GraphicsTask[]> {
-    const snapshot = await getDocs(collection(firestore, 'graphics_tasks'));
-    return snapshot.docs.map(doc => doc.data() as GraphicsTask);
-}
-
-export async function getInspectionsData(): Promise<InspectionSubmission[]> {
-    const snapshot = await getDocs(collection(firestore, 'inspections'));
-    return snapshot.docs.map(doc => doc.data() as InspectionSubmission);
-}
-
-export async function getPreggerReportsData(): Promise<PreggerReport[]> {
-    const snapshot = await getDocs(collection(firestore, 'pregger_reports'));
-    return snapshot.docs.map(doc => doc.data() as PreggerReport);
-}
+export { type Report, type FilmsReport, type GantryReport, type GraphicsTask, type InspectionSubmission, type OeJob, type PreggerReport };
