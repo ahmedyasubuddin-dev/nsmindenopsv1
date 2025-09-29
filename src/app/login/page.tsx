@@ -43,17 +43,26 @@ export default function LoginPage() {
   const [password, setPassword] = useState('password');
   const [isLoading, setIsLoading] = useState(false);
 
-  const assignRoleToUser = async (user: User) => {
+  const assignRoleAndUserDoc = async (user: User) => {
     const role = getRoleFromEmail(user.email);
     if (role && user.uid) {
       try {
         const roleDocRef = doc(firestore, 'roles_admin', user.uid);
         await setDoc(roleDocRef, { role: role });
-        console.log(`Role '${role}' assigned to user ${user.uid}`);
+        
+        const userDocRef = doc(firestore, 'users', user.uid);
+        await setDoc(userDocRef, {
+            uid: user.uid,
+            email: user.email,
+            displayName: user.email?.split('@')[0] || 'User',
+            role: role
+        }, { merge: true });
+
+        console.log(`Role '${role}' assigned and user document created for ${user.uid}`);
       } catch (error) {
-        console.error("Error assigning role:", error);
+        console.error("Error assigning role/user doc:", error);
         toast({
-          title: 'Role Assignment Failed',
+          title: 'Setup Failed',
           description: 'Could not set the user role in the database.',
           variant: 'destructive',
         });
@@ -67,19 +76,16 @@ export default function LoginPage() {
 
     try {
       const userCredential = await signInWithEmailAndPassword(firebaseAuth, email, password);
-      // Ensure role is assigned on every login in case it was missed
-      await assignRoleToUser(userCredential.user); 
+      await assignRoleAndUserDoc(userCredential.user); 
       toast({
         title: 'Login Successful',
         description: 'Welcome back!',
       });
-      // No need to call router.push, the layout effect will handle it
     } catch (error: any) {
       if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-        // If user doesn't exist, create them and then assign the role
         try {
           const userCredential = await createUserWithEmailAndPassword(firebaseAuth, email, password);
-          await assignRoleToUser(userCredential.user);
+          await assignRoleAndUserDoc(userCredential.user);
           toast({
             title: 'Account Created & Logged In',
             description: 'Your user account has been automatically created.',
