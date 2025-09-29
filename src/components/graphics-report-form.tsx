@@ -25,10 +25,10 @@ import { GraphicsKanbanBoard } from "./graphics/graphics-kanban-board"
 import type { GraphicsTask as Task } from "@/lib/data-store"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "./ui/dialog"
 import { sendShippingNotification } from "@/ai/flows/send-notification-flow"
-import { updateGraphicsTask, deleteGraphicsTask } from "@/lib/data-store"
+import { updateGraphicsTask, deleteGraphicsTask, addGraphicsTask } from "@/lib/data-store"
 import { PageHeader } from "@/components/page-header"
 import { useCollection, useFirebase, useMemoFirebase } from "@/firebase"
-import { addDocumentNonBlocking } from "@/firebase"
+import { useAuth as useFirebaseAuth } from "@/firebase"
 import { collection, query } from "firebase/firestore"
 
 
@@ -81,8 +81,13 @@ function Section({ title, description, children, actions }: { title: string, des
 export function GraphicsReportForm() {
     const { toast } = useToast();
     const { firestore } = useFirebase();
+    const { isUserLoading } = useFirebaseAuth();
     
-    const tasksQuery = useMemoFirebase(() => query(collection(firestore, 'graphics-tasks')), [firestore]);
+    const tasksQuery = useMemoFirebase(() => {
+      if (isUserLoading) return null;
+      return query(collection(firestore, 'graphics-tasks'));
+    }, [firestore, isUserLoading]);
+    
     const { data: tasks, isLoading: isLoadingTasks } = useCollection<Task>(tasksQuery);
     
     const [notifiedTags, setNotifiedTags] = useState<Set<string>>(new Set());
@@ -169,7 +174,6 @@ export function GraphicsReportForm() {
     
     const addNewTask = async (type: 'cutting' | 'inking') => {
         const timestamp = Date.now();
-        const tasksCollection = collection(firestore, 'graphics-tasks');
         
         if (type === 'cutting') {
              const cuttingTask: Omit<Task, 'id'> = {
@@ -180,8 +184,8 @@ export function GraphicsReportForm() {
                 type: 'inking', tagId: '', status: 'todo',
                 content: '', tagType: 'Sail', startedAt: new Date().toISOString(),
             };
-            await addDocumentNonBlocking(tasksCollection, { ...cuttingTask, id: `cut-${timestamp}` });
-            await addDocumentNonBlocking(tasksCollection, { ...inkingTask, id: `ink-${timestamp}` });
+            await addGraphicsTask(firestore, { ...cuttingTask, id: `cut-${timestamp}` });
+            await addGraphicsTask(firestore, { ...inkingTask, id: `ink-${timestamp}` });
             toast({ title: "Task Pair Added", description: `A new Cutting and Inking task pair has been created.` });
 
         } else {
@@ -189,12 +193,12 @@ export function GraphicsReportForm() {
                 type: 'inking', tagId: '', status: 'todo',
                 content: '', tagType: 'Sail', startedAt: new Date().toISOString(),
             };
-            await addDocumentNonBlocking(tasksCollection, { ...inkingTask, id: `ink-${timestamp}` });
-            toast({ title: "Task Added", description: `A new Inking task has been created.` });
+             await addGraphicsTask(firestore, { ...inkingTask, id: `ink-${timestamp}` });
+             toast({ title: "Task Added", description: `A new Inking task has been created.` });
         }
     }
     
-    const updateTask = async (updatedTask: Task) => {
+    const onUpdateTask = async (updatedTask: Task) => {
         await updateGraphicsTask(firestore, updatedTask);
         
         if (updatedTask.type === 'cutting') {
@@ -214,7 +218,7 @@ export function GraphicsReportForm() {
         }
     }
     
-    const deleteTask = async (taskId: string) => {
+    const onDeleteTask = async (taskId: string) => {
         await deleteGraphicsTask(firestore, taskId);
         toast({ title: "Task Deleted", variant: "destructive" });
     }
@@ -290,10 +294,10 @@ export function GraphicsReportForm() {
                         <TabsTrigger value="inking">Inking Tasks</TabsTrigger>
                     </TabsList>
                     <TabsContent value="cutting">
-                        <GraphicsKanbanBoard tasks={cuttingTasks} type="cutting" onUpdateTask={updateTask} onDeleteTask={deleteTask} onAddTask={() => addNewTask('cutting')} />
+                        <GraphicsKanbanBoard tasks={cuttingTasks} type="cutting" onUpdateTask={onUpdateTask} onDeleteTask={onDeleteTask} onAddTask={() => addNewTask('cutting')} />
                     </TabsContent>
                     <TabsContent value="inking">
-                        <GraphicsKanbanBoard tasks={inkingTasks} type="inking" onUpdateTask={updateTask} onDeleteTask={deleteTask} onAddTask={() => addNewTask('inking')} />
+                        <GraphicsKanbanBoard tasks={inkingTasks} type="inking" onUpdateTask={onUpdateTask} onDeleteTask={onDeleteTask} onAddTask={() => addNewTask('inking')} />
                     </TabsContent>
                 </Tabs>
             </div>
