@@ -9,7 +9,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import type { UserRole } from '@/lib/roles';
 import { getRoleFromEmail } from '@/lib/roles';
-import { FirebaseClientProvider, useUser, useAuth as useFirebaseAuth } from '@/firebase'; // Renamed to avoid naming conflict
+import { FirebaseClientProvider, useUser, useAuth as useFirebaseAuth } from '@/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 
 const APP_TITLE = 'SRD: Minden Operations';
@@ -21,7 +21,7 @@ interface AppAuthContextType {
   logout: () => void;
 }
 
-export const AuthContext = createContext<AppAuthContextType | undefined>(undefined);
+const AuthContext = createContext<AppAuthContextType | undefined>(undefined);
 
 export const useAuth = (): AppAuthContextType => {
   const context = useContext(AuthContext);
@@ -111,12 +111,12 @@ export default function RootLayout({
       <body className="font-body antialiased">
         <FirebaseClientProvider>
           <AuthProvider>
-              <AppTitleProvider title={APP_TITLE}>
-                  <AppContent>
-                    {children}
-                  </AppContent>
-              </AppTitleProvider>
-            </AuthProvider>
+            <AppTitleProvider title={APP_TITLE}>
+                <AppContent>
+                  {children}
+                </AppContent>
+            </AppTitleProvider>
+          </AuthProvider>
         </FirebaseClientProvider>
         <Toaster />
       </body>
