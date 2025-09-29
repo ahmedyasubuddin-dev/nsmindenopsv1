@@ -1,8 +1,8 @@
 
 'use server';
 /**
- * @fileoverview This file serves as the single, centralized file-based data store for the application.
- * Data is persisted to JSON files in the `src/lib/data` directory.
+ * @fileoverview This file provides the data access layer for the application,
+ * interacting with Google Cloud Firestore.
  */
 import type { Report, WorkItem } from './types';
 import {
@@ -147,48 +147,48 @@ export interface InspectionSubmission {
 // you would use `onSnapshot` from 'firebase/firestore' in a React hook.
 // This is handled in the UI layer with useCollection/useDoc.
 
-export function getOeJobs(firestore: Firestore): Promise<OeJob[]> {
+export async function getOeJobs(firestore: Firestore): Promise<OeJob[]> {
     const jobsCollection = collection(firestore, 'jobs');
     return getDocs(jobsCollection).then(snapshot => 
         snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as OeJob))
     );
 }
-export function getFilmsData(firestore: Firestore): Promise<FilmsReport[]> {
+export async function getFilmsData(firestore: Firestore): Promise<FilmsReport[]> {
     const filmsCollection = collection(firestore, 'films');
     return getDocs(filmsCollection).then(snapshot => 
         snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FilmsReport))
     );
 }
 
-export function getGantryReportsData(firestore: Firestore): Promise<GantryReport[]> {
+export async function getGantryReportsData(firestore: Firestore): Promise<GantryReport[]> {
     const gantryCollection = collection(firestore, 'gantry_reports');
     return getDocs(gantryCollection).then(snapshot => 
         snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as GantryReport))
     );
 }
 
-export function getGraphicsTasks(firestore: Firestore): Promise<GraphicsTask[]> {
+export async function getGraphicsTasks(firestore: Firestore): Promise<GraphicsTask[]> {
     const graphicsCollection = collection(firestore, 'graphics_tasks');
     return getDocs(graphicsCollection).then(snapshot => 
         snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as GraphicsTask))
     );
 }
 
-export function getPreggerReportsData(firestore: Firestore): Promise<PreggerReport[]> {
+export async function getPreggerReportsData(firestore: Firestore): Promise<PreggerReport[]> {
      const preggerCollection = collection(firestore, 'pregger_reports');
     return getDocs(preggerCollection).then(snapshot => 
         snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PreggerReport))
     );
 }
 
-export function getInspectionsData(firestore: Firestore): Promise<InspectionSubmission[]> {
+export async function getInspectionsData(firestore: Firestore): Promise<InspectionSubmission[]> {
     const inspectionsCollection = collection(firestore, 'inspections');
     return getDocs(inspectionsCollection).then(snapshot => 
         snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as InspectionSubmission))
     );
 }
 
-export function getTapeheadsSubmissions(firestore: Firestore): Promise<Report[]> {
+export async function getTapeheadsSubmissions(firestore: Firestore): Promise<Report[]> {
     const tapeheadsCollection = collection(firestore, 'tapeheads_submissions');
     return getDocs(tapeheadsCollection).then(snapshot => 
         snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Report))
@@ -196,16 +196,16 @@ export function getTapeheadsSubmissions(firestore: Firestore): Promise<Report[]>
 }
 
 
-export function setGraphicsTasks(firestore: Firestore, tasks: GraphicsTask[]): void {
+export async function setGraphicsTasks(firestore: Firestore, tasks: GraphicsTask[]): Promise<void> {
     // This is inefficient for individual updates, but fine for a full replacement.
     // In a real app, you'd update individual task documents.
-    tasks.forEach(task => {
+    for (const task of tasks) {
         const taskRef = doc(firestore, 'graphics_tasks', task.id);
-        setDocumentNonBlocking(taskRef, task, { merge: true });
-    });
+        await setDoc(taskRef, task, { merge: true });
+    }
 }
 
-export function addOeJob(firestore: Firestore, job: { oeBase: string, sections: Array<{ sectionId: string, panelStart: number, panelEnd: number }> }): void {
+export async function addOeJob(firestore: Firestore, job: { oeBase: string, sections: Array<{ sectionId: string, panelStart: number, panelEnd: number }> }): Promise<void> {
     const newJob = {
         oeBase: job.oeBase,
         status: 'pending',
@@ -216,7 +216,7 @@ export function addOeJob(firestore: Firestore, job: { oeBase: string, sections: 
 }
 
 
-export function addFilmsReport(firestore: Firestore, report: Omit<FilmsReport, 'id'>): void {
+export async function addFilmsReport(firestore: Firestore, report: Omit<FilmsReport, 'id'>): Promise<void> {
     const newReport = {
         id: `film_rpt_${Date.now()}`,
         ...report,
@@ -275,17 +275,17 @@ export async function markPanelsAsCompleted(firestore: Firestore, oeBase: string
     updateDocumentNonBlocking(jobRef, { sections: updatedSections, status: newStatus });
 }
 
-export function addTapeheadsSubmission(firestore: Firestore, report: Report): void {
+export async function addTapeheadsSubmission(firestore: Firestore, report: Report): Promise<void> {
     const submissionRef = doc(firestore, 'tapeheads_submissions', report.id);
     setDocumentNonBlocking(submissionRef, report, {});
 }
 
-export function updateTapeheadsSubmission(firestore: Firestore, updatedReport: Report): void {
+export async function updateTapeheadsSubmission(firestore: Firestore, updatedReport: Report): Promise<void> {
     const submissionRef = doc(firestore, 'tapeheads_submissions', updatedReport.id);
     updateDocumentNonBlocking(submissionRef, updatedReport);
 }
 
- export function deleteTapeheadsSubmission(firestore: Firestore, id: string): void {
+ export async function deleteTapeheadsSubmission(firestore: Firestore, id: string): Promise<void> {
     const submissionRef = doc(firestore, 'tapeheads_submissions', id);
     deleteDocumentNonBlocking(submissionRef);
 }
