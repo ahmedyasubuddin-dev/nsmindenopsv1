@@ -11,9 +11,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth as useAppAuth } from '@/hooks/use-auth';
 import { Logo } from '@/components/icons';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { initiateEmailSignIn } from '@/firebase';
 import { useAuth as useFirebaseAuth } from '@/firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 
 const users = {
   'superuser@ns.com': 'password',
@@ -54,16 +53,36 @@ export default function LoginPage() {
       });
       // The redirect is now handled by the layout effect
     } catch (error: any) {
-      console.error("Firebase Auth Error:", error);
-      let description = 'Could not process your login request.';
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-        description = 'Invalid credentials. Please check your email and password.';
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+        // User doesn't exist, so create them
+        try {
+          await createUserWithEmailAndPassword(firebaseAuth, email, password);
+          toast({
+            title: 'Account Created',
+            description: `A new account for ${email} has been created. Welcome!`,
+          });
+          // Firebase will automatically sign the user in after creation,
+          // so the onAuthStateChanged listener in the layout will handle the redirect.
+        } catch (createError: any) {
+          console.error("Firebase Create User Error:", createError);
+          toast({
+            title: 'Account Creation Failed',
+            description: createError.message,
+            variant: 'destructive',
+          });
+        }
+      } else {
+        console.error("Firebase Auth Error:", error);
+        let description = 'Could not process your login request.';
+        if (error.code === 'auth/wrong-password') {
+            description = 'Invalid password. Please check your credentials.';
+        }
+        toast({
+          title: 'Authentication Failed',
+          description,
+          variant: 'destructive',
+        });
       }
-      toast({
-        title: 'Authentication Failed',
-        description,
-        variant: 'destructive',
-      });
     } finally {
       setIsLoading(false);
     }
