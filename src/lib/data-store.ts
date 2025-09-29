@@ -9,6 +9,9 @@ import {
     readData,
     writeData
 } from './data-store-server';
+import { addDocumentNonBlocking } from '@/firebase';
+import { collection } from 'firebase/firestore';
+import { useFirestore } from '@/firebase';
 
 //_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 //
@@ -149,17 +152,16 @@ export async function setTapeheadsSubmissions(reports: Report[]) {
     await writeData('tapeheadsSubmissions', reports);
 }
 
-export async function addOeJob(job: { oeBase: string, sections: Array<{ sectionId: string, panelStart: number, panelEnd: number }> }): Promise<void> {
-    const oeJobs = await getOeJobs();
-    const newJob: OeJob = {
-        id: `job-${Date.now()}`,
+export function addOeJob(firestore: any, job: { oeBase: string, sections: Array<{ sectionId: string, panelStart: number, panelEnd: number }> }): void {
+    const newJob = {
         oeBase: job.oeBase,
         status: 'pending',
         sections: job.sections.map(s => ({ ...s, completedPanels: [] })),
     };
-    oeJobs.unshift(newJob);
-    await writeData('oeJobs', oeJobs);
+    const jobsCollection = collection(firestore, 'jobs');
+    addDocumentNonBlocking(jobsCollection, newJob);
 }
+
 
 export async function addFilmsReport(report: Omit<FilmsReport, 'id'>): Promise<void> {
     const reports = await getFilmsData();

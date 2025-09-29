@@ -1,5 +1,67 @@
 {
   "entities": {
+    "Job": {
+      "title": "Job",
+      "description": "Represents an Order Entry job with its constituent sections (sails).",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the job."
+        },
+        "oeBase": {
+          "type": "string",
+          "description": "The base Order Entry number for the job."
+        },
+        "status": {
+          "type": "string",
+          "description": "The current status of the job (e.g., pending, in-progress, completed).",
+          "enum": [
+            "pending",
+            "in-progress",
+            "completed"
+          ]
+        },
+        "sections": {
+          "type": "array",
+          "description": "An array of sections or sails that make up the job.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "sectionId": {
+                "type": "string",
+                "description": "The unique identifier for the section (e.g., sail number)."
+              },
+              "panelStart": {
+                "type": "number",
+                "description": "The starting panel number for this section."
+              },
+              "panelEnd": {
+                "type": "number",
+                "description": "The ending panel number for this section."
+              },
+              "completedPanels": {
+                "type": "array",
+                "description": "An array of panel IDs that have been completed for this section.",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "sectionId",
+              "panelStart",
+              "panelEnd"
+            ]
+          }
+        }
+      },
+      "required": [
+        "oeBase",
+        "status",
+        "sections"
+      ]
+    },
     "Department": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Department",
@@ -151,6 +213,22 @@
   },
   "firestore": {
     "structure": [
+      {
+        "path": "/jobs/{jobId}",
+        "definition": {
+          "entityName": "Job",
+          "schema": {
+            "$ref": "#/backend/entities/Job"
+          },
+          "description": "Stores OE Job information.",
+          "params": [
+            {
+              "name": "jobId",
+              "description": "The unique identifier of the job."
+            }
+          ]
+        }
+      },
       {
         "path": "/departments/{departmentId}",
         "definition": {

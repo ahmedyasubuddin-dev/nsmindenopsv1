@@ -11,6 +11,7 @@ import Cookies from 'js-cookie';
 import { AuthContext, useAuth } from '@/hooks/use-auth';
 import type { UserRole } from '@/lib/roles';
 import { getRoleFromEmail } from '@/lib/roles';
+import { FirebaseClientProvider } from '@/firebase';
 
 const APP_TITLE = 'SRD: Minden Operations';
 
@@ -98,13 +99,15 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased">
-         <AuthProvider>
-            <AppTitleProvider title={APP_TITLE}>
-                <AppContent>
-                  {children}
-                </AppContent>
-             </AppTitleProvider>
-          </AuthProvider>
+        <FirebaseClientProvider>
+          <AuthProvider>
+              <AppTitleProvider title={APP_TITLE}>
+                  <AppContent>
+                    {children}
+                  </AppContent>
+              </AppTitleProvider>
+            </AuthProvider>
+        </FirebaseClientProvider>
         <Toaster />
       </body>
     </html>
