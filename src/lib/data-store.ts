@@ -9,9 +9,8 @@ import {
     readData,
     writeData
 } from './data-store-server';
-import { addDocumentNonBlocking } from '@/firebase';
-import { collection } from 'firebase/firestore';
-import { useFirestore } from '@/firebase';
+import { addDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase';
+import { collection, doc, Firestore } from 'firebase/firestore';
 
 //_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 //
@@ -152,7 +151,7 @@ export async function setTapeheadsSubmissions(reports: Report[]) {
     await writeData('tapeheadsSubmissions', reports);
 }
 
-export function addOeJob(firestore: any, job: { oeBase: string, sections: Array<{ sectionId: string, panelStart: number, panelEnd: number }> }): void {
+export function addOeJob(firestore: Firestore, job: { oeBase: string, sections: Array<{ sectionId: string, panelStart: number, panelEnd: number }> }): void {
     const newJob = {
         oeBase: job.oeBase,
         status: 'pending',
@@ -163,14 +162,13 @@ export function addOeJob(firestore: any, job: { oeBase: string, sections: Array<
 }
 
 
-export async function addFilmsReport(report: Omit<FilmsReport, 'id'>): Promise<void> {
-    const reports = await getFilmsData();
-    const newReport: FilmsReport = {
+export function addFilmsReport(firestore: Firestore, report: Omit<FilmsReport, 'id'>): void {
+    const newReport = {
         id: `film_rpt_${Date.now()}`,
         ...report,
     };
-    reports.unshift(newReport);
-    await writeData('filmsData', reports);
+    const reportRef = doc(firestore, 'films', newReport.id);
+    setDocumentNonBlocking(reportRef, newReport, { merge: true });
 }
 
 export async function getOeSection(oeBase?: string, sectionId?: string): Promise<(OeSection & { jobStatus: OeJob['status']}) | undefined> {

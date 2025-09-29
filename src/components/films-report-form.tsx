@@ -24,6 +24,7 @@ import { Checkbox } from "./ui/checkbox"
 import { Separator } from "./ui/separator"
 import { addFilmsReport } from "@/lib/data-store"
 import { formatISO } from "date-fns"
+import { useFirestore } from "@/firebase"
 
 const sailEntrySchema = z.object({
   sail_number: z.string().min(1, "Sail# is required."),
@@ -146,7 +147,7 @@ function SailListSection({
                   <FormItem>
                      <FormLabel className="sr-only">Comments</FormLabel>
                     <FormControl>
-                      <Input placeholder="Optional comments..." {...field} />
+                      <Input placeholder="Optional comments..." {...field} value={field.value ?? ''} />
                     </FormControl>
                      <FormMessage />
                   </FormItem>
@@ -169,6 +170,7 @@ function SailListSection({
 
 export function FilmsReportForm() {
   const { toast } = useToast();
+  const firestore = useFirestore();
   const form = useForm<FilmsReportFormValues>({
     resolver: zodResolver(filmsReportSchema),
     defaultValues,
@@ -189,7 +191,7 @@ export function FilmsReportForm() {
       // Storing personnel and downtime can be added here if needed in the future
     };
 
-    await addFilmsReport(reportData);
+    addFilmsReport(firestore, reportData);
 
     toast({
       title: "Films Report Submitted!",
@@ -229,7 +231,7 @@ export function FilmsReportForm() {
                         <FormField control={form.control} name={`personnel.${index}.name`} render={({ field }) => (<FormItem className="flex-1"><FormLabel>Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
                         <FormField control={form.control} name={`personnel.${index}.start_time`} render={({ field }) => (<FormItem className="flex-1"><FormLabel>Start Time</FormLabel><FormControl><Input type="time" {...field} /></FormControl><FormMessage /></FormItem>)} />
                         <FormField control={form.control} name={`personnel.${index}.end_time`} render={({ field }) => (<FormItem className="flex-1"><FormLabel>End Time</FormLabel><FormControl><Input type="time" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                        <FormField control={form.control} name={`personnel.${index}.task`} render={({ field }) => (<FormItem className="flex-1"><FormLabel>Task/Notes</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                        <FormField control={form.control} name={`personnel.${index}.task`} render={({ field }) => (<FormItem className="flex-1"><FormLabel>Task/Notes</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
                         <Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={() => removePersonnel(index)}><Trash2 className="size-4" /></Button>
                     </div>
                  ))}
@@ -273,5 +275,3 @@ export function FilmsReportForm() {
     </Form>
   )
 }
-
-    

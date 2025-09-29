@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "Job": {
@@ -203,6 +204,48 @@
         "displayName",
         "role"
       ]
+    },
+    "FilmsReport": {
+      "title": "Films Report",
+      "description": "A report from the Films department detailing which sails were started and finished.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "report_date": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "gantry_number": {
+          "type": "string"
+        },
+        "sails_started": {
+          "type": "array",
+          "items": {
+            "$ref": "#/backend/entities/SailEntry"
+          }
+        },
+        "sails_finished": {
+          "type": "array",
+          "items": {
+            "$ref": "#/backend/entities/SailEntry"
+          }
+        }
+      }
+    },
+    "SailEntry": {
+      "title": "Sail Entry",
+      "description": "An entry for a sail, including its number and optional comments.",
+      "type": "object",
+      "properties": {
+        "sail_number": {
+          "type": "string"
+        },
+        "comments": {
+          "type": "string"
+        }
+      }
     }
   },
   "auth": {
@@ -313,6 +356,22 @@
             {
               "name": "userId",
               "description": "The unique identifier of the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/films/{reportId}",
+        "definition": {
+          "entityName": "FilmsReport",
+          "schema": {
+            "$ref": "#/backend/entities/FilmsReport"
+          },
+          "description": "Stores reports from the Films department.",
+          "params": [
+            {
+              "name": "reportId",
+              "description": "The unique identifier for the films report."
             }
           ]
         }
