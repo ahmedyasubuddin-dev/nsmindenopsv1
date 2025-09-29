@@ -6,30 +6,15 @@ import { AppLayout } from '@/components/app-layout';
 import { Toaster } from "@/components/ui/toaster"
 import { AppTitleProvider } from '@/components/app-title-context';
 import { usePathname, useRouter } from 'next/navigation';
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { useState, useEffect, ReactNode } from 'react';
 import type { UserRole } from '@/lib/roles';
 import { getRoleFromEmail } from '@/lib/roles';
-import { FirebaseClientProvider, useUser, useAuth as useFirebaseAuth } from '@/firebase';
+import { FirebaseClientProvider, useAuth as useFirebaseAuth } from '@/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
+import { AuthContext } from '@/hooks/use-auth';
 
 const APP_TITLE = 'SRD: Minden Operations';
 
-interface AppAuthContextType {
-  isAuthenticated: boolean;
-  user: { email: string | null; role: UserRole | null };
-  isLoading: boolean;
-  logout: () => void;
-}
-
-const AuthContext = createContext<AppAuthContextType | undefined>(undefined);
-
-export const useAuth = (): AppAuthContextType => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
 
 function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<{ email: string | null; role: UserRole | null }>({ email: null, role: null });
@@ -65,7 +50,7 @@ function AuthProvider({ children }: { children: ReactNode }) {
 
 
 function AppContent({ children }: { children: ReactNode }) {
-  const {isAuthenticated, isLoading} = useAuth();
+  const { isAuthenticated, isLoading } = React.useContext(AuthContext)!;
   const router = useRouter();
   const pathname = usePathname();
   
