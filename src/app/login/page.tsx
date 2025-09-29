@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Logo } from '@/components/icons';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth as useFirebaseAuth, useUser } from '@/firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 
 const users = {
   'superuser@ns.com': 'password',
@@ -50,14 +50,31 @@ export default function LoginPage() {
         title: 'Login Successful',
         description: 'Welcome back!',
       });
-      // The redirect is now handled by the layout effect
-    } catch (error) {
-      console.error(error);
-      toast({
-        title: 'Invalid Credentials',
-        description: 'Please check your email and password.',
-        variant: 'destructive',
-      });
+    } catch (error: any) {
+        // If user not found, create the user and sign in
+        if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+             try {
+                await createUserWithEmailAndPassword(firebaseAuth, email, password);
+                toast({
+                    title: 'Account Created',
+                    description: 'Your user account has been created and you are now signed in.',
+                });
+             } catch (creationError: any) {
+                 console.error("User creation error:", creationError);
+                 toast({
+                    title: 'Login Failed',
+                    description: creationError.message || 'An unknown error occurred during account creation.',
+                    variant: 'destructive',
+                });
+             }
+        } else {
+            console.error(error);
+            toast({
+                title: 'Invalid Credentials',
+                description: 'Please check your email and password.',
+                variant: 'destructive',
+            });
+        }
     } finally {
       setIsLoading(false);
     }
