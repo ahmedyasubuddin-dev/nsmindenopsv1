@@ -5,21 +5,18 @@
  * interacting with Google Cloud Firestore.
  */
 import {
-    addDoc,
     collection,
-    deleteDoc,
+    addDoc,
     doc,
-    getDoc,
+    updateDoc,
+    deleteDoc,
     getDocs,
     query,
-    setDoc,
-    updateDoc,
-    where
-} from 'firebase/firestore';
+    where,
+    setDoc
+} from 'firebase-admin/firestore';
 import { firestore } from '@/firebase/server-init';
 import type { Report, FilmsReport, GantryReport, GraphicsTask, InspectionSubmission, OeJob, PreggerReport, WorkItem, TapeUsage } from './types';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
 
 
 export async function addOeJob(job: { oeBase: string, sections: Array<{ sectionId: string, panelStart: number, panelEnd: number }> }): Promise<void> {
@@ -33,14 +30,12 @@ export async function addOeJob(job: { oeBase: string, sections: Array<{ sectionI
     try {
         await addDoc(jobsCollection, newJob);
     } catch (error) {
-        // This is a server-side operation, so we can't use the client-side error emitter.
-        // For now, we will just re-throw the original error to be caught by the client.
+        // This is a server-side operation.
         // A more robust solution would involve a dedicated server-side logging mechanism.
         console.error("Error in addOeJob:", error);
         throw error;
     }
 }
-
 
 export async function addFilmsReport(report: Omit<FilmsReport, 'id'>): Promise<void> {
     const newReport = {
@@ -48,15 +43,7 @@ export async function addFilmsReport(report: Omit<FilmsReport, 'id'>): Promise<v
         ...report,
     };
     const reportRef = doc(firestore, 'films', newReport.id);
-    await setDoc(reportRef, newReport, { merge: true }).catch(error => {
-        const contextualError = new FirestorePermissionError({
-          operation: 'create',
-          path: reportRef.path,
-          requestResourceData: newReport,
-        });
-        errorEmitter.emit('permission-error', contextualError);
-        throw contextualError;
-    });
+    await setDoc(reportRef, newReport, { merge: true });
 }
 
 export async function getGraphicsTasks(): Promise<GraphicsTask[]> {
@@ -71,15 +58,7 @@ export async function getGraphicsTasks(): Promise<GraphicsTask[]> {
 export async function setGraphicsTasks(tasks: GraphicsTask[]): Promise<void> {
     const batch = tasks.map(task => {
         const taskRef = doc(firestore, 'graphics_tasks', task.id);
-        return setDoc(taskRef, task, { merge: true }).catch(error => {
-            const contextualError = new FirestorePermissionError({
-              operation: 'write',
-              path: taskRef.path,
-              requestResourceData: task,
-            });
-            errorEmitter.emit('permission-error', contextualError);
-            // We don't re-throw here to allow other tasks in the batch to proceed
-        });
+        return setDoc(taskRef, task, { merge: true });
     });
     await Promise.all(batch);
 }
@@ -122,55 +101,23 @@ export async function markPanelsAsCompleted(oeBase: string, sectionId: string, p
     
     const updateData = { sections: updatedSections, status: newStatus };
 
-    await updateDoc(jobRef, updateData).catch(error => {
-        const contextualError = new FirestorePermissionError({
-          operation: 'update',
-          path: jobRef.path,
-          requestResourceData: updateData,
-        });
-        errorEmitter.emit('permission-error', contextualError);
-        throw contextualError;
-    });
+    await updateDoc(jobRef, updateData);
 }
 
 export async function addTapeheadsSubmission(report: Report): Promise<void> {
     const submissionRef = doc(firestore, 'tapeheads_submissions', report.id);
-    await setDoc(submissionRef, report, {}).catch(error => {
-        const contextualError = new FirestorePermissionError({
-          operation: 'create',
-          path: submissionRef.path,
-          requestResourceData: report,
-        });
-        errorEmitter.emit('permission-error', contextualError);
-        throw contextualError;
-    });
+    await setDoc(submissionRef, report, {});
 }
 
 export async function updateTapeheadsSubmission(updatedReport: Report): Promise<void> {
     const submissionRef = doc(firestore, 'tapeheads_submissions', updatedReport.id);
-    await updateDoc(submissionRef, { ...updatedReport }).catch(error => {
-        const contextualError = new FirestorePermissionError({
-          operation: 'update',
-          path: submissionRef.path,
-          requestResourceData: updatedReport,
-        });
-        errorEmitter.emit('permission-error', contextualError);
-        throw contextualError;
-    });
+    await updateDoc(submissionRef, { ...updatedReport });
 }
 
 export async function deleteTapeheadsSubmission(id: string): Promise<void> {
     const submissionRef = doc(firestore, 'tapeheads_submissions', id);
-    await deleteDoc(submissionRef).catch(error => {
-        const contextualError = new FirestorePermissionError({
-          operation: 'delete',
-          path: submissionRef.path
-        });
-        errorEmitter.emit('permission-error', contextualError);
-        throw contextualError;
-    });
+    await deleteDoc(submissionRef);
 }
 
 
 export { type Report, type FilmsReport, type GantryReport, type GraphicsTask, type InspectionSubmission, type OeJob, type PreggerReport, type WorkItem, type TapeUsage };
-
