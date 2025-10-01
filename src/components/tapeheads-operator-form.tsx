@@ -1,5 +1,4 @@
 
-
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -149,6 +148,10 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
   const { toast } = useToast();
   const router = useRouter();
   const { firestore } = useFirebase();
+  const { isUserLoading } = useFirebaseAuth();
+
+  const jobsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'jobs')), [firestore, isUserLoading]);
+  const { data: oeJobs, isLoading: isLoadingJobs } = useCollection<OeJob>(jobsQuery);
   
   const isEditMode = !!reportToEdit;
 
@@ -393,7 +396,7 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
                  )}
                 <div className="space-y-4">
                   {workItemFields.map((field, index) => (
-                    <WorkItemCard key={field.id} index={index} remove={removeWorkItem} control={form.control} isEditMode={isEditMode} />
+                    <WorkItemCard key={field.id} index={index} remove={removeWorkItem} control={form.control} isEditMode={isEditMode} oeJobs={oeJobs || []} />
                   ))}
                 </div>
               </div>
@@ -418,13 +421,10 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
   )
 }
 
-function WorkItemCard({ index, remove, control, isEditMode }: { index: number, remove: (index: number) => void, control: any, isEditMode: boolean }) {
+function WorkItemCard({ index, remove, control, isEditMode, oeJobs }: { index: number, remove: (index: number) => void, control: any, isEditMode: boolean, oeJobs: OeJob[] }) {
   const { toast } = useToast();
   const { firestore } = useFirebase();
   const { isUserLoading } = useFirebaseAuth();
-
-  const jobsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'jobs')), [firestore, isUserLoading]);
-  const { data: oeJobs, isLoading: isLoadingJobs } = useCollection<OeJob>(jobsQuery);
   
   const submissionsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'tapeheads-submissions')), [firestore, isUserLoading]);
   const { data: allSubmissions, isLoading: isLoadingSubmissions } = useCollection<Report>(submissionsQuery);
