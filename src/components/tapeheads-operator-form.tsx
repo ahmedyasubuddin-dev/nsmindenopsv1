@@ -509,7 +509,7 @@ function WorkItemCard({ index, remove, control, isEditMode, oeJobs }: { index: n
             )} />
             <FormField control={control} name={`workItems.${index}.panelsWorkedOn`} render={({ field }) => {
                 const handleIndividualChange = (value: string) => field.onChange(value ? [value] : []);
-                return <FormItem><FormLabel>Panels Worked On</FormLabel>{watchPanelWorkType === 'nested' ? <MultiSelect options={panelOptions} selected={field.value} onChange={field.onChange} placeholder="Select panels..." /> : <Select onValueChange={handleIndividualChange} value={field.value?.[0] || ""} disabled={panelOptions.length === 0}><FormControl><SelectTrigger><SelectValue placeholder={panelOptions.length > 0 ? "Select a panel" : "All panels complete"} /></SelectTrigger></FormControl><SelectContent>{panelOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}</SelectContent></Select>}<FormMessage /></FormItem>
+                return <FormItem><FormLabel>Panels Worked On</FormLabel>{watchPanelWorkType === 'nested' ? <MultiSelect options={panelOptions} selected={field.value || []} onChange={field.onChange} placeholder="Select panels..." /> : <Select onValueChange={handleIndividualChange} value={field.value?.[0] || ""} disabled={panelOptions.length === 0}><FormControl><SelectTrigger><SelectValue placeholder={panelOptions.length > 0 ? "Select a panel" : "All panels complete"} /></SelectTrigger></FormControl><SelectContent>{panelOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}</SelectContent></Select>}<FormMessage /></FormItem>
             }}/>
         </div>
          {watchPanelWorkType === 'nested' && (
