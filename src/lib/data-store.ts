@@ -15,11 +15,13 @@ import {
     DocumentData,
     arrayUnion
 } from 'firebase/firestore';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 import type { Report, FilmsReport, GantryReport, GraphicsTask, InspectionSubmission, OeJob, PreggerReport, WorkItem, TapeUsage } from './types';
 
-
 export async function getGraphicsTasks(db: Firestore): Promise<GraphicsTask[]> {
+    if (!db) return [];
     const snapshot = await getDocs(collection(db, 'graphics_tasks'));
     if (snapshot.empty) {
         return [];
@@ -28,16 +30,27 @@ export async function getGraphicsTasks(db: Firestore): Promise<GraphicsTask[]> {
 }
 
 export async function setGraphicsTasks(db: Firestore, tasks: GraphicsTask[]): Promise<void> {
+    if (!db) return;
     for (const task of tasks) {
         const taskRef = doc(db, 'graphics_tasks', task.id);
         await updateDoc(taskRef, { ...task }, { merge: true });
     }
 }
 
-export async function addFilmsReport(db: Firestore, report: any): Promise<void> {
-    const filmsCollection = collection(db, 'films');
-    await addDoc(filmsCollection, report);
+export function addFilmsReport(db: Firestore, report: any): void {
+  const filmsCollection = collection(db, 'films');
+  addDoc(filmsCollection, report).catch(error => {
+    errorEmitter.emit(
+      'permission-error',
+      new FirestorePermissionError({
+        path: filmsCollection.path,
+        operation: 'create',
+        requestResourceData: report,
+      })
+    );
+  });
 }
+
 
 export async function markPanelsAsCompleted(db: Firestore, oeBase: string, sectionId: string, panels: string[]): Promise<void> {
     if (!db) {

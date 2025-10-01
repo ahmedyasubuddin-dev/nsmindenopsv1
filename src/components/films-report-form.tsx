@@ -182,7 +182,7 @@ export function FilmsReportForm() {
   
   const hadDowntime = useWatch({ control: form.control, name: "had_downtime" });
 
-  async function onSubmit(values: FilmsReportFormValues) {
+  function onSubmit(values: FilmsReportFormValues) {
     if (!firestore) {
         toast({ title: "Error", description: "Firestore not available.", variant: "destructive" });
         return;
@@ -195,22 +195,13 @@ export function FilmsReportForm() {
       // Storing personnel and downtime can be added here if needed in the future
     };
 
-    try {
-        await addFilmsReport(firestore, reportData);
+    addFilmsReport(firestore, reportData);
 
-        toast({
-          title: "Films Report Submitted!",
-          description: "Your report has been successfully submitted.",
-        });
-        form.reset();
-    } catch(e: any) {
-        console.error(e);
-        toast({
-            variant: "destructive",
-            title: "Uh oh! Something went wrong.",
-            description: e.message || "Could not submit Films report.",
-        });
-    }
+    toast({
+      title: "Films Report Submitted!",
+      description: "Your report has been successfully submitted.",
+    });
+    form.reset();
   }
 
   return (
