@@ -150,7 +150,7 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
   const { firestore } = useFirebase();
   const { isUserLoading } = useFirebaseAuth();
 
-  const jobsQuery = useMemoFirebase(() => query(collection(firestore, 'jobs')), [firestore]);
+  const jobsQuery = useMemoFirebase(() => query(collection(firestore, 'jobs')), []);
   const { data: oeJobs, isLoading: isLoadingJobs } = useCollection<OeJob>(jobsQuery);
   
   const isEditMode = !!reportToEdit;
@@ -567,5 +567,3 @@ function WorkItemCard({ index, remove, control, isEditMode, oeJobs }: { index: n
     </Card>
   );
 }
-
-    
