@@ -89,8 +89,6 @@ const tapeheadsOperatorSchema = z.object({
 
   shiftStartTime: z.string().min(1, "Start time is required."),
   shiftEndTime: z.string().min(1, "End time is required."),
-  hoursWorked: z.coerce.number().optional(),
-  metersPerManHour: z.coerce.number().optional(),
 
   workItems: z.array(workItemSchema).min(1, "At least one work item must be added."),
 
@@ -148,14 +146,14 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
   const { toast } = useToast();
   const router = useRouter();
   const { firestore, isUserLoading } = useFirebase();
-  
-  const jobsQuery = useMemoFirebase(() => query(collection(firestore, 'jobs')), []);
-  const { data: oeJobs, isLoading: isLoadingJobs } = useCollection<OeJob>(jobsQuery);
-
-  const submissionsQuery = useMemoFirebase(() => query(collection(firestore, 'tapeheads-submissions')), []);
-  const { data: allSubmissions, isLoading: isLoadingSubmissions } = useCollection<Report>(submissionsQuery);
 
   const isEditMode = !!reportToEdit;
+
+  const jobsQuery = useMemoFirebase(() => query(collection(firestore, 'jobs')), []);
+  const { data: oeJobs, isLoading: isLoadingJobs } = useCollection<OeJob>(jobsQuery);
+  
+  const submissionsQuery = useMemoFirebase(() => query(collection(firestore, 'tapeheads-submissions')), []);
+  const { data: allSubmissions, isLoading: isLoadingSubmissions } = useCollection<Report>(submissionsQuery);
 
   const defaultValues = useMemo(() => {
     if (!reportToEdit) {
@@ -188,7 +186,6 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
         nestedPanels: item.nestedPanels
     }));
 
-
     return {
       ...reportToEdit,
       date: new Date(reportToEdit.date),
@@ -210,55 +207,8 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
   const watchEndTime = useWatch({ control: form.control, name: "shiftEndTime" });
   const watchWorkItems = useWatch({ control: form.control, name: "workItems" });
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-        const takeoverStateJSON = localStorage.getItem('tapeheadsTakeoverState');
-        if (takeoverStateJSON) {
-            const takeoverState = JSON.parse(takeoverStateJSON);
-            const { report, workItemToContinue } = takeoverState;
-
-            form.reset({
-                date: new Date(),
-                shift: "1",
-                shiftLeadName: report.shiftLeadName,
-                thNumber: report.thNumber,
-                operatorName: "", 
-                shiftStartTime: "",
-                shiftEndTime: "",
-                workItems: [{
-                    ...workItemToContinue,
-                    hadSpinOut: workItemToContinue.had_spin_out,
-                    spinOuts: workItemToContinue.spin_outs,
-                    spinOutDuration: workItemToContinue.spin_out_duration_minutes,
-                    problems: workItemToContinue.issues,
-                    panelWorkType: workItemToContinue.nestedPanels && workItemToContinue.nestedPanels.length > 0 ? 'nested' : 'individual',
-                }],
-                checklist: checklistItems.reduce((acc, item) => ({...acc, [item.id]: false}), {})
-            });
-
-            localStorage.removeItem('tapeheadsTakeoverState');
-
-            toast({
-                title: "Taking Over Task",
-                description: `Continuing work on ${workItemToContinue.oeNumber}-${workItemToContinue.section}. Please enter your details.`,
-            });
-        }
-    }
-  }, []); // Run only once on mount, form instance is stable
-
-
-  useEffect(() => {
-    if (reportToEdit) {
-      form.reset(defaultValues as OperatorFormValues);
-    }
-  }, [reportToEdit, form, defaultValues]);
-  
-  const totalMetersProduced = useMemo(() => {
-    return (watchWorkItems || []).reduce((sum, item) => {
-        const itemTotal = (item.tapes || []).reduce((tapeSum, tape) => tapeSum + (tape.metersProduced || 0), 0);
-        return sum + itemTotal;
-    }, 0);
-  }, [watchWorkItems]);
+  const [hoursWorked, setHoursWorked] = useState(0);
+  const [metersPerManHour, setMetersPerManHour] = useState(0);
 
   useEffect(() => {
     if (watchStartTime && watchEndTime) {
@@ -269,15 +219,27 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
       }
       const diffMs = end.getTime() - start.getTime();
       const hours = parseFloat((diffMs / (1000 * 60 * 60)).toFixed(1));
-      form.setValue("hoursWorked", hours);
+      setHoursWorked(hours);
+
+      const totalMetersProduced = (watchWorkItems || []).reduce((sum, item) => {
+        const itemTotal = (item.tapes || []).reduce((tapeSum, tape) => tapeSum + (tape.metersProduced || 0), 0);
+        return sum + itemTotal;
+      }, 0);
 
       if (hours > 0 && totalMetersProduced > 0) {
-        form.setValue("metersPerManHour", parseFloat((totalMetersProduced / hours).toFixed(1)));
+        setMetersPerManHour(parseFloat((totalMetersProduced / hours).toFixed(1)));
       } else {
-        form.setValue("metersPerManHour", 0);
+        setMetersPerManHour(0);
       }
     }
-  }, [watchStartTime, watchEndTime, totalMetersProduced, form]);
+  }, [watchStartTime, watchEndTime, watchWorkItems]);
+
+
+  useEffect(() => {
+    if (reportToEdit) {
+      form.reset(defaultValues as OperatorFormValues);
+    }
+  }, [reportToEdit, form, defaultValues]);
   
   async function onSubmit(values: OperatorFormValues) {
     // Logic to update panel statuses
@@ -296,8 +258,8 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
         operatorName: values.operatorName,
         shiftStartTime: values.shiftStartTime,
         shiftEndTime: values.shiftEndTime,
-        hoursWorked: values.hoursWorked,
-        metersPerManHour: values.metersPerManHour,
+        hoursWorked: hoursWorked,
+        metersPerManHour: metersPerManHour,
         workItems: values.workItems.map(item => {
             const totalMeters = (item.tapes || []).reduce((sum, tape) => sum + tape.metersProduced, 0);
             return {
@@ -381,8 +343,8 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
                       <FormField control={form.control} name="shiftEndTime" render={({ field }) => (<FormItem><FormLabel>Shift End Time</FormLabel><FormControl><Input type="time" {...field} /></FormControl><FormMessage /></FormItem>)} />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                      <FormField control={form.control} name="hoursWorked" render={({ field }) => (<FormItem><FormLabel>Hours Worked</FormLabel><FormControl><Input type="number" {...field} readOnly className="bg-muted/70" /></FormControl><FormMessage /></FormItem>)} />
-                      <FormField control={form.control} name="metersPerManHour" render={({ field }) => (<FormItem><FormLabel>Meters/Man-Hour</FormLabel><FormControl><Input type="number" {...field} readOnly className="bg-muted/70" /></FormControl><FormMessage /></FormItem>)} />
+                      <FormItem><FormLabel>Hours Worked</FormLabel><FormControl><Input type="number" value={hoursWorked} readOnly className="bg-muted/70" /></FormControl></FormItem>
+                      <FormItem><FormLabel>Meters/Man-Hour</FormLabel><FormControl><Input type="number" value={metersPerManHour} readOnly className="bg-muted/70" /></FormControl></FormItem>
                     </div>
                  </div>
               </Section>
@@ -399,7 +361,15 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
                  )}
                 <div className="space-y-4">
                   {workItemFields.map((field, index) => (
-                    <WorkItemCard key={field.id} index={index} remove={removeWorkItem} control={form.control} isEditMode={isEditMode} oeJobs={oeJobs || []} allSubmissions={allSubmissions || []} />
+                    <WorkItemCard 
+                        key={field.id} 
+                        index={index} 
+                        remove={removeWorkItem} 
+                        control={form.control} 
+                        isEditMode={isEditMode} 
+                        oeJobs={oeJobs || []} 
+                        allSubmissions={allSubmissions || []}
+                    />
                   ))}
                 </div>
               </div>
@@ -437,32 +407,6 @@ function WorkItemCard({ index, remove, control, isEditMode, oeJobs, allSubmissio
   const { fields: tapeFields, append: appendTape, remove: removeTape } = useFieldArray({ control: control, name: `workItems.${index}.tapes` });
   const { fields: problemFields, append: appendProblem, remove: removeProblem } = useFieldArray({ control: control, name: `workItems.${index}.problems` });
   const { fields: nestedPanelFields, append: appendNestedPanel, remove: removeNestedPanel } = useFieldArray({ control: control, name: `workItems.${index}.nestedPanels` });
-
-  useEffect(() => {
-    if (!watchOeNumber || !watchSection || !watchPanelsWorkedOn || watchPanelsWorkedOn.length === 0 || isEditMode) {
-      return;
-    }
-
-    const isPanelInProgress = allSubmissions.some(report =>
-      report.workItems?.some(item => {
-        if (item.oeNumber !== watchOeNumber || item.section !== watchSection || item.endOfShiftStatus !== 'In Progress') {
-          return false;
-        }
-        // Check for intersection of panels
-        const inProgressPanels = item.panelsWorkedOn || [];
-        const selectedPanels = watchPanelsWorkedOn || [];
-        return selectedPanels.some(p => inProgressPanels.includes(p));
-      })
-    );
-
-    if (isPanelInProgress) {
-      toast({
-        title: "Work In Progress",
-        description: `One or more selected panels are already in progress. Check the dashboard to 'Take Over'.`,
-        variant: "destructive",
-      });
-    }
-  }, [watchOeNumber, watchSection, watchPanelsWorkedOn, toast, isEditMode, allSubmissions]);
   
   const availableOes = useMemo(() => oeJobs ? [...new Set(oeJobs.map(j => j.oeBase))] : [], [oeJobs]);
   
