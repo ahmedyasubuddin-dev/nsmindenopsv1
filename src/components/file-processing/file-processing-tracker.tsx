@@ -86,19 +86,28 @@ export function FileProcessingTracker() {
   const onFinalSubmit = async () => {
     if (!reviewData) return;
     
-    await addOeJob({
-      oeBase: reviewData.oeBase,
-      sections: reviewData.sections.map(s => ({
-        sectionId: s.sectionId,
-        panelStart: s.panelStart,
-        panelEnd: s.panelEnd,
-      })),
-    });
-    
-    toast({
-      title: 'OE Job Initialized',
-      description: `Job for ${reviewData.oeBase} has been created and saved to Firestore.`,
-    });
+    try {
+        await addOeJob({
+            oeBase: reviewData.oeBase,
+            sections: reviewData.sections.map(s => ({
+                sectionId: s.sectionId,
+                panelStart: s.panelStart,
+                panelEnd: s.panelEnd,
+            })),
+        });
+        
+        toast({
+            title: 'OE Job Initialized',
+            description: `Job for ${reviewData.oeBase} has been created and saved to Firestore.`,
+        });
+    } catch(e: any) {
+        console.error(e);
+        toast({
+            variant: "destructive",
+            title: "Uh oh! Something went wrong.",
+            description: e.message || "Could not initialize OE Job.",
+        });
+    }
     
     setIsReviewing(false);
     setReviewData(null);
