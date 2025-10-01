@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -430,7 +431,7 @@ function WorkItemCard({ index, remove, control, isEditMode, oeJobs }: { index: n
   const { firestore } = useFirebase();
   const { isUserLoading } = useFirebaseAuth();
   
-  const submissionsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'tapeheads-submissions')), [firestore, isUserLoading]);
+  const submissionsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'tapeheads-submissions')), []);
   const { data: allSubmissions, isLoading: isLoadingSubmissions } = useCollection<Report>(submissionsQuery);
 
   const watchOeNumber = useWatch({ control, name: `workItems.${index}.oeNumber` });
