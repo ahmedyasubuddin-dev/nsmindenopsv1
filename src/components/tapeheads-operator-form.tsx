@@ -152,7 +152,7 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
   const jobsQuery = useMemoFirebase(() => query(collection(firestore, 'jobs')), []);
   const { data: oeJobs, isLoading: isLoadingJobs } = useCollection<OeJob>(jobsQuery);
 
-  const submissionsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'tapeheads-submissions')), [isUserLoading, firestore]);
+  const submissionsQuery = useMemoFirebase(() => query(collection(firestore, 'tapeheads-submissions')), []);
   const { data: allSubmissions, isLoading: isLoadingSubmissions } = useCollection<Report>(submissionsQuery);
 
   const isEditMode = !!reportToEdit;
@@ -211,22 +211,20 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
   const watchWorkItems = useWatch({ control: form.control, name: "workItems" });
 
   useEffect(() => {
-    // Check for takeover state on component mount
     if (typeof window !== 'undefined') {
         const takeoverStateJSON = localStorage.getItem('tapeheadsTakeoverState');
         if (takeoverStateJSON) {
             const takeoverState = JSON.parse(takeoverStateJSON);
             const { report, workItemToContinue } = takeoverState;
 
-            // Populate the form with data from the takeover state
             form.reset({
-                date: new Date(), // Set to current date for the new shift
-                shift: "1", // Or prompt for new shift
-                shiftLeadName: report.shiftLeadName, // Keep lead name or clear
+                date: new Date(),
+                shift: "1",
+                shiftLeadName: report.shiftLeadName,
                 thNumber: report.thNumber,
-                operatorName: "", // Clear for new operator
-                shiftStartTime: "", // Clear for new operator
-                shiftEndTime: "", // Clear for new operator
+                operatorName: "", 
+                shiftStartTime: "",
+                shiftEndTime: "",
                 workItems: [{
                     ...workItemToContinue,
                     hadSpinOut: workItemToContinue.had_spin_out,
@@ -238,7 +236,6 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
                 checklist: checklistItems.reduce((acc, item) => ({...acc, [item.id]: false}), {})
             });
 
-            // Clear the state from localStorage so it's not reused
             localStorage.removeItem('tapeheadsTakeoverState');
 
             toast({
@@ -247,7 +244,7 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
             });
         }
     }
-  }, [form, toast]);
+  }, []); // Run only once on mount, form instance is stable
 
 
   useEffect(() => {
@@ -564,3 +561,5 @@ function WorkItemCard({ index, remove, control, isEditMode, oeJobs, allSubmissio
     </Card>
   );
 }
+
+    
