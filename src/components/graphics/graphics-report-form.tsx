@@ -19,11 +19,11 @@ import {
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Checkbox } from "./ui/checkbox"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
-import { GraphicsKanbanBoard } from "./graphics/graphics-kanban-board"
+import { Checkbox } from "../ui/checkbox"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs"
+import { GraphicsKanbanBoard } from "./graphics-kanban-board"
 import type { GraphicsTask as Task } from "@/lib/data-store"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "./ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "../ui/dialog"
 import { sendShippingNotification } from "@/ai/flows/send-notification-flow"
 import { getGraphicsTasks, setGraphicsTasks } from "@/lib/data-store"
 import { PageHeader } from "@/components/page-header"
@@ -98,10 +98,12 @@ export function GraphicsReportForm() {
     });
 
     useEffect(() => {
-        getGraphicsTasks().then(tasks => {
-            setTasks(tasks);
+        const fetchTasks = async () => {
+            const fetchedTasks = await getGraphicsTasks();
+            setTasks(fetchedTasks);
             setLoading(false);
-        });
+        };
+        fetchTasks();
     }, []);
     
      useEffect(() => {
@@ -298,10 +300,10 @@ export function GraphicsReportForm() {
                         <TabsTrigger value="inking">Inking Tasks</TabsTrigger>
                     </TabsList>
                     <TabsContent value="cutting">
-                        <GraphicsKanbanBoard tasks={cuttingTasks} setTasks={updateTasks} type="cutting" onUpdateTask={updateTask} onDeleteTask={deleteTask} onAddTask={() => addNewTask('cutting')} />
+                        <GraphicsKanbanBoard tasks={cuttingTasks} allTasks={tasks} setTasks={updateTasks} type="cutting" onUpdateTask={updateTask} onDeleteTask={deleteTask} onAddTask={() => addNewTask('cutting')} />
                     </TabsContent>
                     <TabsContent value="inking">
-                        <GraphicsKanbanBoard tasks={inkingTasks} setTasks={updateTasks} type="inking" onUpdateTask={updateTask} onDeleteTask={deleteTask} onAddTask={() => addNewTask('inking')} />
+                        <GraphicsKanbanBoard tasks={inkingTasks} allTasks={tasks} setTasks={updateTasks} type="inking" onUpdateTask={updateTask} onDeleteTask={deleteTask} onAddTask={() => addNewTask('inking')} />
                     </TabsContent>
                 </Tabs>
             </div>

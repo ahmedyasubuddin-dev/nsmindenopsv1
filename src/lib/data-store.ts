@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileoverview This file provides the data access layer for the application,
@@ -39,12 +40,19 @@ export async function addFilmsReport(report: Omit<FilmsReport, 'id'>): Promise<v
     await setDoc(reportRef, newReport, { merge: true });
 }
 
-export async function setGraphicsTasks(tasks: GraphicsTask[]): Promise<void> {
-    const batch = [];
-    for (const task of tasks) {
-        const taskRef = doc(firestore, 'graphics_tasks', task.id);
-        batch.push(setDoc(taskRef, task, { merge: true }));
+export async function getGraphicsTasks(): Promise<GraphicsTask[]> {
+    const snapshot = await getDocs(collection(firestore, 'graphics_tasks'));
+    if (snapshot.empty) {
+        return [];
     }
+    return snapshot.docs.map(doc => doc.data() as GraphicsTask);
+}
+
+export async function setGraphicsTasks(tasks: GraphicsTask[]): Promise<void> {
+    const batch = tasks.map(task => {
+        const taskRef = doc(firestore, 'graphics_tasks', task.id);
+        return setDoc(taskRef, task, { merge: true });
+    });
     await Promise.all(batch);
 }
 

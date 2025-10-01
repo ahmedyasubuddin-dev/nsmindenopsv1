@@ -7,11 +7,12 @@ import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
 import { GraphicsTaskCard } from './graphics-task-card';
 import type { GraphicsTask as Task } from '@/lib/types';
-import { setGraphicsTasks, getGraphicsTasks } from '@/lib/data-store';
+import { setGraphicsTasks } from '@/lib/data-store';
 
 interface KanbanBoardProps {
     tasks: Task[];
     setTasks: (tasks: Task[]) => void;
+    allTasks: Task[];
     type: 'cutting' | 'inking';
     onAddTask: () => void;
     onUpdateTask: (task: Task) => void;
@@ -24,7 +25,7 @@ const columns = {
     done: { id: 'done', title: 'Completed' },
 };
 
-export function GraphicsKanbanBoard({ tasks, setTasks, type, onAddTask, onUpdateTask, onDeleteTask }: KanbanBoardProps) {
+export function GraphicsKanbanBoard({ tasks, setTasks, allTasks, type, onAddTask, onUpdateTask, onDeleteTask }: KanbanBoardProps) {
 
     const onDragEnd: OnDragEndResponder = async (result) => {
         const { destination, source, draggableId } = result;
@@ -37,7 +38,6 @@ export function GraphicsKanbanBoard({ tasks, setTasks, type, onAddTask, onUpdate
             return;
         }
         
-        const allTasks = await getGraphicsTasks();
         const task = allTasks.find(t => t.id === draggableId);
 
         if (task) {
