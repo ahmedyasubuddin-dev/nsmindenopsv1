@@ -24,6 +24,7 @@ import { Checkbox } from "./ui/checkbox"
 import { Separator } from "./ui/separator"
 import { addFilmsReport } from "@/lib/data-store"
 import { formatISO } from "date-fns"
+import { useFirestore } from "@/firebase"
 
 const sailEntrySchema = z.object({
   sail_number: z.string().min(1, "Sail# is required."),
@@ -169,6 +170,7 @@ function SailListSection({
 
 export function FilmsReportForm() {
   const { toast } = useToast();
+  const firestore = useFirestore();
   const form = useForm<FilmsReportFormValues>({
     resolver: zodResolver(filmsReportSchema),
     defaultValues,
@@ -181,6 +183,10 @@ export function FilmsReportForm() {
   const hadDowntime = useWatch({ control: form.control, name: "had_downtime" });
 
   async function onSubmit(values: FilmsReportFormValues) {
+    if (!firestore) {
+        toast({ title: "Error", description: "Firestore not available.", variant: "destructive" });
+        return;
+    }
     const reportData = {
       report_date: formatISO(values.report_date),
       gantry_number: values.gantry_mold_number.split('/')[0].replace('Gantry ', '').trim(),
@@ -189,13 +195,22 @@ export function FilmsReportForm() {
       // Storing personnel and downtime can be added here if needed in the future
     };
 
-    await addFilmsReport(reportData);
+    try {
+        await addFilmsReport(firestore, reportData);
 
-    toast({
-      title: "Films Report Submitted!",
-      description: "Your report has been successfully submitted.",
-    });
-    form.reset();
+        toast({
+          title: "Films Report Submitted!",
+          description: "Your report has been successfully submitted.",
+        });
+        form.reset();
+    } catch(e: any) {
+        console.error(e);
+        toast({
+            variant: "destructive",
+            title: "Uh oh! Something went wrong.",
+            description: e.message || "Could not submit Films report.",
+        });
+    }
   }
 
   return (

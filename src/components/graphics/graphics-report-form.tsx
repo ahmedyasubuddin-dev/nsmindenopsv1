@@ -27,6 +27,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { sendShippingNotification } from "@/ai/flows/send-notification-flow"
 import { getGraphicsTasks, setGraphicsTasks } from "@/lib/data-store"
 import { PageHeader } from "@/components/page-header"
+import { useFirestore } from "@/firebase"
 
 
 const personnelSchema = z.object({
@@ -80,6 +81,7 @@ export function GraphicsReportForm() {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [notifiedTags, setNotifiedTags] = useState<Set<string>>(new Set());
     const [loading, setLoading] = useState(true);
+    const firestore = useFirestore();
 
     const form = useForm<GraphicsReportFormValues>({
         resolver: zodResolver(graphicsReportSchema),
@@ -99,12 +101,13 @@ export function GraphicsReportForm() {
 
     useEffect(() => {
         const fetchTasks = async () => {
-            const fetchedTasks = await getGraphicsTasks();
+            if (!firestore) return;
+            const fetchedTasks = await getGraphicsTasks(firestore);
             setTasks(fetchedTasks);
             setLoading(false);
         };
         fetchTasks();
-    }, []);
+    }, [firestore]);
     
      useEffect(() => {
         const checkFinishedTags = async () => {
@@ -170,8 +173,9 @@ export function GraphicsReportForm() {
     const { fields: maintenanceFields, append: appendMaintenance, remove: removeMaintenance } = useFieldArray({ control: form.control, name: "maintenance_tasks" });
     
     const updateTasks = async (newTasks: Task[]) => {
+      if (!firestore) return;
       setTasks(newTasks);
-      await setGraphicsTasks(newTasks);
+      await setGraphicsTasks(firestore, newTasks);
     };
 
     const addNewTask = (type: 'cutting' | 'inking') => {

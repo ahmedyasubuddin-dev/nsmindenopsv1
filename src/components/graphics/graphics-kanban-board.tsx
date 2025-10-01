@@ -8,6 +8,7 @@ import { PlusCircle } from 'lucide-react';
 import { GraphicsTaskCard } from './graphics-task-card';
 import type { GraphicsTask as Task } from '@/lib/types';
 import { setGraphicsTasks } from '@/lib/data-store';
+import { useFirestore } from '@/firebase';
 
 interface KanbanBoardProps {
     tasks: Task[];
@@ -26,6 +27,7 @@ const columns = {
 };
 
 export function GraphicsKanbanBoard({ tasks, setTasks, allTasks, type, onAddTask, onUpdateTask, onDeleteTask }: KanbanBoardProps) {
+    const firestore = useFirestore();
 
     const onDragEnd: OnDragEndResponder = async (result) => {
         const { destination, source, draggableId } = result;
@@ -50,7 +52,9 @@ export function GraphicsKanbanBoard({ tasks, setTasks, allTasks, type, onAddTask
 
             const newTasks = allTasks.map(t => t.id === draggableId ? updatedTask : t);
             setTasks(newTasks);
-            await setGraphicsTasks(newTasks);
+            if(firestore) {
+               await setGraphicsTasks(firestore, newTasks);
+            }
         }
     };
     

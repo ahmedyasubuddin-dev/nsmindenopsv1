@@ -147,6 +147,7 @@ interface TapeheadsOperatorFormProps {
 export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsOperatorFormProps) {
   const { toast } = useToast();
   const router = useRouter();
+  const firestore = useFirestore();
   
   const isEditMode = !!reportToEdit;
 
@@ -276,10 +277,14 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
   }, [watchStartTime, watchEndTime, totalMetersProduced, form]);
   
   async function onSubmit(values: OperatorFormValues) {
+    if (!firestore) {
+      toast({ title: "Error", description: "Firestore not available.", variant: "destructive" });
+      return;
+    }
     // Logic to update panel statuses
     for (const item of values.workItems) {
         if (item.endOfShiftStatus === 'Completed') {
-            await markPanelsAsCompleted(item.oeNumber, item.section, item.panelsWorkedOn);
+            await markPanelsAsCompleted(firestore, item.oeNumber, item.section, item.panelsWorkedOn);
         }
     }
 
@@ -321,10 +326,10 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
     };
     
     if (onFormSubmit) {
-      await updateTapeheadsSubmission(reportData);
+      await updateTapeheadsSubmission(firestore, reportData);
       onFormSubmit(reportData);
     } else {
-      await addTapeheadsSubmission(reportData);
+      await addTapeheadsSubmission(firestore, reportData);
       router.push('/report/tapeheads');
     }
 

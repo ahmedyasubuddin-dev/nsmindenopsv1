@@ -1,85 +1,96 @@
 
-'use server';
-/**
- * @fileoverview This file provides the data access layer for the application,
- * interacting with Google Cloud Firestore.
- */
-import { firestore } from '@/firebase/server-init';
+'use client';
+import {
+    collection,
+    addDoc,
+    Firestore,
+    getDocs,
+    doc,
+    updateDoc,
+    deleteDoc,
+    query,
+    where,
+    Query,
+    CollectionReference,
+    DocumentData,
+    arrayUnion
+} from 'firebase/firestore';
+
 import type { Report, FilmsReport, GantryReport, GraphicsTask, InspectionSubmission, OeJob, PreggerReport, WorkItem, TapeUsage } from './types';
 
 
-export async function getGraphicsTasks(): Promise<GraphicsTask[]> {
-    const snapshot = await firestore.collection('graphics_tasks').get();
+export async function getGraphicsTasks(db: Firestore): Promise<GraphicsTask[]> {
+    const snapshot = await getDocs(collection(db, 'graphics_tasks'));
     if (snapshot.empty) {
         return [];
     }
     return snapshot.docs.map(doc => doc.data() as GraphicsTask);
 }
 
-
-export async function setGraphicsTasks(tasks: GraphicsTask[]): Promise<void> {
-    const batch = firestore.batch();
-    tasks.forEach(task => {
-        const taskRef = firestore.collection('graphics_tasks').doc(task.id);
-        batch.set(taskRef, task, { merge: true });
-    });
-    await batch.commit();
+export async function setGraphicsTasks(db: Firestore, tasks: GraphicsTask[]): Promise<void> {
+    for (const task of tasks) {
+        const taskRef = doc(db, 'graphics_tasks', task.id);
+        await updateDoc(taskRef, { ...task }, { merge: true });
+    }
 }
 
+export async function addFilmsReport(db: Firestore, report: any): Promise<void> {
+    const filmsCollection = collection(db, 'films');
+    await addDoc(filmsCollection, report);
+}
 
-export async function markPanelsAsCompleted(oeBase: string, sectionId: string, panels: string[]): Promise<void> {
-    const jobsQuery = firestore.collection('jobs').where('oeBase', '==', oeBase);
-    const querySnapshot = await jobsQuery.get();
+export async function markPanelsAsCompleted(db: Firestore, oeBase: string, sectionId: string, panels: string[]): Promise<void> {
+    if (!db) {
+        console.error("Firestore instance is not available.");
+        return;
+    }
+    const jobsQuery = query(collection(db, 'jobs'), where('oeBase', '==', oeBase));
+    const querySnapshot = await getDocs(jobsQuery);
 
     if (querySnapshot.empty) return;
     
     const jobDoc = querySnapshot.docs[0];
     const job = { id: jobDoc.id, ...jobDoc.data() } as OeJob;
-    const jobRef = firestore.collection('jobs').doc(job.id!);
+    const jobRef = doc(db, 'jobs', job.id!);
 
     const sectionIndex = job.sections.findIndex(s => s.sectionId === sectionId);
     if (sectionIndex === -1) return;
+    
+    const updateData: any = {};
+    // Atomically add new elements to the completedPanels array
+    updateData[`sections.${sectionIndex}.completedPanels`] = arrayUnion(...panels);
 
-    const section = job.sections[sectionIndex];
-    if (!section.completedPanels) {
-        section.completedPanels = [];
-    }
-    const newPanels = panels.filter(p => !section.completedPanels!.includes(p));
-    section.completedPanels.push(...newPanels);
+    // After calculating new status, update it
+    const updatedSections = [...job.sections];
+    const currentCompleted = updatedSections[sectionIndex].completedPanels || [];
+    updatedSections[sectionIndex].completedPanels = [...new Set([...currentCompleted, ...panels])];
 
-    const allSectionsComplete = job.sections.every(s => {
+    const allSectionsComplete = updatedSections.every(s => {
         const totalPanels = s.panelEnd - s.panelStart + 1;
         return (s.completedPanels?.length || 0) >= totalPanels;
     });
 
-    let newStatus = job.status;
     if (allSectionsComplete) {
-        newStatus = 'completed';
-    } else if (job.sections.some(s => (s.completedPanels?.length || 0) > 0)) {
-        newStatus = 'in-progress';
+        updateData['status'] = 'completed';
+    } else if (updatedSections.some(s => (s.completedPanels?.length || 0) > 0)) {
+        updateData['status'] = 'in-progress';
     }
 
-    const updatedSections = [...job.sections];
-    updatedSections[sectionIndex] = section;
-    
-    const updateData = { sections: updatedSections, status: newStatus };
-
-    await jobRef.update(updateData);
+    await updateDoc(jobRef, updateData);
 }
 
-export async function addTapeheadsSubmission(report: Report): Promise<void> {
-    const submissionRef = firestore.collection('tapeheads_submissions').doc(report.id);
-    await submissionRef.set(report, {});
+export async function addTapeheadsSubmission(db: Firestore, report: Report): Promise<void> {
+    await addDoc(collection(db, 'tapeheads_submissions'), report);
 }
 
-export async function updateTapeheadsSubmission(updatedReport: Report): Promise<void> {
-    const submissionRef = firestore.collection('tapeheads_submissions').doc(updatedReport.id);
-    await submissionRef.update({ ...updatedReport });
+export async function updateTapeheadsSubmission(db: Firestore, updatedReport: Report): Promise<void> {
+    const submissionRef = doc(db, 'tapeheads_submissions', updatedReport.id);
+    await updateDoc(submissionRef, { ...updatedReport });
 }
 
-export async function deleteTapeheadsSubmission(id: string): Promise<void> {
-    const submissionRef = firestore.collection('tapeheads_submissions').doc(id);
-    await submissionRef.delete();
+export async function deleteTapeheadsSubmission(db: Firestore, id: string): Promise<void> {
+    const submissionRef = doc(db, 'tapeheads_submissions', id);
+    await deleteDoc(submissionRef);
 }
 
 

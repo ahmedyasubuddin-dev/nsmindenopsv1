@@ -155,6 +155,8 @@ function Section({ title, description, children }: { title: string, description?
 
 export function GantryReportForm() {
   const { toast } = useToast();
+  const firestore = useFirestore();
+
   const form = useForm<GantryReportFormValues>({
     resolver: zodResolver(gantryReportSchema),
     defaultValues,
