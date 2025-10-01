@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { DatePicker } from '@/components/ui/date-picker';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/componentsui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { deleteTapeheadsSubmission, type Report } from '@/lib/data-store';
 import { isSameDay } from 'date-fns';
 import { Textarea } from '../ui/textarea';
@@ -128,7 +128,7 @@ export function TapeheadsReviewSummary() {
             where('date', '<=', endDate)
         );
         const querySnapshot = await getDocs(q);
-        const reports = querySnapshot.docs.map(doc => doc.data() as Report);
+        const reports = querySnapshot.docs.map(doc => ({...doc.data(), id: doc.id} as Report));
         setSubmissions(reports);
     } catch (error) {
         console.error("Error fetching submissions:", error);
@@ -336,6 +336,8 @@ export function TapeheadsReviewSummary() {
     </div>
   );
 }
+
+    
 
     
 
