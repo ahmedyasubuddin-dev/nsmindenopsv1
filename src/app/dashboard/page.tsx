@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip } from "recharts";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -39,7 +39,7 @@ export default function DashboardPage() {
     const [isClient, setIsClient] = useState(false);
     const role = getRoleFromEmail(user?.email);
 
-    const canView = (permission: any) => hasPermission(role, permission);
+    const canView = useCallback((permission: any) => hasPermission(role, permission), [role]);
 
     const tapeheadsQuery = useMemoFirebase(() => (isUserLoading || !canView('nav:report:tapeheads')) ? null : query(collection(firestore, 'tapeheads-submissions')), [firestore, isUserLoading, role]);
     const { data: tapeheadsSubmissions, isLoading: isLoadingTapeheads } = useCollection<Report>(tapeheadsQuery);
