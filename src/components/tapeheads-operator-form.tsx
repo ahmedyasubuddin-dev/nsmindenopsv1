@@ -1,5 +1,4 @@
 
-
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -33,7 +32,7 @@ import { MultiSelect, MultiSelectOption } from "./ui/multi-select"
 import { useRouter } from "next/navigation"
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group"
 import { addTapeheadsSubmission, updateTapeheadsSubmission, markPanelsAsCompleted } from "@/lib/data-store"
-import type { Report, WorkItem, OeJob, OeSection } from "@/lib/data-store"
+import type { Report, OeJob, OeSection } from "@/lib/data-store"
 import { useCollection, useFirebase, useMemoFirebase, useAuth as useFirebaseAuth } from "@/firebase"
 import { collection, query } from "firebase/firestore"
 
@@ -431,7 +430,7 @@ function WorkItemCard({ index, remove, control, isEditMode, oeJobs }: { index: n
   const { firestore } = useFirebase();
   const { isUserLoading } = useFirebaseAuth();
   
-  const submissionsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'tapeheads-submissions')), []);
+  const submissionsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'tapeheads-submissions')), [isUserLoading]);
   const { data: allSubmissions, isLoading: isLoadingSubmissions } = useCollection<Report>(submissionsQuery);
 
   const watchOeNumber = useWatch({ control, name: `workItems.${index}.oeNumber` });
