@@ -19,14 +19,16 @@ import {
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Checkbox } from "./ui/checkbox"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
-import { GraphicsKanbanBoard } from "./graphics/graphics-kanban-board"
+import { Checkbox } from "../ui/checkbox"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs"
+import { GraphicsKanbanBoard } from "./graphics-kanban-board"
 import type { GraphicsTask as Task } from "@/lib/data-store"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "./ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "../ui/dialog"
 import { sendShippingNotification } from "@/ai/flows/send-notification-flow"
-import { getGraphicsTasks, setGraphicsTasks } from "@/lib/data-store"
+import { updateGraphicsTask, deleteGraphicsTask, addGraphicsTask } from "@/lib/data-store"
 import { PageHeader } from "@/components/page-header"
+import { useCollection, useFirebase, useMemoFirebase, useAuth as useFirebaseAuth } from "@/firebase"
+import { collection, query } from "firebase/firestore"
 
 
 const personnelSchema = z.object({
@@ -77,9 +79,17 @@ function Section({ title, description, children, actions }: { title: string, des
 
 export function GraphicsReportForm() {
     const { toast } = useToast();
-    const [tasks, setTasks] = useState<Task[]>([]);
+    const { firestore } = useFirebase();
+    const { isUserLoading } = useFirebaseAuth();
+    
+    const tasksQuery = useMemoFirebase(() => {
+      if (isUserLoading) return null;
+      return query(collection(firestore, 'graphics-tasks'));
+    }, [firestore, isUserLoading]);
+    
+    const { data: tasks, isLoading: isLoadingTasks } = useCollection<Task>(tasksQuery);
+    
     const [notifiedTags, setNotifiedTags] = useState<Set<string>>(new Set());
-    const [loading, setLoading] = useState(true);
 
     const form = useForm<GraphicsReportFormValues>({
         resolver: zodResolver(graphicsReportSchema),
@@ -97,19 +107,13 @@ export function GraphicsReportForm() {
         mode: "onBlur"
     });
 
-    useEffect(() => {
-        getGraphicsTasks().then(tasks => {
-            setTasks(tasks);
-            setLoading(false);
-        });
-    }, []);
-    
      useEffect(() => {
+        if (!tasks) return;
+
         const checkFinishedTags = async () => {
             const finishedTagIds = new Set<string>();
             const tagTaskMap: Record<string, Task[]> = {};
 
-            // Group tasks by tagId
             tasks.forEach(task => {
                 if (!task.tagId) return;
                 if (!tagTaskMap[task.tagId]) {
@@ -167,70 +171,61 @@ export function GraphicsReportForm() {
     const { fields: personnelFields, append: appendPersonnel, remove: removePersonnel } = useFieldArray({ control: form.control, name: "personnel" });
     const { fields: maintenanceFields, append: appendMaintenance, remove: removeMaintenance } = useFieldArray({ control: form.control, name: "maintenance_tasks" });
     
-    const updateTasks = async (newTasks: Task[]) => {
-      setTasks(newTasks);
-      await setGraphicsTasks(newTasks);
-    };
-
-    const addNewTask = (type: 'cutting' | 'inking') => {
+    const addNewTask = async (type: 'cutting' | 'inking') => {
         const timestamp = Date.now();
-        const currentTasks = tasks;
-
-        const cuttingTask: Task = {
-            id: `cut-${timestamp}`, type: 'cutting', tagId: '', status: 'todo',
-            content: '', tagType: 'Sail', startedAt: new Date().toISOString(),
-        };
-
-        const inkingTask: Task = {
-            id: `ink-${timestamp}`, type: 'inking', tagId: '', status: 'todo',
-            content: '', tagType: 'Sail', startedAt: new Date().toISOString(),
-        };
-
-        let newTasks;
-        // If it's a cutting task for a sail, add both. Otherwise just add one.
+        
         if (type === 'cutting') {
-            newTasks = [...currentTasks, cuttingTask, inkingTask];
+             const cuttingTask: Omit<Task, 'id'> = {
+                type: 'cutting', tagId: '', status: 'todo',
+                content: '', tagType: 'Sail', startedAt: new Date().toISOString(),
+            };
+            const inkingTask: Omit<Task, 'id'> = {
+                type: 'inking', tagId: '', status: 'todo',
+                content: '', tagType: 'Sail', startedAt: new Date().toISOString(),
+            };
+            await addGraphicsTask(firestore, { ...cuttingTask });
+            await addGraphicsTask(firestore, { ...inkingTask });
             toast({ title: "Task Pair Added", description: `A new Cutting and Inking task pair has been created.` });
+
         } else {
-            // For decals or manual inking tasks
-             newTasks = [...currentTasks, inkingTask];
+            const inkingTask: Omit<Task, 'id'> = {
+                type: 'inking', tagId: '', status: 'todo',
+                content: '', tagType: 'Sail', startedAt: new Date().toISOString(),
+            };
+             await addGraphicsTask(firestore, { ...inkingTask });
              toast({ title: "Task Added", description: `A new Inking task has been created.` });
         }
-        
-        updateTasks(newTasks);
     }
     
-    const updateTask = (updatedTask: Task) => {
-        let newTasks = tasks.map(task => task.id === updatedTask.id ? updatedTask : task);
+    const onUpdateTask = async (updatedTask: Task) => {
+        await updateGraphicsTask(firestore, updatedTask);
         
-        // If a cutting task is updated, sync its details to the corresponding inking task
         if (updatedTask.type === 'cutting') {
             const correspondingInkingId = updatedTask.id.replace('cut-', 'ink-');
-            newTasks = newTasks.map(t => 
-                t.id === correspondingInkingId 
-                    ? { ...t, 
-                        tagId: updatedTask.tagId,
-                        tagType: updatedTask.tagType,
-                        sidedness: updatedTask.sidedness,
-                        sideOfWork: updatedTask.sideOfWork,
-                        content: updatedTask.content, // sync content as well
-                      } 
-                    : t
-            );
+            const inkingTask = tasks?.find(t => t.id === correspondingInkingId);
+            if (inkingTask) {
+                const syncedInkingTask = {
+                    ...inkingTask,
+                    tagId: updatedTask.tagId,
+                    tagType: updatedTask.tagType,
+                    sidedness: updatedTask.sidedness,
+                    sideOfWork: updatedTask.sideOfWork,
+                    content: updatedTask.content,
+                };
+                await updateGraphicsTask(firestore, syncedInkingTask);
+            }
         }
-
-        updateTasks(newTasks);
     }
     
-    const deleteTask = (taskId: string) => {
-        const newTasks = tasks.filter(task => task.id !== taskId);
-        updateTasks(newTasks);
+    const onDeleteTask = async (taskId: string) => {
+        await deleteGraphicsTask(firestore, taskId);
+        toast({ title: "Task Deleted", variant: "destructive" });
     }
 
-    const cuttingTasks = tasks.filter(t => t.type === 'cutting');
-    const inkingTasks = tasks.filter(t => t.type === 'inking');
+    const cuttingTasks = tasks?.filter(t => t.type === 'cutting') || [];
+    const inkingTasks = tasks?.filter(t => t.type === 'inking') || [];
 
-    if (loading) {
+    if (isLoadingTasks) {
         return <div>Loading tasks...</div>
     }
 
@@ -298,10 +293,10 @@ export function GraphicsReportForm() {
                         <TabsTrigger value="inking">Inking Tasks</TabsTrigger>
                     </TabsList>
                     <TabsContent value="cutting">
-                        <GraphicsKanbanBoard tasks={cuttingTasks} setTasks={updateTasks} type="cutting" onUpdateTask={updateTask} onDeleteTask={deleteTask} onAddTask={() => addNewTask('cutting')} />
+                        <GraphicsKanbanBoard tasks={cuttingTasks} type="cutting" onUpdateTask={onUpdateTask} onDeleteTask={onDeleteTask} onAddTask={() => addNewTask('cutting')} />
                     </TabsContent>
                     <TabsContent value="inking">
-                        <GraphicsKanbanBoard tasks={inkingTasks} setTasks={updateTasks} type="inking" onUpdateTask={updateTask} onDeleteTask={deleteTask} onAddTask={() => addNewTask('inking')} />
+                        <GraphicsKanbanBoard tasks={inkingTasks} type="inking" onUpdateTask={onUpdateTask} onDeleteTask={onDeleteTask} onAddTask={() => addNewTask('inking')} />
                     </TabsContent>
                 </Tabs>
             </div>
