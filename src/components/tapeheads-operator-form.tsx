@@ -33,7 +33,7 @@ import { useRouter } from "next/navigation"
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group"
 import { addTapeheadsSubmission, updateTapeheadsSubmission, markPanelsAsCompleted } from "@/lib/data-store"
 import type { Report, OeJob, OeSection } from "@/lib/data-store"
-import { useCollection, useFirebase, useMemoFirebase, useAuth as useFirebaseAuth } from "@/firebase"
+import { useCollection, useFirebase, useAuth as useFirebaseAuth } from "@/firebase"
 import { collection, query } from "firebase/firestore"
 
 const tapeIdsList = [
@@ -150,7 +150,7 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
   const { firestore } = useFirebase();
   const { isUserLoading } = useFirebaseAuth();
 
-  const jobsQuery = useMemoFirebase(() => query(collection(firestore, 'jobs')), []);
+  const jobsQuery = useMemo(() => query(collection(firestore, 'jobs')), [firestore]);
   const { data: oeJobs, isLoading: isLoadingJobs } = useCollection<OeJob>(jobsQuery);
   
   const isEditMode = !!reportToEdit;
@@ -430,7 +430,7 @@ function WorkItemCard({ index, remove, control, isEditMode, oeJobs }: { index: n
   const { firestore } = useFirebase();
   const { isUserLoading } = useFirebaseAuth();
   
-  const submissionsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'tapeheads-submissions')), [isUserLoading]);
+  const submissionsQuery = useMemo(() => isUserLoading ? null : query(collection(firestore, 'tapeheads-submissions')), [isUserLoading, firestore]);
   const { data: allSubmissions, isLoading: isLoadingSubmissions } = useCollection<Report>(submissionsQuery);
 
   const watchOeNumber = useWatch({ control, name: `workItems.${index}.oeNumber` });
