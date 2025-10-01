@@ -33,7 +33,7 @@ import { useRouter } from "next/navigation"
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group"
 import { addTapeheadsSubmission, updateTapeheadsSubmission, markPanelsAsCompleted } from "@/lib/data-store"
 import type { Report, OeJob, OeSection } from "@/lib/data-store"
-import { useCollection, useFirebase, useMemoFirebase, useAuth as useFirebaseAuth } from "@/firebase"
+import { useCollection, useFirebase, useMemoFirebase, useUser } from "@/firebase"
 import { collection, query } from "firebase/firestore"
 
 const tapeIdsList = [
@@ -147,11 +147,14 @@ interface TapeheadsOperatorFormProps {
 export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsOperatorFormProps) {
   const { toast } = useToast();
   const router = useRouter();
-  const { firestore } = useFirebase();
+  const { firestore, isUserLoading } = useFirebase();
   
   const jobsQuery = useMemoFirebase(() => query(collection(firestore, 'jobs')), []);
   const { data: oeJobs, isLoading: isLoadingJobs } = useCollection<OeJob>(jobsQuery);
-  
+
+  const submissionsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'tapeheads-submissions')), [isUserLoading, firestore]);
+  const { data: allSubmissions, isLoading: isLoadingSubmissions } = useCollection<Report>(submissionsQuery);
+
   const isEditMode = !!reportToEdit;
 
   const defaultValues = useMemo(() => {
@@ -338,7 +341,7 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
     });
   }
   
-  if (isLoadingJobs) {
+  if (isLoadingJobs || isLoadingSubmissions) {
     return <div>Loading...</div>
   }
 
@@ -399,7 +402,7 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
                  )}
                 <div className="space-y-4">
                   {workItemFields.map((field, index) => (
-                    <WorkItemCard key={field.id} index={index} remove={removeWorkItem} control={form.control} isEditMode={isEditMode} oeJobs={oeJobs || []} />
+                    <WorkItemCard key={field.id} index={index} remove={removeWorkItem} control={form.control} isEditMode={isEditMode} oeJobs={oeJobs || []} allSubmissions={allSubmissions || []} />
                   ))}
                 </div>
               </div>
@@ -424,14 +427,9 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
   )
 }
 
-function WorkItemCard({ index, remove, control, isEditMode, oeJobs }: { index: number, remove: (index: number) => void, control: any, isEditMode: boolean, oeJobs: OeJob[] }) {
+function WorkItemCard({ index, remove, control, isEditMode, oeJobs, allSubmissions }: { index: number, remove: (index: number) => void, control: any, isEditMode: boolean, oeJobs: OeJob[], allSubmissions: Report[] }) {
   const { toast } = useToast();
-  const { firestore } = useFirebase();
-  const { isUserLoading } = useFirebaseAuth();
   
-  const submissionsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'tapeheads-submissions')), [isUserLoading, firestore]);
-  const { data: allSubmissions, isLoading: isLoadingSubmissions } = useCollection<Report>(submissionsQuery);
-
   const watchOeNumber = useWatch({ control, name: `workItems.${index}.oeNumber` });
   const watchSection = useWatch({ control, name: `workItems.${index}.section` });
   const watchPanelsWorkedOn = useWatch({ control, name: `workItems.${index}.panelsWorkedOn` });
@@ -444,11 +442,11 @@ function WorkItemCard({ index, remove, control, isEditMode, oeJobs }: { index: n
   const { fields: nestedPanelFields, append: appendNestedPanel, remove: removeNestedPanel } = useFieldArray({ control: control, name: `workItems.${index}.nestedPanels` });
 
   useEffect(() => {
-    if (isLoadingSubmissions || !watchOeNumber || !watchSection || !watchPanelsWorkedOn || watchPanelsWorkedOn.length === 0 || isEditMode) {
+    if (!watchOeNumber || !watchSection || !watchPanelsWorkedOn || watchPanelsWorkedOn.length === 0 || isEditMode) {
       return;
     }
 
-    const isPanelInProgress = (allSubmissions || []).some(report =>
+    const isPanelInProgress = allSubmissions.some(report =>
       report.workItems?.some(item => {
         if (item.oeNumber !== watchOeNumber || item.section !== watchSection || item.endOfShiftStatus !== 'In Progress') {
           return false;
@@ -467,7 +465,7 @@ function WorkItemCard({ index, remove, control, isEditMode, oeJobs }: { index: n
         variant: "destructive",
       });
     }
-  }, [watchOeNumber, watchSection, watchPanelsWorkedOn, toast, isEditMode, allSubmissions, isLoadingSubmissions]);
+  }, [watchOeNumber, watchSection, watchPanelsWorkedOn, toast, isEditMode, allSubmissions]);
   
   const availableOes = useMemo(() => oeJobs ? [...new Set(oeJobs.map(j => j.oeBase))] : [], [oeJobs]);
   
