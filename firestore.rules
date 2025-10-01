@@ -1,119 +1,171 @@
-/**
- * @fileoverview Firestore Security Rules for SRD Minden.
- *
- * Core Philosophy:
- * This ruleset enforces a role-based and ownership-based access control model.
- * Users can only read and write their own data, with the exception of administrators who can manage all data.
- * Data related to departments and shifts is generally readable, but write access is restricted.
- *
- * Data Structure:
- * - /departments/{departmentId}: Stores department information.
- * - /departments/{departmentId}/shifts/{shiftId}: Stores shift information for each department.
- * - /users/{userId}: Stores user information.
- * - /departments/{departmentId}/reports/{reportId}: Stores reports for each department.
- * - /roles_admin/{userId}: Documents in this collection indicate administrative privileges.
- *
- * Key Security Decisions:
- * - Users can only create, update, or delete their own user documents.
- * - Reports are scoped to departments, and users can only create reports within their own department.
- * - Only administrators can create, update, or delete departments and shifts.
- * - Listing of users is disallowed for security.
- *
- * Denormalization for Authorization:
- * - The Report document contains a `userId` field, which is used to enforce ownership.
- * - The User document contains a `departmentId` and `role` which is used to filter data in Reports.
- *
- * Structural Segregation:
- * - Reports are separated by department to simplify security rules and ensure consistent access requirements.
- */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    function isAdmin() {
-          return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
-    }
-
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
+    /**
+     * @description Allows anyone to read Job information. Allows anyone to create, update, and delete Job information.
+     * @path /jobs/{jobId}
+     * @allow (get, list)
+     * @allow (create)
+     * @allow (update)
+     * @allow (delete)
+     * @deny None.
+     * @principle Allows anyone to create, read, update, and delete Job information.
+     */
+    match /jobs/{jobId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
     }
 
     /**
-     * @description Allows admins to manage departments.
+     * @description Allows anyone to read Department information. Allows anyone to create, update, and delete Department information.
      * @path /departments/{departmentId}
-     * @allow (create, update, delete) - Admin can create a new department.
-     * @deny (create, update, delete) - Non-admin user attempts to create a new department.
-     * @principle Enforces admin-only access for department management.
+     * @allow (get, list)
+     * @allow (create)
+     * @allow (update)
+     * @allow (delete)
+     * @deny None.
+     * @principle Allows anyone to create, read, update, and delete Department information.
      */
     match /departments/{departmentId} {
-      allow get, list: if true;
-      allow create, update, delete: if isAdmin();
+      allow get: if true;
+      allow list: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
     }
 
     /**
-     * @description Allows admins to manage shifts within departments.
+     * @description Allows anyone to read Shift information. Allows anyone to create, update, and delete Shift information.
      * @path /departments/{departmentId}/shifts/{shiftId}
-     * @allow (create, update, delete) - Admin can create a new shift.
-     * @deny (create, update, delete) - Non-admin user attempts to create a new shift.
-     * @principle Enforces admin-only access for shift management.
+     * @allow (get, list)
+     * @allow (create)
+     * @allow (update)
+     * @allow (delete)
+     * @deny None.
+     * @principle Allows anyone to create, read, update, and delete Shift information.
      */
     match /departments/{departmentId}/shifts/{shiftId} {
-      allow get, list: if true;
-      allow create, update, delete: if isAdmin();
+      allow get: if true;
+      allow list: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
     }
 
     /**
-     * @description Allows users to manage their own user documents.
+     * @description Manages user profiles, ensuring users can only access their own data.
      * @path /users/{userId}
-     * @allow (create) - User can create their own user document.
-     * @allow (get, update, delete) - User can get, update, and delete their own user document.
-     * @deny (create, update, delete) - User attempts to modify another user's document.
-     * @principle Enforces document ownership for user management.
+     * @allow (get, list) User 'bob' with UID 'bob' can read their own profile document.
+     * @allow (create) User 'bob' with UID 'bob' can create their profile document.
+     * @allow (update) User 'bob' with UID 'bob' can update their own profile document.
+     * @allow (delete) User 'bob' with UID 'bob' can delete their own profile document.
+     * @deny (get, list) User 'alice' with UID 'alice' cannot read user 'bob's profile document.
+     * @deny (create) User 'alice' with UID 'alice' cannot create a profile document for user 'bob'.
+     * @deny (update) User 'alice' with UID 'alice' cannot update user 'bob's profile document.
+     * @deny (delete) User 'alice' with UID 'alice' cannot delete user 'bob's profile document.
+     * @principle Enforces strict user ownership.
      */
     match /users/{userId} {
-      allow get: if isOwner(userId) || isAdmin();
+      allow get: if isOwner(userId);
       allow list: if false;
-      allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId) || isAdmin();
-      allow delete: if isExistingOwner(userId) || isAdmin();
+      allow create: if request.auth.uid == userId;
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId);
     }
 
     /**
-     * @description Allows users to create reports within their department, and admins to manage all reports.
+     * @description Allows anyone to read Report information. Allows anyone to create, update, and delete Report information.
      * @path /departments/{departmentId}/reports/{reportId}
-     * @allow (create) - User can create a report in their department.
-     * @allow (get, list, update, delete) - Admin can manage any report. User can only read/update/delete their own report.
-     * @deny (create, update, delete) - User attempts to create a report in another department.
-     * @principle Enforces department-based report creation and admin-only management.
+     * @allow (get, list)
+     * @allow (create)
+     * @allow (update)
+     * @allow (delete)
+     * @deny None.
+     * @principle Allows anyone to create, read, update, and delete Report information.
      */
     match /departments/{departmentId}/reports/{reportId} {
-        allow get, list: if isAdmin();
-        allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-        allow update, delete: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
+      allow get: if true;
+      allow list: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
     }
 
     /**
-     * @description Allows admins to manage admin roles. Existence of the document grants admin access.
+     * @description Controls admin role assignments.
      * @path /roles_admin/{userId}
-     * @allow (create) - Admin can assign admin role to a user.
-     * @allow (get, delete) - Admin can view and revoke admin role from a user.
-     * @deny (create, update, delete) - Non-admin user attempts to manage admin roles.
-     * @principle Enforces admin-only access for role management.
+     * @allow (get) User 'bob' with UID 'bob' can read their own admin role document.
+     * @allow (create) An admin can create an admin role document for user 'bob'.
+     * @deny (get) User 'alice' with UID 'alice' cannot read user 'bob's admin role document.
+     * @deny (create) User 'alice' without admin privileges cannot create an admin role document.
+     * @deny (update) No one can update an admin role document (deletion and recreation are used instead).
+     * @deny (delete) Only admins can delete an admin role document.
+     * @principle Grants admin privileges based on document existence, managed by other admins.
      */
     match /roles_admin/{userId} {
-      allow get: if isAdmin();
+      allow get: if isOwner(userId);
       allow list: if false;
       allow create: if isAdmin();
       allow update: if false;
       allow delete: if isAdmin();
     }
+
+    /**
+     * @description Allows anyone to read Films Reports information. Allows anyone to create, update, and delete Films Reports information.
+     * @path /films/{reportId}
+     * @allow (get, list)
+     * @allow (create)
+     * @allow (update)
+     * @allow (delete)
+     * @deny None.
+     * @principle Allows anyone to create, read, update, and delete Films Reports information.
+     */
+    match /films/{reportId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
+    }
+  }
+
+  // ----- Helper functions -----
+
+  /**
+   * @description Checks if the current user is signed in.
+   * @return {bool} True if the user is signed in, false otherwise.
+   */
+  function isSignedIn() {
+    return request.auth != null;
+  }
+
+  /**
+   * @description Checks if the current user is the owner of the document.
+   * @param {string} userId The user ID to compare against the request's auth UID.
+   * @return {bool} True if the user is the owner, false otherwise.
+   */
+  function isOwner(userId) {
+    return isSignedIn() && request.auth.uid == userId;
+  }
+
+    /**
+   * @description Checks if the current user is the owner of the existing document.
+   * @param {string} userId The user ID to compare against the request's auth UID.
+   * @return {bool} True if the user is the owner and document exists, false otherwise.
+   */
+  function isExistingOwner(userId) {
+      return isOwner(userId) && exists(resource.data);
+  }
+
+  /**
+   * @description Checks if the current user has admin privileges.
+   * @return {bool} True if the user is an admin, false otherwise.
+   */
+  function isAdmin() {
+    return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
   }
 }

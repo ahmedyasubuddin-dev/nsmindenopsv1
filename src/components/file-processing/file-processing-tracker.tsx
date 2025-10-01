@@ -10,7 +10,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { addOeJob } from '@/lib/data-store';
 import { PlusCircle, Trash2 } from 'lucide-react';
 import {
   AlertDialog,
@@ -24,6 +23,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '../ui/badge';
 import { Alert, AlertDescription } from '../ui/alert';
+import { useFirestore } from '@/firebase';
+import { collection, addDoc } from 'firebase/firestore';
 
 const sectionSchema = z.object({
   sectionId: z.string().min(1, 'Sail # is required.').length(3, 'Must be 3 digits.'),
@@ -61,6 +62,7 @@ type OeTrackerFormValues = z.infer<typeof oeTrackerSchema>;
 
 export function FileProcessingTracker() {
   const { toast } = useToast();
+  const firestore = useFirestore();
   const [isReviewing, setIsReviewing] = useState(false);
   const [reviewData, setReviewData] = useState<OeTrackerFormValues | null>(null);
 
@@ -84,17 +86,20 @@ export function FileProcessingTracker() {
   };
   
   const onFinalSubmit = async () => {
-    if (!reviewData) return;
+    if (!reviewData || !firestore) return;
     
+    const newJob = {
+      oeBase: reviewData.oeBase,
+      status: 'pending',
+      sections: reviewData.sections.map(s => ({
+        ...s,
+        completedPanels: [],
+      })),
+    };
+
     try {
-        await addOeJob({
-            oeBase: reviewData.oeBase,
-            sections: reviewData.sections.map(s => ({
-                sectionId: s.sectionId,
-                panelStart: s.panelStart,
-                panelEnd: s.panelEnd,
-            })),
-        });
+        const jobsCollection = collection(firestore, 'jobs');
+        await addDoc(jobsCollection, newJob);
         
         toast({
             title: 'OE Job Initialized',

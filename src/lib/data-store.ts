@@ -8,33 +8,6 @@ import { firestore } from '@/firebase/server-init';
 import type { Report, FilmsReport, GantryReport, GraphicsTask, InspectionSubmission, OeJob, PreggerReport, WorkItem, TapeUsage } from './types';
 
 
-export async function addOeJob(job: { oeBase: string, sections: Array<{ sectionId: string, panelStart: number, panelEnd: number }> }): Promise<void> {
-    const newJob = {
-        oeBase: job.oeBase,
-        status: 'pending',
-        sections: job.sections.map(s => ({ ...s, completedPanels: [] })),
-    };
-    const jobsCollection = firestore.collection('jobs');
-    
-    try {
-        await jobsCollection.add(newJob);
-    } catch (error) {
-        // This is a server-side operation.
-        // A more robust solution would involve a dedicated server-side logging mechanism.
-        console.error("Error in addOeJob:", error);
-        throw error;
-    }
-}
-
-export async function addFilmsReport(report: Omit<FilmsReport, 'id'>): Promise<void> {
-    const newReport = {
-        id: `film_rpt_${Date.now()}`,
-        ...report,
-    };
-    const reportRef = firestore.collection('films').doc(newReport.id);
-    await reportRef.set(newReport, { merge: true });
-}
-
 export async function getGraphicsTasks(): Promise<GraphicsTask[]> {
     const snapshot = await firestore.collection('graphics_tasks').get();
     if (snapshot.empty) {
