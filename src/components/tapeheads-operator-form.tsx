@@ -229,11 +229,18 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
                 metersPerManHour: 0,
                 workItems: [{
                     ...workItemToContinue,
+                    oeNumber: workItemToContinue.oeNumber || '',
+                    section: workItemToContinue.section || '',
+                    endOfShiftStatus: workItemToContinue.endOfShiftStatus || 'In Progress',
+                    layer: workItemToContinue.layer || '',
+                    tapes: workItemToContinue.tapes || [],
                     hadSpinOut: workItemToContinue.had_spin_out,
                     spinOuts: workItemToContinue.spin_outs,
                     spinOutDuration: workItemToContinue.spin_out_duration_minutes,
-                    problems: workItemToContinue.issues,
+                    problems: workItemToContinue.issues || [],
                     panelWorkType: workItemToContinue.nestedPanels && workItemToContinue.nestedPanels.length > 0 ? 'nested' : 'individual',
+                    panelsWorkedOn: workItemToContinue.panelsWorkedOn || [],
+                    nestedPanels: workItemToContinue.nestedPanels || []
                 }],
                 checklist: checklistItems.reduce((acc, item) => ({...acc, [item.id]: false}), {})
             });
@@ -311,16 +318,17 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
                 oeNumber: item.oeNumber,
                 section: item.section,
                 endOfShiftStatus: item.endOfShiftStatus as 'Completed' | 'In Progress',
-                layer: item.layer,
+                layer: item.layer || '',
                 tapes: item.tapes,
                 total_meters: totalMeters,
                 total_tapes: (item.tapes || []).length,
                 had_spin_out: item.hadSpinOut,
-                spin_outs: item.spinOuts,
-                spin_out_duration_minutes: item.spinOutDuration,
-                issues: item.problems,
+                spin_outs: item.spinOuts || 0,
+                spin_out_duration_minutes: item.spinOutDuration || 0,
+                issues: item.problems || [],
                 panelsWorkedOn: item.panelsWorkedOn,
-                nestedPanels: item.nestedPanels,
+                nestedPanels: item.nestedPanels || [],
+                materialType: '', // This field seems to be missing from the form but present in some types
             }
         }),
         checklist: values.checklist,
@@ -505,7 +513,7 @@ function WorkItemCard({ index, remove, control, isEditMode }: { index: number, r
       const job = oeJobs.find(j => j.oeBase === watchOeNumber);
       if (!job) return [];
       
-      const sections = Array.isArray(job.sections) ? job.sections : Object.values(job.sections);
+      const sections = Array.isArray(job.sections) ? job.sections : Object.values(job.sections || {});
       const sail = sections.find(s => s.sectionId === watchSection);
       if (!sail) return [];
       
@@ -578,15 +586,15 @@ function WorkItemCard({ index, remove, control, isEditMode }: { index: number, r
               <FormField control={control} name={`workItems.${index}.hadSpinOut`} render={({ field }) => (<FormItem className="flex items-center gap-2"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><FormLabel>Had Spin Out?</FormLabel></FormItem>)} />
               {watchHadSpinout && (
                   <div className="grid grid-cols-2 gap-4">
-                    <FormField control={control} name={`workItems.${index}.spinOuts`} render={({ field }) => (<FormItem><FormLabel># of Spin-outs</FormLabel><FormControl><Input type="number" placeholder="1" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
-                    <FormField control={control} name={`workItems.${index}.spinOutDuration`} render={({ field }) => (<FormItem><FormLabel>Spin Out Duration (minutes)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={control} name={`workItems.${index}.spinOuts`} render={({ field }) => (<FormItem><FormLabel># of Spin-outs</FormLabel><FormControl><Input type="number" placeholder="1" {...field} value={field.value ?? 0} /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={control} name={`workItems.${index}.spinOutDuration`} render={({ field }) => (<FormItem><FormLabel>Spin Out Duration (minutes)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? 0} /></FormControl><FormMessage /></FormItem>)} />
                   </div>
               )}
               <h4 className="font-medium pt-2">Problems</h4>
               {problemFields.map((field: any, problemIndex: number) => (
                   <div key={field.id} className="flex items-end gap-4 p-4 border rounded-md">
                       <FormField control={control} name={`workItems.${index}.problems.${problemIndex}.problem_reason`} render={({ field }) => (<FormItem className="flex-1"><FormLabel>Problem Reason</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
-                      <FormField control={control} name={`workItems.${index}.problems.${problemIndex}.duration_minutes`} render={({ field }) => (<FormItem><FormLabel>Duration (min)</FormLabel><FormControl><Input type="number" value={field.value ?? ''} onChange={field.onChange} /></FormControl><FormMessage /></FormItem>)} />
+                      <FormField control={control} name={`workItems.${index}.problems.${problemIndex}.duration_minutes`} render={({ field }) => (<FormItem><FormLabel>Duration (min)</FormLabel><FormControl><Input type="number" value={field.value ?? 0} onChange={field.onChange} /></FormControl><FormMessage /></FormItem>)} />
                       <Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={() => removeProblem(problemIndex)}><Trash2 className="size-4" /></Button>
                   </div>
               ))}
