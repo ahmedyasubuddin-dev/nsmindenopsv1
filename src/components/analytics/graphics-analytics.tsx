@@ -14,6 +14,8 @@ import { sendShippingNotification } from '@/ai/flows/send-notification-flow';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore } from '@/firebase';
 import { collection, getDocs } from 'firebase/firestore';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase';
 
 export function GraphicsAnalytics() {
     const [date, setDate] = useState<Date | undefined>(new Date());
@@ -27,9 +29,17 @@ export function GraphicsAnalytics() {
         async function fetchData() {
             if (!firestore) return;
             setLoading(true);
-            const snapshot = await getDocs(collection(firestore, 'graphics_tasks'));
-            setAllTasks(snapshot.docs.map(doc => doc.data() as GraphicsTask));
-            setLoading(false);
+            try {
+                const snapshot = await getDocs(collection(firestore, 'graphics_tasks'));
+                setAllTasks(snapshot.docs.map(doc => doc.data() as GraphicsTask));
+            } catch (error) {
+                 errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: 'graphics_tasks',
+                    operation: 'list'
+                }));
+            } finally {
+                setLoading(false);
+            }
         }
         fetchData();
     }, [firestore]);
@@ -223,5 +233,3 @@ export function GraphicsAnalytics() {
         </div>
     );
 }
-
-    

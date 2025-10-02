@@ -22,11 +22,23 @@ import type { Report, FilmsReport, GantryReport, GraphicsTask, InspectionSubmiss
 
 export async function getGraphicsTasks(db: Firestore): Promise<GraphicsTask[]> {
     if (!db) return [];
-    const snapshot = await getDocs(collection(db, 'graphics_tasks'));
-    if (snapshot.empty) {
+    const graphicsTasksCollection = collection(db, 'graphics_tasks');
+    try {
+        const snapshot = await getDocs(graphicsTasksCollection);
+        if (snapshot.empty) {
+            return [];
+        }
+        return snapshot.docs.map(doc => doc.data() as GraphicsTask);
+    } catch (error) {
+        errorEmitter.emit(
+            'permission-error',
+            new FirestorePermissionError({
+                path: 'graphics_tasks',
+                operation: 'list',
+            })
+        );
         return [];
     }
-    return snapshot.docs.map(doc => doc.data() as GraphicsTask);
 }
 
 export async function setGraphicsTasks(db: Firestore, tasks: GraphicsTask[]): Promise<void> {
@@ -77,13 +89,14 @@ export async function markPanelsAsCompleted(db: Firestore, oeBase: string, secti
         const job = { id: jobDoc.id, ...jobDoc.data() } as OeJob;
         const jobRef = doc(db, 'jobs', job.id!);
 
-        const sectionIndex = job.sections.findIndex(s => s.sectionId === sectionId);
+        const sections = Array.isArray(job.sections) ? job.sections : Object.values(job.sections || {});
+        const sectionIndex = sections.findIndex(s => s.sectionId === sectionId);
         if (sectionIndex === -1) return;
         
         const updateData: any = {};
         updateData[`sections.${sectionIndex}.completedPanels`] = arrayUnion(...panels);
 
-        const updatedSections = [...job.sections];
+        const updatedSections = [...sections];
         const currentCompleted = updatedSections[sectionIndex].completedPanels || [];
         updatedSections[sectionIndex].completedPanels = [...new Set([...currentCompleted, ...panels])];
 
@@ -162,5 +175,3 @@ export function deleteTapeheadsSubmission(db: Firestore, id: string): void {
 
 
 export { type Report, type FilmsReport, type GantryReport, type GraphicsTask, type InspectionSubmission, type OeJob, type PreggerReport, type WorkItem, type TapeUsage };
-
-    

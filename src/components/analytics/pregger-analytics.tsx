@@ -21,6 +21,8 @@ import { Badge } from "../ui/badge"
 import type { PreggerReport } from "@/lib/types"
 import { useFirestore } from "@/firebase"
 import { collection, getDocs } from "firebase/firestore"
+import { FirestorePermissionError } from "@/firebase"
+import { errorEmitter } from "@/firebase/error-emitter"
 
 const productionChartConfig = {
   shift1: { label: "Shift 1", color: "hsl(var(--chart-1))" },
@@ -53,10 +55,18 @@ export function PreggerAnalytics() {
     async function fetchData() {
         if (!firestore) return;
         setLoading(true);
-        const snapshot = await getDocs(collection(firestore, 'pregger_reports'));
-        const data = snapshot.docs.map(doc => doc.data() as PreggerReport);
-        setAllData(data);
-        setLoading(false);
+        try {
+            const snapshot = await getDocs(collection(firestore, 'pregger_reports'));
+            const data = snapshot.docs.map(doc => doc.data() as PreggerReport);
+            setAllData(data);
+        } catch (error) {
+             errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: 'pregger_reports',
+                operation: 'list'
+            }));
+        } finally {
+            setLoading(false);
+        }
     }
     fetchData();
   }, [firestore]);
@@ -270,5 +280,3 @@ export function PreggerAnalytics() {
     </div>
   )
 }
-
-    
