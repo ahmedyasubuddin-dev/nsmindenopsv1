@@ -30,6 +30,10 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/hooks/use-toast"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
+import { useFirestore } from "@/firebase"
+import { collection, addDoc } from "firebase/firestore"
+import { errorEmitter } from "@/firebase/error-emitter"
+import { FirestorePermissionError } from "@/firebase/errors"
 
 const tapeIdsList = [
     "928108", "938108", "938108T", "928128", "938128T", "*938138*",
@@ -104,6 +108,7 @@ function SectionHeader({ title, description }: { title: string, description?: st
 
 export function PreggerReportForm() {
   const { toast } = useToast();
+  const firestore = useFirestore();
   const form = useForm<PreggerReportFormValues>({
     resolver: zodResolver(preggerReportSchema),
     defaultValues,
@@ -126,12 +131,29 @@ export function PreggerReportForm() {
 
 
   function onSubmit(values: PreggerReportFormValues) {
-    console.log(values);
-    toast({
-      title: "Pregger Report Submitted!",
-      description: "Your detailed report has been successfully submitted.",
-    });
-    form.reset();
+    if (!firestore) {
+      toast({ title: 'Firestore not available', variant: 'destructive' });
+      return;
+    }
+    const reportsCollection = collection(firestore, 'pregger_reports');
+    addDoc(reportsCollection, values)
+      .then(() => {
+        toast({
+          title: "Pregger Report Submitted!",
+          description: "Your detailed report has been successfully submitted.",
+        });
+        form.reset();
+      })
+      .catch((error) => {
+        errorEmitter.emit(
+          'permission-error',
+          new FirestorePermissionError({
+            path: reportsCollection.path,
+            operation: 'create',
+            requestResourceData: values,
+          })
+        );
+      });
   }
 
   return (
@@ -309,7 +331,3 @@ export function PreggerReportForm() {
     </Card>
   )
 }
-
-    
-
-    

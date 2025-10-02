@@ -33,7 +33,9 @@ import { Switch } from "./ui/switch"
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert"
 import type { FilmsReport } from "@/lib/data-store"
 import { useFirestore } from "@/firebase"
-import { collection, getDocs } from "firebase/firestore"
+import { collection, getDocs, addDoc } from "firebase/firestore"
+import { errorEmitter } from "@/firebase/error-emitter"
+import { FirestorePermissionError } from "@/firebase/errors"
 
 const stageOfProcessOptions = [
     "RF Smart Mold Adjust", "Grid Base Film Installation", "Panel Installation", 
@@ -180,12 +182,29 @@ export function GantryReportForm() {
 
 
   function onSubmit(values: GantryReportFormValues) {
-    console.log(values);
-    toast({
-      title: "Gantry Report Submitted!",
-      description: "Your detailed report has been successfully submitted.",
-    });
-    form.reset();
+    if (!firestore) {
+      toast({ title: 'Firestore not available', variant: 'destructive' });
+      return;
+    }
+    const reportsCollection = collection(firestore, 'gantry_reports');
+    addDoc(reportsCollection, values)
+      .then(() => {
+        toast({
+          title: 'Gantry Report Submitted!',
+          description: 'Your detailed report has been successfully submitted.',
+        });
+        form.reset();
+      })
+      .catch((error) => {
+        errorEmitter.emit(
+          'permission-error',
+          new FirestorePermissionError({
+            path: reportsCollection.path,
+            operation: 'create',
+            requestResourceData: values,
+          })
+        );
+      });
   }
   
   return (
@@ -481,5 +500,3 @@ function MoldField({ moldIndex, control, removeMold }: { moldIndex: number, cont
     </Card>
   )
 }
-
-    

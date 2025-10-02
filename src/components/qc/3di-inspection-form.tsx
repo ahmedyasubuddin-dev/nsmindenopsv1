@@ -20,6 +20,10 @@ import { cn } from '@/lib/utils';
 import { Card } from '../ui/card';
 import { defectCategories } from '@/lib/qc-data';
 import { FileDown } from 'lucide-react';
+import { useFirestore } from '@/firebase';
+import { addDoc, collection } from 'firebase/firestore';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 const temperatureSchema = z.object({
   head: z.coerce.number().optional(),
@@ -103,6 +107,7 @@ export type InspectionFormValues = z.infer<typeof inspectionFormSchema>;
 
 export function ThreeDiInspectionForm() {
   const { toast } = useToast();
+  const firestore = useFirestore();
   const methods = useForm<InspectionFormValues>({
     resolver: zodResolver(inspectionFormSchema),
     defaultValues: {
@@ -173,16 +178,33 @@ export function ThreeDiInspectionForm() {
   const showReinspection = totalScore >= 61 && totalScore < 100;
 
   async function onSubmit(data: InspectionFormValues) {
-    console.log({ ...data, totalScore, status: inspectionStatus.text });
-    
-    // Dynamically import the PDF generator only on the client-side
-    const { generatePdf } = await import('@/lib/generate-qc-pdf');
-    await generatePdf(data, { totalScore, statusText: inspectionStatus.text });
-    
-    toast({
-      title: 'Inspection Submitted & PDF Generated',
-      description: `OE# ${data.oeNumber} has been submitted with a score of ${totalScore}.`,
-    });
+    if (!firestore) {
+      toast({ title: 'Firestore not available', variant: 'destructive' });
+      return;
+    }
+    const submissionData = { ...data, totalScore, status: inspectionStatus.text };
+    const inspectionsCollection = collection(firestore, 'inspections');
+
+    addDoc(inspectionsCollection, submissionData)
+      .then(async () => {
+        const { generatePdf } = await import('@/lib/generate-qc-pdf');
+        await generatePdf(data, { totalScore, statusText: inspectionStatus.text });
+        
+        toast({
+          title: 'Inspection Submitted & PDF Generated',
+          description: `OE# ${data.oeNumber} has been submitted with a score of ${totalScore}.`,
+        });
+      })
+      .catch((error) => {
+        errorEmitter.emit(
+          'permission-error',
+          new FirestorePermissionError({
+            path: inspectionsCollection.path,
+            operation: 'create',
+            requestResourceData: submissionData,
+          })
+        );
+      });
   }
 
   const handleExportPdf = async () => {
