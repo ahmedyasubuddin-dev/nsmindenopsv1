@@ -33,7 +33,7 @@ import { Switch } from "./ui/switch"
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert"
 import type { FilmsReport } from "@/lib/data-store"
 import { useFirestore } from "@/firebase"
-import { collection, getDocs, addDoc } from "firebase/firestore"
+import { collection, getDocs, addDoc, onSnapshot } from "firebase/firestore"
 import { errorEmitter } from "@/firebase/error-emitter"
 import { FirestorePermissionError } from "@/firebase/errors"
 
@@ -340,12 +340,17 @@ function MoldField({ moldIndex, control, removeMold }: { moldIndex: number, cont
   const [filmsData, setFilmsData] = React.useState<FilmsReport[]>([]);
   
   React.useEffect(() => {
-    async function fetchData() {
-        if (!firestore) return;
-        const snapshot = await getDocs(collection(firestore, 'films'));
+    if (!firestore) return;
+    const filmsCollection = collection(firestore, 'films');
+    const unsubscribe = onSnapshot(filmsCollection, (snapshot) => {
         setFilmsData(snapshot.docs.map(doc => doc.data() as FilmsReport));
-    }
-    fetchData();
+    }, (error) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: 'films',
+            operation: 'list'
+        }));
+    });
+    return () => unsubscribe();
   }, [firestore]);
 
   const sailsReadyForGantry = React.useMemo(() => {

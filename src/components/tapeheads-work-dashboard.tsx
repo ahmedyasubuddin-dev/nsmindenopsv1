@@ -1,7 +1,7 @@
 
 "use client"
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from './page-header';
@@ -14,7 +14,7 @@ import { Progress } from './ui/progress';
 import { DatePicker } from './ui/date-picker';
 import { format, isSameDay } from 'date-fns';
 import { useFirestore } from '@/firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, onSnapshot } from 'firebase/firestore';
 
 function SubmittedReportCard({ report, workItem, itemIndex }: { report: Report, workItem: WorkItem, itemIndex: number }) {
     const router = useRouter();
@@ -89,36 +89,40 @@ export function TapeheadsWorkDashboard() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const fetchReports = async () => {
-            if (!firestore) return;
-            try {
-                setLoading(true);
-                const snapshot = await getDocs(collection(firestore, 'tapeheads_submissions'));
-                setReports(snapshot.docs.map(doc => doc.data() as Report));
-            } catch (error) {
-                console.error("Error fetching reports:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchReports();
+        if (!firestore) return;
+        setLoading(true);
+        const reportsCollection = collection(firestore, 'tapeheads_submissions');
+        const unsubscribe = onSnapshot(reportsCollection, (snapshot) => {
+            const fetchedReports = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data(),
+                date: doc.data().date.toDate(),
+            } as Report));
+            setReports(fetchedReports);
+            setLoading(false);
+        }, (error) => {
+            console.error("Error fetching reports:", error);
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
     }, [firestore]);
 
-    const filteredWorkItems = React.useMemo(() => {
+    const filteredWorkItems = useMemo(() => {
         if (!reports) return [];
-        return reports.flatMap(report => 
-            (report.workItems || []).map((workItem, index) => ({ report, workItem, id: `${report.id}-${index}` }))
-        ).filter(({ report, workItem }) => {
-            // Rule 1: Always show items that are 'In Progress'
-            if (workItem.endOfShiftStatus === 'In Progress') {
-                return true;
-            }
-            // Rule 2: For other statuses (like 'Completed'), only show if the date matches the filter
-            if (date && isSameDay(new Date(report.date), date)) {
-                return true;
-            }
-            return false;
-        });
+        return reports
+            .flatMap(report => 
+                (report.workItems || []).map((workItem, index) => ({ report, workItem, id: `${report.id}-${index}` }))
+            )
+            .filter(({ report, workItem }) => {
+                if (workItem.endOfShiftStatus === 'In Progress') {
+                    return true;
+                }
+                if (date && isSameDay(new Date(report.date), date)) {
+                    return true;
+                }
+                return false;
+            });
     }, [date, reports]);
     
     if (loading) {
@@ -161,7 +165,3 @@ export function TapeheadsWorkDashboard() {
         </div>
     )
 }
-
-    
-
-    

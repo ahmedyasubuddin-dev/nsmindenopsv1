@@ -1,217 +1,165 @@
+/**
+ * @file Firestore Security Rules
+ * @description This ruleset enforces role-based access control for the Shift Report Dashboard application.
+ *
+ * Core Philosophy:
+ *  - Strict role-based authorization to protect sensitive shift report data.
+ *  - Fine-grained access control based on user roles and department affiliations.
+ *  - Authorization Independence: Denormalized `User.departmentId` and `User.role` within `Report` documents.
+ *
+ * Data Structure:
+ *  - `/jobs/{jobId}`: Stores OE job information.
+ *  - `/departments/{departmentId}`: Stores department information.
+ *  - `/departments/{departmentId}/shifts/{shiftId}`: Stores shift information for each department.
+ *  - `/users/{userId}`: Stores user information; `userId` is the document ID.
+ *  - `/departments/{departmentId}/reports/{reportId}`: Stores shift reports, with `userId` and `departmentId` denormalized for authorization.
+ *  - `/roles_admin/{userId}`: Indicates administrative privileges; document existence grants admin access.
+ *  - `/films/{reportId}`: Stores film reports.
+ *
+ * Key Security Decisions:
+ *  - Reports are segregated by department and user for consistent access control.
+ *  - User listing is allowed for administrators only.
+ *  - Global roles (e.g., admin) are managed through dedicated collections.
+ *  - Denormalization of `User.departmentId` and `User.role` enables Authorization Independence.
+ */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows reading and writing of job information.
+     * @description Rules for OE Jobs.
      * @path /jobs/{jobId}
-     * @allow get: if true;
-     * @allow list: if true;
-     * @allow create: if isSignedIn();
-     * @allow update: if isJobOwner(jobId);
-     * @allow delete: if isJobOwner(jobId);
-     * @principle Public read, owner-only writes.
+     * @allow (read): Admins can read all jobs.
+     * @allow (create): No direct job creation via client, only admin.
+     * @deny (create): Non-admin user attempts to create a new job.
+     * @principle Role-based access control.
      */
     match /jobs/{jobId} {
-      allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && isJobOwner(jobId);
-      allow delete: if isSignedIn() && isJobOwner(jobId);
+      allow get, list: if isAdmin();
+      allow create: if false;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /**
-     * @description Allows reading and writing of department information.
+     * @description Rules for Departments.
      * @path /departments/{departmentId}
-     * @allow get: if true;
-     * @allow list: if true;
-     * @allow create: if isSignedIn();
-     * @allow update: if isDepartmentOwner(departmentId);
-     * @allow delete: if isDepartmentOwner(departmentId);
-     * @principle Public read, owner-only writes.
+     * @allow (get, list): Any signed-in user can read department information.
+     * @allow (create): No direct department creation via client, only admin.
+     * @deny (create): Non-admin user attempts to create a new department.
+     * @principle Role-based access control.
      */
     match /departments/{departmentId} {
-      allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && isDepartmentOwner(departmentId);
-      allow delete: if isSignedIn() && isDepartmentOwner(departmentId);
+      allow get, list: if isSignedIn();
+      allow create: if false;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /**
-     * @description Allows reading and writing of shift information for each department.
+     * @description Rules for Shifts within a Department.
      * @path /departments/{departmentId}/shifts/{shiftId}
-     * @allow get: if true;
-     * @allow list: if true;
-     * @allow create: if isDepartmentMember(departmentId);
-     * @allow update: if isShiftOwner(departmentId, shiftId);
-     * @allow delete: if isShiftOwner(departmentId, shiftId);
-     * @principle Public read, owner-only writes.
+     * @allow (get, list): Any signed-in user can read shift information within a department.
+     * @allow (create): No direct shift creation via client, only admin.
+     * @deny (create): Non-admin user attempts to create a new shift.
+     * @principle Role-based access control.
      */
     match /departments/{departmentId}/shifts/{shiftId} {
-      allow get, list: if true;
-      allow create: if isSignedIn() && isDepartmentMember(departmentId);
-      allow update: if isSignedIn() && isShiftOwner(departmentId, shiftId);
-      allow delete: if isSignedIn() && isShiftOwner(departmentId, shiftId);
+      allow get, list: if isSignedIn();
+      allow create: if false;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /**
-     * @description Allows users to read their own profile and create their profile if the userId matches their auth.uid.  No listing allowed.
+     * @description Rules for Users.
      * @path /users/{userId}
-     * @allow get: if isOwner(userId);
-     * @allow list: if false;
-     * @allow create: if request.auth.uid == userId;
-     * @allow update: if isOwner(userId);
-     * @allow delete: if isOwner(userId);
-     * @principle Enforces document ownership for reads and writes, allows self-creation.
+     * @allow (get): Any signed-in user can read user information.
+     * @allow (create): A user can create their own record, but the ID must match their auth UID.
+     * @deny (create): User attempts to create a record with an ID that doesn't match their auth UID.
+     * @allow (list): Only admins can list all users.
+     * @principle Ownership and role-based access control.
      */
     match /users/{userId} {
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if false;
-      allow create: if isSignedIn() && request.auth.uid == userId;
-      allow update: if isSignedIn() && isOwner(userId);
-      allow delete: if isSignedIn() && isOwner(userId);
+      allow get: if isSignedIn();
+      allow create: if isSelfCreation(userId);
+      allow update: if isOwner(userId) && resource != null;
+      allow delete: if isOwner(userId) && resource != null;
+      allow list: if isAdmin();
     }
 
     /**
-     * @description Allows users to read, create, update, and delete reports within their department.
+     * @description Rules for Reports within a Department.
      * @path /departments/{departmentId}/reports/{reportId}
-     * @allow get: if isDepartmentMember(departmentId);
-     * @allow list: if isDepartmentMember(departmentId);
-     * @allow create: if isDepartmentMember(departmentId);
-     * @allow update: if isReportOwner(departmentId, reportId);
-     * @allow delete: if isReportOwner(departmentId, reportId);
-     * @principle Restricts access to reports based on department membership.
+     * @allow (create): A user can create a report in their own department.
+     * @allow (get, list): Users can read reports from their department.
+     * @deny (create): User attempts to create a report in a different department.
+     * @deny (update, delete): Non-owner attempts to modify or delete a report.
+     * @principle Department-based access control.
      */
     match /departments/{departmentId}/reports/{reportId} {
-      allow get: if isSignedIn() && isDepartmentMember(departmentId);
-      allow list: if isSignedIn() && isDepartmentMember(departmentId);
-      allow create: if isSignedIn() && isDepartmentMember(departmentId);
-      allow update: if isSignedIn() && isReportOwner(departmentId, reportId);
-      allow delete: if isSignedIn() && isReportOwner(departmentId, reportId);
+      allow get, list: if isDepartmentMember(departmentId);
+      allow create: if isDepartmentMember(departmentId) && request.resource.data.userId == request.auth.uid;
+      allow update: if isReportOwner(reportId, departmentId) && resource != null;
+      allow delete: if isReportOwner(reportId, departmentId) && resource != null;
     }
 
     /**
-     * @description Allows admins to read, create, update, and delete roles within their department.
+     * @description Rules for Admin Roles.
      * @path /roles_admin/{userId}
-     * @allow get: if isAdmin();
-     * @allow list: if isAdmin();
-     * @allow create: if isAdmin();
-     * @allow update: if isAdmin();
-     * @allow delete: if isAdmin();
-     * @principle Restricts access to reports based on admin status.
+     * @allow (get): Any signed-in user can check for admin privileges.
+     * @allow (create): Only admins can assign admin roles.
+     * @deny (create): Non-admin user attempts to assign an admin role.
+     * @allow (delete): Only admins can revoke admin roles.
+     * @deny (delete): Non-admin user attempts to revoke an admin role.
+     * @principle Role-based access control.
      */
     match /roles_admin/{userId} {
-      allow get: if isSignedIn() && isAdmin();
-      allow list: if isSignedIn() && isAdmin();
-      allow create: if isSignedIn() && isAdmin();
-      allow update: if isSignedIn() && isAdmin();
-      allow delete: if isSignedIn() && isAdmin();
+      allow get: if isSignedIn();
+      allow create: if isAdmin();
+      allow update: if false;
+      allow delete: if isAdmin();
+      allow list: if isAdmin();
     }
-      /**
-       * @description Allows reading and writing of film reports.
-       * @path /films/{reportId}
-       * @allow get: if true;
-       * @allow list: if true;
-       * @allow create: if isSignedIn();
-       * @allow update: if isFilmOwner(reportId);
-       * @allow delete: if isFilmOwner(reportId);
-       * @principle Public read, owner-only writes.
-       */
-      match /films/{reportId} {
-          allow get, list: if true;
-          allow create: if isSignedIn();
-          allow update: if isSignedIn() && isFilmOwner(reportId);
-          allow delete: if isSignedIn() && isFilmOwner(reportId);
-      }
-  }
-
-  // Helper functions
-
-  /**
-   * @description Checks if the user is signed in.
-   * @return {boolean} True if the user is signed in, false otherwise.
-   */
-  function isSignedIn() {
-    return request.auth != null;
-  }
-
-  /**
-   * @description Checks if the user is the owner of the document.
-   * @param {string} userId The user ID to check against.
-   * @return {boolean} True if the user is the owner, false otherwise.
-   */
-  function isOwner(userId) {
-    return isSignedIn() && request.auth.uid == userId;
-  }
-
-  /**
-   * @description Checks if the user is the owner of the existing document.
-   * @param {string} userId The user ID to check against.
-   * @return {boolean} True if the user is the owner and the document exists, false otherwise.
-   */
-  function isExistingOwner(userId) {
-    return isSignedIn() && resource.data.userId == userId;
-  }
-    /**
-     * @description Checks if the user is a member of the department.
-     * @param {string} departmentId The department ID to check against.
-     * @return {boolean} True if the user is a member of the department, false otherwise.
-     */
-  function isDepartmentMember(departmentId) {
-    return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.departmentId == departmentId;
-  }
 
     /**
-     * @description Checks if the user has the admin role.
-     * @return {boolean} True if the user has the admin role, false otherwise.
+     * @description Rules for Film Reports.
+     * @path /films/{reportId}
+     * @allow (get, list): Any signed-in user can read film reports.
+     * @allow (create): Only admins can create film reports.
+     * @deny (create): Non-admin user attempts to create a film report.
+     * @principle Role-based access control.
      */
-  function isAdmin() {
-        return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
-  }
+    match /films/{reportId} {
+      allow get, list: if isSignedIn();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
 
-    /**
-     * @description Checks if the user is the owner of the job.
-     * @param {string} jobId The job ID to check against.
-     * @return {boolean} True if the user is the owner, false otherwise.
-     */
-  function isJobOwner(jobId) {
-    return get(/databases/$(database)/documents/jobs/$(jobId)).data.ownerId == request.auth.uid;
-  }
+    function isSignedIn() {
+      return request.auth != null;
+    }
 
-    /**
-     * @description Checks if the user is the owner of the department.
-     * @param {string} departmentId The department ID to check against.
-     * @return {boolean} True if the user is the owner, false otherwise.
-     */
-  function isDepartmentOwner(departmentId) {
-    return get(/databases/$(database)/documents/departments/$(departmentId)).data.ownerId == request.auth.uid;
-  }
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
 
-    /**
-     * @description Checks if the user is the owner of the shift.
-     * @param {string} departmentId The department ID to check against.
-     * @param {string} shiftId The shift ID to check against.
-     * @return {boolean} True if the user is the owner, false otherwise.
-     */
-  function isShiftOwner(departmentId, shiftId) {
-    return get(/databases/$(database)/documents/departments/$(departmentId)/shifts/$(shiftId)).data.ownerId == request.auth.uid;
-  }
+    function isSelfCreation(userId) {
+        return request.auth.uid == userId && request.resource.data.id == userId;
+    }
 
-    /**
-     * @description Checks if the user is the owner of the report.
-     * @param {string} departmentId The department ID to check against.
-     * @param {string} reportId The report ID to check against.
-     * @return {boolean} True if the user is the owner, false otherwise.
-     */
-  function isReportOwner(departmentId, reportId) {
-    return get(/databases/$(database)/documents/departments/$(departmentId)/reports/$(reportId)).data.ownerId == request.auth.uid;
-  }
+    function isAdmin() {
+      return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+    }
 
-    /**
-     * @description Checks if the user is the owner of the film report.
-     * @param {string} filmId The film ID to check against.
-     * @return {boolean} True if the user is the owner, false otherwise.
-     */
-  function isFilmOwner(filmId) {
-    return get(/databases/$(database)/documents/films/$(filmId)).data.ownerId == request.auth.uid;
+    function isDepartmentMember(departmentId) {
+        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.departmentId == departmentId;
+    }
+
+    function isReportOwner(reportId, departmentId) {
+        return exists(/databases/$(database)/documents/departments/$(departmentId)/reports/$(reportId))
+               && get(/databases/$(database)/documents/departments/$(departmentId)/reports/$(reportId)).data.userId == request.auth.uid;
+    }
   }
 }
