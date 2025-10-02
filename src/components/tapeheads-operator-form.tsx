@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -328,7 +329,6 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
                 issues: item.problems || [],
                 panelsWorkedOn: item.panelsWorkedOn,
                 nestedPanels: item.nestedPanels || [],
-                materialType: '', // This field seems to be missing from the form but present in some types
             }
         }),
         checklist: values.checklist,
@@ -604,3 +604,7 @@ function WorkItemCard({ index, remove, control, isEditMode }: { index: number, r
     </Card>
   );
 }
+
+    
+
+    

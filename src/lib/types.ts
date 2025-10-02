@@ -1,5 +1,4 @@
 
-
 export type Department = 'Pregger' | 'Tapeheads' | 'Gantry' | 'Films' | 'Graphics';
 
 export type Shift = 1 | 2 | 3;
@@ -34,7 +33,6 @@ export interface WorkItem {
     issues: { problem_reason: string; duration_minutes: number }[];
     panelsWorkedOn: string[];
     nestedPanels: string[];
-    materialType: string;
 }
 
 export interface Report {
@@ -44,8 +42,6 @@ export interface Report {
   thNumber: string;
   date: Date;
   status: 'Submitted' | 'Approved' | 'Requires Attention';
-  comments?: string;
-  leadComments?: string;
   shiftLeadName: string;
   shiftStartTime: string;
   shiftEndTime: string;
@@ -54,5 +50,70 @@ export interface Report {
   workItems: WorkItem[];
   checklist: any;
   total_meters: number;
-  [key: string]: any;
+  leadComments?: string;
+  comments?: string;
 }
+
+export interface GantryReport {
+    id: string;
+    date: Date;
+    shift: string;
+    personnel: {name: string}[];
+    molds?: {
+        mold_number: string;
+        sails?: {
+            sail_number: string;
+            stage_of_process?: string;
+            issues?: string;
+        }[];
+        images?: any[];
+        downtime_caused?: boolean;
+    }[];
+    downtime?: {
+        reason: string;
+        duration: number;
+    }[];
+    maintenance?: {
+        duration: number;
+    }[];
+}
+
+export interface PreggerReport {
+    id: string;
+    report_date: string;
+    shift: number;
+    workCompleted: {
+        tape_id: string;
+        meters: number;
+        waste_meters: number;
+    }[];
+    personnel: {
+        name: string;
+        start_time: string;
+        end_time: string;
+    }[];
+    downtime?: {
+        reason: string;
+        duration_minutes: number;
+    }[];
+}
+
+export interface GraphicsTask {
+  id: string;
+  type: 'cutting' | 'inking';
+  tagId: string;
+  status: 'todo' | 'inProgress' | 'done';
+  content: string;
+  tagType: 'Sail' | 'Decal';
+  sidedness?: 'Single-Sided' | 'Double-Sided';
+  sideOfWork?: 'Port' | 'Starboard';
+  startedAt: string;
+  completedAt?: string;
+  durationMins?: number;
+  personnelCount?: number;
+  workTypes?: string[];
+  tapeUsed?: boolean;
+  isFinished?: boolean;
+}
+
+    
