@@ -43,16 +43,19 @@ const roles: Record<UserRole, Permission[]> = {
     ],
     'B2 Supervisor': [
         'nav:dashboard',
-        'nav:report:pregger', 'nav:report:tapeheads',
+        'nav:report:pregger', 'nav:report:tapeheads', 'nav:report:gantry', 'nav:report:films', 'nav:report:graphics',
         'nav:review:tapeheads',
         'nav:analytics', 'nav:analytics:pregger', 'nav:analytics:tapeheads', 'nav:analytics:gantry', 'nav:analytics:films', 'nav:analytics:graphics',
         'nav:status',
+        'nav:file-processing',
     ],
     'B1 Supervisor': [
         'nav:dashboard',
-        'nav:report:gantry', 'nav:report:films', 'nav:report:graphics',
+        'nav:report:pregger', 'nav:report:tapeheads', 'nav:report:gantry', 'nav:report:films', 'nav:report:graphics',
+        'nav:review:tapeheads',
         'nav:analytics', 'nav:analytics:pregger', 'nav:analytics:tapeheads', 'nav:analytics:gantry', 'nav:analytics:films', 'nav:analytics:graphics',
         'nav:status',
+        'nav:file-processing',
     ],
     'Quality Manager': [
         'nav:dashboard',
@@ -65,18 +68,17 @@ const roles: Record<UserRole, Permission[]> = {
         'nav:status',
         'nav:analytics', 'nav:analytics:pregger', 'nav:analytics:tapeheads', 'nav:analytics:gantry', 'nav:analytics:films', 'nav:analytics:graphics',
     ],
-    'Pregger Lead': ['nav:dashboard', 'nav:report:pregger', 'nav:status'],
-    'Tapehead Operator': ['nav:dashboard', 'nav:report:tapeheads'],
-    'Tapehead Lead': ['nav:dashboard', 'nav:report:tapeheads', 'nav:status', 'nav:review:tapeheads'],
-    'Gantry Lead': ['nav:dashboard', 'nav:report:gantry', 'nav:status'],
-    'Films Lead': ['nav:dashboard', 'nav:report:films', 'nav:status'],
-    'Graphics Lead': ['nav:dashboard', 'nav:report:graphics', 'nav:status'],
+    'Pregger Lead': ['nav:report:pregger', 'nav:dashboard', 'nav:status'],
+    'Tapehead Operator': ['nav:report:tapeheads', 'nav:dashboard'],
+    'Tapehead Lead': ['nav:report:tapeheads', 'nav:review:tapeheads', 'nav:dashboard', 'nav:status'],
+    'Gantry Lead': ['nav:report:gantry', 'nav:dashboard', 'nav:status'],
+    'Films Lead': ['nav:report:films', 'nav:dashboard', 'nav:status'],
+    'Graphics Lead': ['nav:report:graphics', 'nav:dashboard', 'nav:status'],
 };
 
 export function hasPermission(role: UserRole | null, permission: Permission): boolean {
     if (!role) return false;
-    // Superuser has all permissions
-    if (role === 'Superuser') return true;
+    // Superuser has all permissions implicitly covered by the roles object.
     return roles[role]?.includes(permission) || false;
 }
 
