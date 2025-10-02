@@ -33,7 +33,16 @@ export async function setGraphicsTasks(db: Firestore, tasks: GraphicsTask[]): Pr
     if (!db) return;
     for (const task of tasks) {
         const taskRef = doc(db, 'graphics_tasks', task.id);
-        await updateDoc(taskRef, { ...task }, { merge: true });
+        updateDoc(taskRef, { ...task }, { merge: true }).catch(error => {
+            errorEmitter.emit(
+                'permission-error',
+                new FirestorePermissionError({
+                    path: taskRef.path,
+                    operation: 'update',
+                    requestResourceData: task,
+                })
+            )
+        });
     }
 }
 
@@ -52,58 +61,123 @@ export function addFilmsReport(db: Firestore, report: any): void {
 }
 
 
+export function addOeJob(db: Firestore, job: Omit<OeJob, 'id'>): void {
+    const newJob = {
+      oeBase: job.oeBase,
+      status: 'pending',
+      sections: job.sections.map(s => ({ ...s, completedPanels: [] })),
+    };
+    const jobsCollection = collection(db, 'jobs');
+    addDoc(jobsCollection, newJob).catch(error => {
+        errorEmitter.emit(
+          'permission-error',
+          new FirestorePermissionError({
+            path: jobsCollection.path,
+            operation: 'create',
+            requestResourceData: newJob,
+          })
+        );
+    });
+}
+
+
 export async function markPanelsAsCompleted(db: Firestore, oeBase: string, sectionId: string, panels: string[]): Promise<void> {
     if (!db) {
         console.error("Firestore instance is not available.");
         return;
     }
     const jobsQuery = query(collection(db, 'jobs'), where('oeBase', '==', oeBase));
-    const querySnapshot = await getDocs(jobsQuery);
-
-    if (querySnapshot.empty) return;
     
-    const jobDoc = querySnapshot.docs[0];
-    const job = { id: jobDoc.id, ...jobDoc.data() } as OeJob;
-    const jobRef = doc(db, 'jobs', job.id!);
+    try {
+        const querySnapshot = await getDocs(jobsQuery);
 
-    const sectionIndex = job.sections.findIndex(s => s.sectionId === sectionId);
-    if (sectionIndex === -1) return;
-    
-    const updateData: any = {};
-    // Atomically add new elements to the completedPanels array
-    updateData[`sections.${sectionIndex}.completedPanels`] = arrayUnion(...panels);
+        if (querySnapshot.empty) return;
+        
+        const jobDoc = querySnapshot.docs[0];
+        const job = { id: jobDoc.id, ...jobDoc.data() } as OeJob;
+        const jobRef = doc(db, 'jobs', job.id!);
 
-    // After calculating new status, update it
-    const updatedSections = [...job.sections];
-    const currentCompleted = updatedSections[sectionIndex].completedPanels || [];
-    updatedSections[sectionIndex].completedPanels = [...new Set([...currentCompleted, ...panels])];
+        const sectionIndex = job.sections.findIndex(s => s.sectionId === sectionId);
+        if (sectionIndex === -1) return;
+        
+        const updateData: any = {};
+        updateData[`sections.${sectionIndex}.completedPanels`] = arrayUnion(...panels);
 
-    const allSectionsComplete = updatedSections.every(s => {
-        const totalPanels = s.panelEnd - s.panelStart + 1;
-        return (s.completedPanels?.length || 0) >= totalPanels;
-    });
+        const updatedSections = [...job.sections];
+        const currentCompleted = updatedSections[sectionIndex].completedPanels || [];
+        updatedSections[sectionIndex].completedPanels = [...new Set([...currentCompleted, ...panels])];
 
-    if (allSectionsComplete) {
-        updateData['status'] = 'completed';
-    } else if (updatedSections.some(s => (s.completedPanels?.length || 0) > 0)) {
-        updateData['status'] = 'in-progress';
+        const allSectionsComplete = updatedSections.every(s => {
+            const totalPanels = s.panelEnd - s.panelStart + 1;
+            return (s.completedPanels?.length || 0) >= totalPanels;
+        });
+
+        if (allSectionsComplete) {
+            updateData['status'] = 'completed';
+        } else if (updatedSections.some(s => (s.completedPanels?.length || 0) > 0)) {
+            updateData['status'] = 'in-progress';
+        }
+
+        updateDoc(jobRef, updateData).catch(error => {
+             errorEmitter.emit(
+              'permission-error',
+              new FirestorePermissionError({
+                path: jobRef.path,
+                operation: 'update',
+                requestResourceData: updateData,
+              })
+            );
+        });
+    } catch (error) {
+         errorEmitter.emit(
+          'permission-error',
+          new FirestorePermissionError({
+            path: `jobs`,
+            operation: 'list',
+          })
+        );
     }
-
-    await updateDoc(jobRef, updateData);
 }
 
-export async function addTapeheadsSubmission(db: Firestore, report: Report): Promise<void> {
-    await addDoc(collection(db, 'tapeheads_submissions'), report);
+export function addTapeheadsSubmission(db: Firestore, report: Report): void {
+    const submissionsCollection = collection(db, 'tapeheads_submissions');
+    addDoc(submissionsCollection, report).catch(error => {
+        errorEmitter.emit(
+            'permission-error',
+            new FirestorePermissionError({
+                path: submissionsCollection.path,
+                operation: 'create',
+                requestResourceData: report,
+            })
+        );
+    });
 }
 
-export async function updateTapeheadsSubmission(db: Firestore, updatedReport: Report): Promise<void> {
+export function updateTapeheadsSubmission(db: Firestore, updatedReport: Report): void {
     const submissionRef = doc(db, 'tapeheads_submissions', updatedReport.id);
-    await updateDoc(submissionRef, { ...updatedReport });
+    updateDoc(submissionRef, { ...updatedReport }).catch(error => {
+        errorEmitter.emit(
+            'permission-error',
+            new FirestorePermissionError({
+                path: submissionRef.path,
+                operation: 'update',
+                requestResourceData: updatedReport,
+            })
+        );
+    });
 }
 
-export async function deleteTapeheadsSubmission(db: Firestore, id: string): Promise<void> {
+export function deleteTapeheadsSubmission(db: Firestore, id: string): void {
     const submissionRef = doc(db, 'tapeheads_submissions', id);
-    await deleteDoc(submissionRef);
+    deleteDoc(submissionRef).catch(error => {
+        errorEmitter.emit(
+            'permission-error',
+            new FirestorePermissionError({
+                path: submissionRef.path,
+                operation: 'delete',
+            })
+        );
+    });
 }
 
 
