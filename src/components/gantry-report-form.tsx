@@ -67,11 +67,11 @@ const gantryReportSchema = z.object({
     start_time: z.string().min(1, "Start time is required."),
     end_time: z.string().min(1, "End time is required."),
   })).min(1, "At least one person is required."),
-  personnel_exceptions: z.string().optional(),
+  personnel_exceptions: z.string().optional().default(''),
   recognition: z.array(z.object({
     employee_name: z.string().min(1, "Employee name is required."),
-    reason: z.string().optional(),
-  })).optional(),
+    reason: z.string().optional().default(''),
+  })).optional().default([]),
   molds: z.array(z.object({
     mold_number: z.string().min(1, "Mold number is required."),
     sails: z.array(z.object({
@@ -81,16 +81,16 @@ const gantryReportSchema = z.object({
     })).min(1, "At least one sail is required."),
     images: z.any().optional(),
     downtime_caused: z.boolean().default(false),
-    downtime_cause_description: z.string().optional(),
-    downtime_duration_minutes: z.coerce.number().optional(),
-    gantry_override_reason: z.string().optional(),
+    downtime_cause_description: z.string().optional().default(''),
+    downtime_duration_minutes: z.coerce.number().optional().default(0),
+    gantry_override_reason: z.string().optional().default(''),
   })).min(1, "At least one mold is required."),
   maintenance: z.array(z.object({
     description: z.string().min(1, "Description is required."),
-    duration_minutes: z.coerce.number().min(0, "Duration must be positive."),
+    duration_minutes: z.coerce.number().min(0, "Duration must be positive.").default(0),
     images: z.any().optional(),
-  })).optional(),
-  truck_runs: z.coerce.number().min(0, "Truck runs must be a positive number.").optional(),
+  })).optional().default([]),
+  truck_runs: z.coerce.number().min(0, "Truck runs must be a positive number.").optional().default(0),
 });
 
 type GantryReportFormValues = z.infer<typeof gantryReportSchema>;
@@ -261,7 +261,7 @@ export function GantryReportForm() {
                     <Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={() => removeMaintenance(index)}><Trash2 className="size-4" /></Button>
                  </div>
                  <FormField
-                    control={form.control}
+                    control={control}
                     name={`maintenance.${index}.images`}
                     render={({ field }) => (
                       <FormItem>
@@ -481,3 +481,5 @@ function MoldField({ moldIndex, control, removeMold }: { moldIndex: number, cont
     </Card>
   )
 }
+
+    

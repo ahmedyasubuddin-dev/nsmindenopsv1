@@ -61,26 +61,6 @@ export function addFilmsReport(db: Firestore, report: any): void {
 }
 
 
-export function addOeJob(db: Firestore, job: Omit<OeJob, 'id'>): void {
-    const newJob = {
-      oeBase: job.oeBase,
-      status: 'pending',
-      sections: job.sections.map(s => ({ ...s, completedPanels: [] })),
-    };
-    const jobsCollection = collection(db, 'jobs');
-    addDoc(jobsCollection, newJob).catch(error => {
-        errorEmitter.emit(
-          'permission-error',
-          new FirestorePermissionError({
-            path: jobsCollection.path,
-            operation: 'create',
-            requestResourceData: newJob,
-          })
-        );
-    });
-}
-
-
 export async function markPanelsAsCompleted(db: Firestore, oeBase: string, sectionId: string, panels: string[]): Promise<void> {
     if (!db) {
         console.error("Firestore instance is not available.");
@@ -182,3 +162,5 @@ export function deleteTapeheadsSubmission(db: Firestore, id: string): void {
 
 
 export { type Report, type FilmsReport, type GantryReport, type GraphicsTask, type InspectionSubmission, type OeJob, type PreggerReport, type WorkItem, type TapeUsage };
+
+    

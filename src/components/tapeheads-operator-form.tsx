@@ -55,7 +55,7 @@ const tapeIds = [...new Set(tapeIdsList)];
 
 const problemSchema = z.object({
   problem_reason: z.string().min(1, "Problem reason is required."),
-  duration_minutes: z.coerce.number().optional(),
+  duration_minutes: z.coerce.number().optional().default(0),
 });
 
 const tapeUsageSchema = z.object({
@@ -68,15 +68,15 @@ const workItemSchema = z.object({
   oeNumber: z.string().min(1, "OE Number is required."),
   section: z.string().min(1, "Sail # is required."),
   endOfShiftStatus: z.string().min(1, "Status is required."),
-  layer: z.string().optional(),
+  layer: z.string().optional().default(''),
   tapes: z.array(tapeUsageSchema).min(1, "At least one tape must be logged."),
   hadSpinOut: z.boolean().default(false),
-  spinOuts: z.coerce.number().optional(),
-  spinOutDuration: z.coerce.number().optional(),
-  problems: z.array(problemSchema).optional(),
+  spinOuts: z.coerce.number().optional().default(0),
+  spinOutDuration: z.coerce.number().optional().default(0),
+  problems: z.array(problemSchema).optional().default([]),
   panelWorkType: z.enum(["individual", "nested"]).default("individual"),
   panelsWorkedOn: z.array(z.string()).min(1, "At least one panel must be selected."),
-  nestedPanels: z.array(z.string()).optional(),
+  nestedPanels: z.array(z.string()).optional().default([]),
 });
 
 
@@ -89,8 +89,8 @@ const tapeheadsOperatorSchema = z.object({
 
   shiftStartTime: z.string().min(1, "Start time is required."),
   shiftEndTime: z.string().min(1, "End time is required."),
-  hoursWorked: z.coerce.number().optional(),
-  metersPerManHour: z.coerce.number().optional(),
+  hoursWorked: z.coerce.number().optional().default(0),
+  metersPerManHour: z.coerce.number().optional().default(0),
 
   workItems: z.array(workItemSchema).min(1, "At least one work item must be added."),
 
@@ -168,18 +168,18 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
     
     // Map from Report structure to form structure
     const workItems = (reportToEdit.workItems || []).map(item => ({
-        oeNumber: item.oeNumber,
-        section: item.section,
-        endOfShiftStatus: item.endOfShiftStatus,
-        layer: item.layer,
+        oeNumber: item.oeNumber || '',
+        section: item.section || '',
+        endOfShiftStatus: item.endOfShiftStatus || 'Completed',
+        layer: item.layer || '',
         tapes: item.tapes || [],
-        hadSpinOut: item.had_spin_out,
-        spinOuts: item.spin_outs,
-        spinOutDuration: item.spin_out_duration_minutes,
-        problems: item.issues,
+        hadSpinOut: item.had_spin_out || false,
+        spinOuts: item.spin_outs || 0,
+        spinOutDuration: item.spin_out_duration_minutes || 0,
+        problems: item.issues || [],
         panelWorkType: item.nestedPanels && item.nestedPanels.length > 0 ? 'nested' : 'individual',
-        panelsWorkedOn: item.panelsWorkedOn,
-        nestedPanels: item.nestedPanels
+        panelsWorkedOn: item.panelsWorkedOn || [],
+        nestedPanels: item.nestedPanels || []
     }));
 
 
@@ -387,7 +387,7 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
               <div>
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-lg font-semibold text-primary">Work Items</h3>
-                  <Button type="button" variant="outline" size="sm" onClick={() => appendWorkItem({ oeNumber: '', section: '', endOfShiftStatus: 'Completed', tapes: [], panelsWorkedOn: [], panelWorkType: 'individual', nestedPanels: [], hadSpinOut: false, spinOutDuration: 0, problems: [] })}>
+                  <Button type="button" variant="outline" size="sm" onClick={() => appendWorkItem({ oeNumber: '', section: '', endOfShiftStatus: 'Completed', tapes: [], panelsWorkedOn: [], panelWorkType: 'individual', nestedPanels: [], hadSpinOut: false, spinOuts: 0, spinOutDuration: 0, problems: [] })}>
                       <PlusCircle className="mr-2 h-4 w-4" /> Add Work Item
                   </Button>
                 </div>
@@ -577,3 +577,5 @@ function WorkItemCard({ index, remove, control, isEditMode }: { index: number, r
     </Card>
   );
 }
+
+    
