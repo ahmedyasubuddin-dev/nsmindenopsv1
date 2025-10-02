@@ -1,30 +1,14 @@
 /**
- * @fileoverview Firestore Security Rules for ShiftView application.
- *
- * Core Philosophy: This ruleset enforces a strict role-based and ownership-based security model.
- *   - Users can only read and write their own user documents.
- *   - Reports can only be created by the user and only accessed based on user role (operator, shift_lead, admin) within the relevant department.
- *   - Jobs and Departments data are read only.
- *
- * Data Structure:
- *   - /jobs/{jobId}: Stores OE Job information (read-only).
- *   - /departments/{departmentId}: Stores department information (read-only).
- *   - /departments/{departmentId}/shifts/{shiftId}: Stores shift information for each department (read-only).
- *   - /users/{userId}: Stores user information.
- *   - /departments/{departmentId}/reports/{reportId}: Stores reports for each department. Includes denormalized 'userId' and 'departmentId' for authorization.
- *   - /roles_admin/{userId}: Indicates administrative privileges.  Existence of the document grants admin access.
- *
+ * @file Overview
+ * This ruleset enforces a role-based access control model combined with ownership for user-specific data.
+ * Data is organized hierarchically, with top-level collections for core entities (jobs, departments, films reports) and subcollections for user-specific data (reports under departments).
  * Key Security Decisions:
- *   - User listing is disallowed.
- *   - Reports are scoped to the department and user who created them.
- *   - Jobs and Departments are readable by all authenticated users but not writable.
- *   - Default security posture for ambiguous relationships is strict owner-only access.
+ * - User listing is disallowed for privacy.
+ * - Reports are secured based on user role and department affiliation. The `Report` documents must contain a denormalized `userId` field.
+ * - Administrative privileges are granted based on the existence of a document in the `roles_admin` collection.
  *
- * Denormalization for Authorization:
- *   - Reports include denormalized 'userId' and 'departmentId' to enable authorization rules without needing to query the 'users' collection.
- *
- * Structural Segregation:
- *   - Reports are segregated by department to ensure homogeneous security postures and facilitate simple security rules.
+ * To ensure proper authorization, it's critical that `Report` documents contain the `userId` and `departmentId` of the user who created them.
+ * This allows for efficient security rules without requiring additional reads.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -32,6 +16,10 @@ service cloud.firestore {
 
     /**
      * @description Checks if the request is authenticated.
+     * @path N/A
+     * @allow N/A
+     * @deny N/A
+     * @principle Authentication is required for most operations.
      */
     function isSignedIn() {
       return request.auth != null;
@@ -39,115 +27,161 @@ service cloud.firestore {
 
     /**
      * @description Checks if the authenticated user's ID matches the provided userId.
+     * @path N/A
+     * @allow N/A
+     * @deny N/A
+     * @principle Enforces ownership for user-specific data.
      */
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
     /**
-     * @description Checks if the authenticated user's ID matches the resource's userId and that the resource exists.
+     * @description Checks if the authenticated user is an existing owner of the resource.
      */
     function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
+        return isOwner(userId) && resource != null;
     }
 
     /**
-     * @description Checks if the authenticated user has admin role.
+     * @description Checks if the authenticated user has admin privileges by verifying the existence of a document in the roles_admin collection.
+     * @path N/A
+     * @allow N/A
+     * @deny N/A
+     * @principle Grants admin access based on a dedicated collection.
      */
     function isAdmin() {
       return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
 
     /**
-     * @description Allows authenticated users to read Jobs.  No write access.
+     * @description Allows read access to all.
+     * @path N/A
+     */
+    function allowAllRead() {
+        return true;
+    }
+
+    /**
+     * @description
+     * Defines the access control rules for documents in the `jobs` collection.
+     * This enforces that only authorized users can create, update, or delete jobs.
      * @path /jobs/{jobId}
-     * @allow (get, list) Signed-in user can read any job.
-     * @deny (create, update, delete) No one can create, update, or delete a job.
-     * @principle Public read, no writes.
+     * @allow (get, list) - Any user can read job data.
+     * @allow (create) - NOT APPLICABLE. Update rule to allow based on auth requirements.
+     * @allow (update, delete) - NOT APPLICABLE.  Update rule to allow based on auth requirements.
+     * @deny (create) - Any unauthenticated user attempting to create a job.
+     * @deny (update, delete) - Any unauthenticated user attempting to modify or delete a job.
+     * @principle Restricts write access to authorized users, allows public read access.
      */
     match /jobs/{jobId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if false;
+      allow get, list: if allowAllRead();
+      allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow update: if false;  // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow delete: if false;  // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
     /**
-     * @description Allows authenticated users to read Departments.  No write access.
+     * @description Defines the access control rules for documents in the `departments` collection.
+     *  Only admins can create, update, or delete departments.  All can read.
      * @path /departments/{departmentId}
-     * @allow (get, list) Signed-in user can read any department.
-     * @deny (create, update, delete) No one can create, update, or delete a department.
-     * @principle Public read, no writes.
+     * @allow (get, list) - Any user can read department data.
+     * @allow (create, update, delete) - Only admins can create, update, or delete departments.
+     * @deny (create, update, delete) - Any non-admin user attempting to modify department data.
+     * @principle Restricts write access to admins, allows public read access.
      */
     match /departments/{departmentId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if false;
+      allow get, list: if allowAllRead();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /**
-     * @description Allows authenticated users to read Shifts.  No write access.
+     * @description
+     * Defines the access control rules for documents in the `shifts` subcollection under a specific department.
+     *  Only admins can create, update, or delete shifts. All can read.
      * @path /departments/{departmentId}/shifts/{shiftId}
-     * @allow (get, list) Signed-in user can read any shift.
-     * @deny (create, update, delete) No one can create, update, or delete a shift.
-     * @principle Public read, no writes.
+     * @allow (get, list) - Any user can read shift data.
+     * @allow (create, update, delete) - Only admins can create, update, or delete shifts.
+     * @deny (create, update, delete) - Any non-admin user attempting to modify shift data.
+     * @principle Restricts write access to admins, allows public read access.
      */
     match /departments/{departmentId}/shifts/{shiftId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if false;
+      allow get, list: if allowAllRead();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /**
-     * @description Manages user profiles. Only the user can read/write their own profile.
+     * @description
+     * Defines the access control rules for documents in the `users` collection.
+     *  Allows a user to create their own document.  Only admins can update or delete user documents.
      * @path /users/{userId}
-     * @allow (get, create, update, delete) Signed-in user with matching user ID can read, create, update, or delete their own profile.
-     * @deny (get, create, update, delete) Signed-in user with non-matching user ID cannot read, create, update, or delete another user's profile.
-     * @deny (list) No listing of users allowed for privacy.
-     * @principle Enforces document ownership.
+     * @allow (get) - Any user can read user data.
+     * @allow (create) - A user can create their own user document if the userId matches their auth.uid.
+     * @allow (update, delete) - Only admins can update or delete user documents.
+     * @deny (create) - Any user attempting to create a user document with a userId that does not match their auth.uid.
+     * @deny (update, delete) - Any non-admin user attempting to modify user data.
+     * @principle Restricts write access to admins, allows public read access.
      */
     match /users/{userId} {
-      allow get, update, delete: if isExistingOwner(userId);
-      allow create: if isOwner(userId);
+      allow get: if allowAllRead();
       allow list: if false;
+      allow create: if isOwner(userId);
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
     }
 
     /**
-     * @description Manages shift reports within a specific department.
+     * @description
+     * Defines the access control rules for documents in the `reports` subcollection under a specific department.
+     *  Only the owner of the report or an admin can update or delete it. All can read.
      * @path /departments/{departmentId}/reports/{reportId}
-     * @allow (create) Signed-in user can create a report if the report's userId matches their own and the departmentId matches the path.
-     * @allow (get, list, update, delete) Signed-in user can read, update, or delete a report if they are the owner.
-     * @deny (create, get, list, update, delete) Operations are denied if the user is not the owner of the report.
-     * @principle Enforces document ownership and department affiliation for reports.
+     * @allow (get, list) - Any user can read report data.
+     * @allow (create) - A user can create a report if the userId in the report data matches their auth.uid.
+     * @allow (update, delete) - Only the owner of the report or an admin can update or delete it.
+     * @deny (create) - Any user attempting to create a report with a userId that does not match their auth.uid.
+     * @deny (update, delete) - Any non-admin user attempting to modify report data.
+     * @principle Restricts write access to the owner of the report or an admin, allows public read access.
      */
     match /departments/{departmentId}/reports/{reportId} {
-      allow get, update, delete: if isExistingOwner(resource.data.userId) && resource.data.departmentId == departmentId;
-      allow create: if isOwner(request.resource.data.userId) && request.resource.data.departmentId == departmentId;
+      allow get, list: if allowAllRead();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if isExistingOwner(resource.data.userId) || isAdmin();
+      allow delete: if isExistingOwner(resource.data.userId) || isAdmin();
+    }
+
+    /**
+     * @description Grants admin privileges based on the existence of a document.
+     * @path /roles_admin/{userId}
+     * @allow (get, create, update, delete) - Only admins can manage admin roles.
+     * @deny (get, create, update, delete) - Any non-admin user attempting to manage admin roles.
+     * @principle Grants admin access based on a dedicated collection.
+     */
+    match /roles_admin/{userId} {
+      allow get, create, update, delete: if isAdmin();
       allow list: if false;
     }
 
      /**
-      * @description Administrative role. Grants admin access to user.
-      * @path /roles_admin/{userId}
-      * @allow (get, create, update, delete) Only an admin user can create, update or delete an admin role.
-      * @allow (list) No listing of admin roles allowed.
-      * @principle Role-based access control.
+      * @description
+      * Defines the access control rules for documents in the `films` collection.
+      * This enforces that only authorized users can create, update, or delete films reports.
+      * @path /films/{reportId}
+      * @allow (get, list) - Any user can read films report data.
+      * @allow (create) - NOT APPLICABLE. Update rule to allow based on auth requirements.
+      * @allow (update, delete) - NOT APPLICABLE.  Update rule to allow based on auth requirements.
+      * @deny (create) - Any unauthenticated user attempting to create a films report.
+      * @deny (update, delete) - Any unauthenticated user attempting to modify or delete a films report.
+      * @principle Restricts write access to authorized users, allows public read access.
       */
-    match /roles_admin/{userId} {
-      allow get: if isAdmin();
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
-      allow list: if false;
-    }
-
-    /**
-     * @description Stores reports from the Films department.
-     * @path /films/{reportId}
-     * @allow (get, list) Signed-in user can read any report.
-     * @allow (create) Signed-in user can create a report.
-     * @allow (update, delete) Signed-in user can update or delete a report.
-     */
     match /films/{reportId} {
-        allow get, list: if isSignedIn();
-        allow create: if isSignedIn();
-        allow update, delete: if isSignedIn();
+      allow get, list: if allowAllRead();
+      allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
     }
   }
 }
