@@ -152,19 +152,21 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
   const isEditMode = !!reportToEdit;
 
   const defaultValues = useMemo(() => {
-    if (!reportToEdit) {
-      return {
-          date: new Date(),
-          shift: "1",
-          shiftLeadName: "",
-          thNumber: "",
-          operatorName: "",
-          shiftStartTime: "",
-          shiftEndTime: "",
-          workItems: [],
-          checklist: checklistItems.reduce((acc, item) => ({...acc, [item.id]: false}), {})
-      };
-    }
+    const baseDefaults = {
+      date: new Date(),
+      shift: "1",
+      shiftLeadName: "",
+      thNumber: "",
+      operatorName: "",
+      shiftStartTime: "",
+      shiftEndTime: "",
+      hoursWorked: 0,
+      metersPerManHour: 0,
+      workItems: [],
+      checklist: checklistItems.reduce((acc, item) => ({...acc, [item.id]: false}), {})
+    };
+
+    if (!reportToEdit) return baseDefaults;
     
     // Map from Report structure to form structure
     const workItems = (reportToEdit.workItems || []).map(item => ({
@@ -188,6 +190,8 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
       date: new Date(reportToEdit.date),
       shift: String(reportToEdit.shift),
       workItems: workItems,
+      shiftStartTime: reportToEdit.shiftStartTime || '',
+      shiftEndTime: reportToEdit.shiftEndTime || '',
     };
   }, [reportToEdit]);
 
@@ -221,6 +225,8 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
                 operatorName: "", // Clear for new operator
                 shiftStartTime: "", // Clear for new operator
                 shiftEndTime: "", // Clear for new operator
+                hoursWorked: 0,
+                metersPerManHour: 0,
                 workItems: [{
                     ...workItemToContinue,
                     hadSpinOut: workItemToContinue.had_spin_out,
@@ -482,12 +488,25 @@ function WorkItemCard({ index, remove, control, isEditMode }: { index: number, r
     setAvailableOes([...new Set(jobs.map(j => j.oeBase))]);
   };
 
-  const availableSails = useMemo(() => watchOeNumber ? oeJobs.find(j => j.oeBase === watchOeNumber)?.sections?.map(s => s.sectionId) ?? [] : [], [watchOeNumber, oeJobs]);
+  const availableSails = useMemo(() => {
+    if (!watchOeNumber) return [];
+    const job = oeJobs.find(j => j.oeBase === watchOeNumber);
+    const sections = job?.sections;
+    if (Array.isArray(sections)) {
+        return sections.map(s => s.sectionId);
+    } else if (typeof sections === 'object' && sections !== null) {
+        return Object.values(sections).map(s => s.sectionId);
+    }
+    return [];
+  }, [watchOeNumber, oeJobs]);
   
   const panelOptions = useMemo(() => {
       if (!watchOeNumber || !watchSection) return [];
       const job = oeJobs.find(j => j.oeBase === watchOeNumber);
-      const sail = job?.sections.find(s => s.sectionId === watchSection);
+      if (!job) return [];
+      
+      const sections = Array.isArray(job.sections) ? job.sections : Object.values(job.sections);
+      const sail = sections.find(s => s.sectionId === watchSection);
       if (!sail) return [];
       
       const options: MultiSelectOption[] = [];
@@ -577,5 +596,3 @@ function WorkItemCard({ index, remove, control, isEditMode }: { index: number, r
     </Card>
   );
 }
-
-    
