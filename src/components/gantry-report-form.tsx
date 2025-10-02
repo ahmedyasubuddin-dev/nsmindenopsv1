@@ -32,7 +32,7 @@ import { ImageUpload } from "./image-upload"
 import { Switch } from "./ui/switch"
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert"
 import { addGantryReport, type FilmsReport } from "@/lib/data-store"
-import { useCollection, useFirebase, useMemoFirebase, useAuth as useFirebaseAuth } from "@/firebase"
+import { useCollection, useFirebase, useMemoFirebase, useAuth as useFirebaseAuth, useFirestore } from "@/firebase"
 import { collection, query } from "firebase/firestore"
 
 const stageOfProcessOptions = [
@@ -482,3 +482,5 @@ function MoldField({ moldIndex, control, removeMold }: { moldIndex: number, cont
     </Card>
   )
 }
+
+    
