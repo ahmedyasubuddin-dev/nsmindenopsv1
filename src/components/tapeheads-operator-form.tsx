@@ -325,7 +325,7 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
         }, 0),
     };
     
-    if (onFormSubmit) {
+    if (isEditMode && onFormSubmit) {
       await updateTapeheadsSubmission(firestore, reportData);
       onFormSubmit(reportData);
     } else {
@@ -482,7 +482,7 @@ function WorkItemCard({ index, remove, control, isEditMode }: { index: number, r
     setAvailableOes([...new Set(jobs.map(j => j.oeBase))]);
   };
 
-  const availableSails = useMemo(() => watchOeNumber ? oeJobs.filter(j => j.oeBase === watchOeNumber).flatMap(j => j.sections?.map(s => s.sectionId) || []) : [], [watchOeNumber, oeJobs]);
+  const availableSails = useMemo(() => watchOeNumber ? oeJobs.find(j => j.oeBase === watchOeNumber)?.sections?.map(s => s.sectionId) ?? [] : [], [watchOeNumber, oeJobs]);
   
   const panelOptions = useMemo(() => {
       if (!watchOeNumber || !watchSection) return [];
@@ -577,5 +577,3 @@ function WorkItemCard({ index, remove, control, isEditMode }: { index: number, r
     </Card>
   );
 }
-
-    

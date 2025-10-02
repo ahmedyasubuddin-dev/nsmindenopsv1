@@ -20,7 +20,7 @@ import { Edit, Trash2 } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 import { TapeheadsOperatorForm } from '../tapeheads-operator-form';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 
 const reviewSchema = z.object({
@@ -124,11 +124,18 @@ export function TapeheadsReviewSummary() {
         const q = query(
             collection(firestore, 'tapeheads_submissions'),
             where('shift', '==', parseInt(shift, 10)),
-            where('date', '>=', startDate),
-            where('date', '<=', endDate)
+            where('date', '>=', Timestamp.fromDate(startDate)),
+            where('date', '<=', Timestamp.fromDate(endDate))
         );
         const querySnapshot = await getDocs(q);
-        const reports = querySnapshot.docs.map(doc => ({...doc.data(), id: doc.id} as Report));
+        const reports = querySnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                ...data,
+                id: doc.id,
+                date: (data.date as Timestamp).toDate(),
+            } as Report;
+        });
         setSubmissions(reports);
     } catch (error) {
         console.error("Error fetching submissions:", error);
@@ -144,7 +151,8 @@ export function TapeheadsReviewSummary() {
   }, [fetchSubmissions]);
 
   const handleDeleteReport = async (id: string) => {
-    await deleteTapeheadsSubmission(id);
+    if (!firestore) return;
+    await deleteTapeheadsSubmission(firestore, id);
     fetchSubmissions();
     toast({
         title: "Report Deleted",
@@ -278,7 +286,7 @@ export function TapeheadsReviewSummary() {
                         </div>
                     </CardHeader>
                     <CardContent>
-                        {isLoading && <p className="text-muted-foreground animate-pulse">Generating AI summary...</p>}
+                        {isLoading && aiSummary === '' && <p className="text-muted-foreground animate-pulse">Generating AI summary...</p>}
                         {aiSummary && <p className="text-sm p-4 bg-muted rounded-md whitespace-pre-wrap">{aiSummary}</p>}
                     </CardContent>
                 </Card>
@@ -336,9 +344,3 @@ export function TapeheadsReviewSummary() {
     </div>
   );
 }
-
-    
-
-    
-
-    
