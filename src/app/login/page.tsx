@@ -16,7 +16,6 @@ import { doc, setDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, User } from 'firebase/auth';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
-import Image from 'next/image';
 import { PrivacyPolicy } from '@/components/privacy-policy';
 
 const users = {
@@ -133,13 +132,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative min-h-screen w-full">
-      <Image
-        src="/images/login-background.jpg"
-        alt="An industrial machine laying down carbon fiber strips on a large surface, with motion blur indicating speed."
-        fill
-        className="object-cover"
-      />
+    <div className="relative min-h-screen w-full login-background">
       <div className="absolute inset-0 bg-black/60" />
       <div className="relative z-10 flex min-h-screen flex-col items-center justify-center p-4">
         <Card className="w-full max-w-sm">

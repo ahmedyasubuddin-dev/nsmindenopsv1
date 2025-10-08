@@ -86,3 +86,10 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+@layer components {
+  .login-background {
+    @apply bg-cover bg-center bg-no-repeat;
+    background-image: url('/images/login-background.jpg');
+  }
+}
