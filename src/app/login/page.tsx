@@ -140,7 +140,6 @@ export default function LoginPage() {
         alt={loginHero.alt}
         fill
         className="object-cover"
-        data-ai-hint={loginHero['data-ai-hint']}
       />
       <div className="absolute inset-0 bg-black/60" />
       <div className="relative z-10 flex min-h-screen flex-col items-center justify-center p-4">
