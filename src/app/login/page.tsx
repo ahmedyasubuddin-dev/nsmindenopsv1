@@ -16,6 +16,9 @@ import { doc, setDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, User } from 'firebase/auth';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
+import Image from 'next/image';
+import { loginHero } from '@/lib/placeholder-images.json';
+import { PrivacyPolicy } from '@/components/privacy-policy';
 
 const users = {
   'superuser@ns.com': 'password',
@@ -131,69 +134,82 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader className="text-center">
-            <div className="flex justify-center items-center gap-2 mb-4">
-                 <Logo className="size-10 text-primary" />
-            </div>
-          <CardTitle className="text-2xl font-headline">SRD: Minden Operations</CardTitle>
-          <CardDescription>Enter your credentials to access the dashboard.</CardDescription>
-        </CardHeader>
-        <form onSubmit={handleLogin}>
-            <CardContent className="space-y-4">
-            {authError && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Configuration Error</AlertTitle>
-                <AlertDescription>{authError}</AlertDescription>
-              </Alert>
-            )}
-            <div className="space-y-2">
-              <Label>Select a user to sign in as:</Label>
-              <Select value={email} onValueChange={handleUserSelection}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a user role" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.keys(users).map((userEmail) => (
-                    <SelectItem key={userEmail} value={userEmail}>
-                      {userEmail}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                id="email"
-                type="email"
-                placeholder="m@example.com"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                readOnly
-                />
-            </div>
-            <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input 
-                id="password" 
-                type="password" 
-                required 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                />
-            </div>
-            </CardContent>
-            <CardFooter>
-            <Button className="w-full" type="submit" disabled={isLoading}>
-                {isLoading ? 'Signing In...' : 'Sign In'}
-            </Button>
-            </CardFooter>
-        </form>
-      </Card>
+    <div className="relative min-h-screen w-full">
+      <Image
+        src={loginHero.src}
+        alt={loginHero.alt}
+        fill
+        className="object-cover"
+        data-ai-hint={loginHero['data-ai-hint']}
+      />
+      <div className="absolute inset-0 bg-black/60" />
+      <div className="relative z-10 flex min-h-screen flex-col items-center justify-center p-4">
+        <Card className="w-full max-w-sm">
+            <CardHeader className="text-center">
+                <div className="flex justify-center items-center gap-2 mb-4">
+                    <Logo className="size-10 text-primary" />
+                </div>
+            <CardTitle className="text-2xl font-headline">North Sails Minden Operations</CardTitle>
+            <CardDescription>SRD application for plant operations.</CardDescription>
+            </CardHeader>
+            <form onSubmit={handleLogin}>
+                <CardContent className="space-y-4">
+                {authError && (
+                <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Configuration Error</AlertTitle>
+                    <AlertDescription>{authError}</AlertDescription>
+                </Alert>
+                )}
+                <div className="space-y-2">
+                <Label>Select a user to sign in as:</Label>
+                <Select value={email} onValueChange={handleUserSelection}>
+                    <SelectTrigger>
+                    <SelectValue placeholder="Select a user role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                    {Object.keys(users).map((userEmail) => (
+                        <SelectItem key={userEmail} value={userEmail}>
+                        {userEmail}
+                        </SelectItem>
+                    ))}
+                    </SelectContent>
+                </Select>
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                    id="email"
+                    type="email"
+                    placeholder="m@example.com"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    readOnly
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="password">Password</Label>
+                    <Input 
+                    id="password" 
+                    type="password" 
+                    required 
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    />
+                </div>
+                </CardContent>
+                <CardFooter>
+                <Button className="w-full" type="submit" disabled={isLoading}>
+                    {isLoading ? 'Signing In...' : 'Sign In'}
+                </Button>
+                </CardFooter>
+            </form>
+        </Card>
+        <div className="mt-6 text-center">
+            <PrivacyPolicy />
+        </div>
+      </div>
     </div>
   );
 }
