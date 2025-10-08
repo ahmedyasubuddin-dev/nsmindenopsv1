@@ -135,7 +135,6 @@ export default function LoginPage() {
   return (
     <div className="relative min-h-screen w-full">
       <Image
-        key="/images/login-background.jpg"
         src="/images/login-background.jpg"
         alt="An industrial machine laying down carbon fiber strips on a large surface, with motion blur indicating speed."
         fill
