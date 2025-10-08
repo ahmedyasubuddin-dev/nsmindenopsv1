@@ -92,10 +92,6 @@ export const emailToRoleMap: Record<string, UserRole> = {
     'gantry_lead@ns.com': 'Gantry Lead',
     'films_lead@ns.com': 'Films Lead',
     'graphics_lead@ns.com': 'Graphics Lead',
-    // Old roles for compatibility
-    'lead@ns.com': 'B2 Supervisor',
-    'operator@ns.com': 'Tapehead Operator',
-    'head@ns.com': 'Management',
 };
 
 export function getRoleFromEmail(email: string | null): UserRole | null {

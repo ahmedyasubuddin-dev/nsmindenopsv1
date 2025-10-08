@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Logo } from '@/components/icons';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/componentsui/select';
 import { useAuth as useFirebaseAuth, useFirebase, useUser } from '@/firebase';
 import { getRoleFromEmail, UserRole } from '@/lib/roles';
 import { doc, setDoc } from 'firebase/firestore';
@@ -19,17 +19,17 @@ import { AlertCircle } from 'lucide-react';
 import { PrivacyPolicy } from '@/components/privacy-policy';
 
 const users = {
-  'superuser@ns.com': 'password',
-  'b2_supervisor@ns.com': 'password',
-  'b1_supervisor@ns.com': 'password',
-  'quality_manager@ns.com': 'password',
-  'management@ns.com': 'password',
-  'pregger_lead@ns.com': 'password',
-  'tapehead_operator@ns.com': 'password',
-  'tapehead_lead@ns.com': 'password',
-  'gantry_lead@ns.com': 'password',
-  'films_lead@ns.com': 'password',
-  'graphics_lead@ns.com': 'password',
+  'superuser': 'Super.P@ssw0rd',
+  'b2_supervisor': 'B2.Sup.P@ss',
+  'b1_supervisor': 'B1.Sup.P@ss',
+  'quality_manager': 'QM.P@ssw0rd',
+  'management': 'M@n@ge.P@ss',
+  'pregger_lead': 'Preg.Ld.P@ss',
+  'tapehead_operator': 'T@peOp.P@ss',
+  'tapehead_lead': 'T@peLd.P@ss',
+  'gantry_lead': 'G@ntry.P@ss',
+  'films_lead': 'F!lms.P@ss',
+  'graphics_lead': 'Gr@ph!cs.P@ss',
 };
 
 export default function LoginPage() {
@@ -38,8 +38,8 @@ export default function LoginPage() {
   const firebaseAuth = useFirebaseAuth();
   const { firestore } = useFirebase();
   const { user, isUserLoading } = useUser();
-  const [email, setEmail] = useState('b2_supervisor@ns.com');
-  const [password, setPassword] = useState('password');
+  const [email, setEmail] = useState('b2_supervisor');
+  const [password, setPassword] = useState('B2.Sup.P@ss');
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -75,9 +75,12 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
     setAuthError(null);
+    
+    // Append domain for authentication
+    const fullEmail = `${email}@ns.com`;
 
     try {
-      const userCredential = await signInWithEmailAndPassword(firebaseAuth, email, password);
+      const userCredential = await signInWithEmailAndPassword(firebaseAuth, fullEmail, password);
       await assignRoleAndUserDoc(userCredential.user); 
       toast({
         title: 'Login Successful',
@@ -88,7 +91,7 @@ export default function LoginPage() {
         setAuthError('Email/Password sign-in is not enabled for this Firebase project. Please enable it in the Firebase Console under Authentication > Sign-in method.');
       } else if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
         try {
-          const userCredential = await createUserWithEmailAndPassword(firebaseAuth, email, password);
+          const userCredential = await createUserWithEmailAndPassword(firebaseAuth, fullEmail, password);
           await assignRoleAndUserDoc(userCredential.user);
           toast({
             title: 'Account Created & Logged In',
@@ -168,11 +171,11 @@ export default function LoginPage() {
                 </Select>
                 </div>
                 <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
+                    <Label htmlFor="email">Username</Label>
                     <Input
                     id="email"
-                    type="email"
-                    placeholder="m@example.com"
+                    type="text"
+                    placeholder="e.g. b2_supervisor"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
