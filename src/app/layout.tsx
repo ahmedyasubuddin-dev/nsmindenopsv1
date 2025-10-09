@@ -7,8 +7,41 @@ import { Toaster } from "@/components/ui/toaster"
 import { AppTitleProvider } from '@/components/app-title-context';
 import { FirebaseClientProvider } from '@/firebase';
 import React, { ReactNode } from 'react';
+import { useUser } from '@/firebase';
+import { usePathname, useRouter } from 'next/navigation';
+import { PrivacyPolicy } from '@/components/privacy-policy';
+import LoginPage from './login/page';
+
 
 const APP_TITLE = 'SRD: Minden Operations';
+
+function AuthGuard({ children }: { children: ReactNode }) {
+  const { user, isUserLoading } = useUser();
+  const pathname = usePathname();
+  const router = useRouter();
+
+  React.useEffect(() => {
+    if (!isUserLoading && !user && pathname !== '/login') {
+      router.push('/login');
+    }
+  }, [user, isUserLoading, pathname, router]);
+
+  if (pathname === '/login') {
+    return <>{children}</>;
+  }
+
+  if (isUserLoading || !user) {
+    // You can return a loading spinner here
+    return (
+        <div className="flex items-center justify-center min-h-screen">
+            <div>Loading...</div>
+        </div>
+    );
+  }
+  
+  return <AppLayout>{children}</AppLayout>;
+}
+
 
 export default function RootLayout({
   children,
@@ -26,9 +59,9 @@ export default function RootLayout({
       <body className="font-body antialiased">
         <FirebaseClientProvider>
           <AppTitleProvider title={APP_TITLE}>
-            <AppLayout>
+            <AuthGuard>
               {children}
-            </AppLayout>
+            </AuthGuard>
           </AppTitleProvider>
         </FirebaseClientProvider>
         <Toaster />
