@@ -4,9 +4,37 @@
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import { FirebaseApp } from 'firebase/app';
 import { Firestore } from 'firebase/firestore';
-import { Auth, User, onAuthStateChanged, getIdTokenResult } from 'firebase/auth';
+import { Auth, User } from 'firebase/auth';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
 import type { UserRole } from '@/lib/roles';
+
+// MOCK USER DATA - Simulates a Superuser being logged in at all times
+const MOCK_USER: User = {
+  uid: 'mock-superuser-uid',
+  email: 'superuser@ns.com',
+  displayName: 'Superuser',
+  emailVerified: true,
+  isAnonymous: false,
+  photoURL: null,
+  providerData: [],
+  providerId: 'password',
+  tenantId: null,
+  refreshToken: '',
+  delete: async () => {},
+  getIdToken: async () => 'mock-token',
+  getIdTokenResult: async () => ({
+    token: 'mock-token',
+    expirationTime: '',
+    authTime: '',
+    issuedAtTime: '',
+    signInProvider: null,
+    signInSecondFactor: null,
+    claims: { role: 'Superuser' },
+  }),
+  reload: async () => {},
+  toJSON: () => ({}),
+};
+
 
 interface FirebaseProviderProps {
   children: ReactNode;
@@ -58,39 +86,14 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   firestore,
   auth,
 }) => {
-  const [userAuthState, setUserAuthState] = useState<UserAuthState>({
-    user: null,
-    isUserLoading: true,
+  // We now use a static mock user state instead of listening to auth changes
+  const userAuthState: UserAuthState = {
+    user: MOCK_USER,
+    isUserLoading: false, // Never loading
     userError: null,
-    role: null,
-  });
+    role: 'Superuser', // Hardcoded role
+  };
 
-  useEffect(() => {
-    if (!auth) {
-      setUserAuthState({ user: null, isUserLoading: false, userError: new Error("Auth service not provided."), role: null });
-      return;
-    }
-
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        try {
-          const idTokenResult = await getIdTokenResult(firebaseUser);
-          const userRole = (idTokenResult.claims.role as UserRole) || null;
-          setUserAuthState({ user: firebaseUser, isUserLoading: false, userError: null, role: userRole });
-        } catch (error) {
-          console.error("Error fetching custom claims:", error);
-          setUserAuthState({ user: firebaseUser, isUserLoading: false, userError: error as Error, role: null });
-        }
-      } else {
-        setUserAuthState({ user: null, isUserLoading: false, userError: null, role: null });
-      }
-    }, (error) => {
-      console.error("FirebaseProvider: onAuthStateChanged error:", error);
-      setUserAuthState({ user: null, isUserLoading: false, userError: error, role: null });
-    });
-
-    return () => unsubscribe();
-  }, [auth]);
 
   const contextValue = useMemo((): FirebaseContextState => {
     const servicesAvailable = !!(firebaseApp && firestore && auth);

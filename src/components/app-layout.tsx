@@ -3,7 +3,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   SidebarProvider,
   Sidebar,
@@ -64,7 +64,6 @@ import { cn } from "@/lib/utils";
 import { useAppTitle } from "./app-title-context";
 import { hasPermission } from "@/lib/roles";
 import { useAuth, useUser } from "@/firebase";
-import { signOut } from "firebase/auth";
 
 const departments = [
   { name: 'Pregger', href: '/report/pregger', icon: Building2, permission: 'nav:report:pregger' },
@@ -108,11 +107,12 @@ function useTheme() {
 
 function UserNav() {
   const { user, role } = useUser();
-  const firebaseAuth = useAuth();
   const { setTheme } = useTheme();
 
   const handleLogout = async () => {
-      await signOut(firebaseAuth);
+      // In a real app, this would sign the user out.
+      // Since we removed the login module, we can just reload the page.
+      window.location.reload();
   };
   
   return (
@@ -158,7 +158,7 @@ function UserNav() {
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleLogout}>
             <LogOut className="mr-2 h-4 w-4" />
-            Log out
+            Sign out
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -287,6 +287,16 @@ function MainSidebar() {
 }
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+
+  React.useEffect(() => {
+    // Since we're discarding the login module, we ensure the user is always on a valid page.
+    // If they land on the root, redirect to the dashboard.
+    if (window.location.pathname === '/') {
+      router.replace('/dashboard');
+    }
+  }, [router]);
+
   return (
     <SidebarProvider>
       <MainSidebar />
