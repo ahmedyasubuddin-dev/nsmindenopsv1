@@ -5,33 +5,44 @@ import './globals.css';
 import { AppLayout } from '@/components/app-layout';
 import { Toaster } from "@/components/ui/toaster"
 import { AppTitleProvider } from '@/components/app-title-context';
-import { FirebaseClientProvider } from '@/firebase';
-import React, { ReactNode } from 'react';
-import { useUser } from '@/firebase';
+import { FirebaseClientProvider, useUser } from '@/firebase';
+import React, { ReactNode, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { PrivacyPolicy } from '@/components/privacy-policy';
 import LoginPage from './login/page';
-
+import { hasPermission } from '@/lib/roles';
 
 const APP_TITLE = 'SRD: Minden Operations';
 
 function AuthGuard({ children }: { children: ReactNode }) {
-  const { user, isUserLoading } = useUser();
+  const { user, isUserLoading, role } = useUser();
   const pathname = usePathname();
   const router = useRouter();
 
-  React.useEffect(() => {
-    if (!isUserLoading && !user && pathname !== '/login') {
+  useEffect(() => {
+    if (isUserLoading) return; // Wait until user is loaded
+
+    if (!user && pathname !== '/login') {
       router.push('/login');
+      return;
     }
-  }, [user, isUserLoading, pathname, router]);
+    
+    if (user && pathname === '/login') {
+        router.push('/dashboard');
+        return;
+    }
+    
+    // Admin route guard
+    if (pathname.startsWith('/admin') && !hasPermission(role, 'nav:admin')) {
+      router.push('/dashboard'); // Or a dedicated "not-authorized" page
+    }
+
+  }, [user, isUserLoading, pathname, router, role]);
 
   if (pathname === '/login') {
     return <>{children}</>;
   }
 
   if (isUserLoading || !user) {
-    // You can return a loading spinner here
     return (
         <div className="flex items-center justify-center min-h-screen">
             <div>Loading...</div>

@@ -22,6 +22,7 @@ export interface TapeUsage {
 export interface WorkItem {
     oeNumber: string;
     section: string;
+    materialType: 'individual' | 'nested';
     endOfShiftStatus: 'Completed' | 'In Progress';
     layer?: string;
     tapes: TapeUsage[];

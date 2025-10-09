@@ -1,4 +1,6 @@
 
+import type { UserRole as DeprecatedUserRole } from './types';
+
 export type UserRole = 
   | 'Superuser'
   | 'B2 Supervisor'
@@ -10,7 +12,8 @@ export type UserRole =
   | 'Tapehead Lead'
   | 'Gantry Lead'
   | 'Films Lead'
-  | 'Graphics Lead';
+  | 'Graphics Lead'
+  | null;
 
 export type Permission = 
   // Navigation Links
@@ -29,9 +32,10 @@ export type Permission =
   | 'nav:analytics:graphics'
   | 'nav:qc'
   | 'nav:status'
-  | 'nav:file-processing';
+  | 'nav:file-processing'
+  | 'nav:admin';
 
-const roles: Record<UserRole, Permission[]> = {
+const roles: Record<Exclude<UserRole, null>, Permission[]> = {
     'Superuser': [
         'nav:dashboard',
         'nav:report:pregger', 'nav:report:tapeheads', 'nav:report:gantry', 'nav:report:films', 'nav:report:graphics',
@@ -40,6 +44,7 @@ const roles: Record<UserRole, Permission[]> = {
         'nav:qc',
         'nav:status',
         'nav:file-processing',
+        'nav:admin',
     ],
     'B2 Supervisor': [
         'nav:dashboard',
@@ -73,7 +78,7 @@ const roles: Record<UserRole, Permission[]> = {
     'Graphics Lead': ['nav:dashboard', 'nav:report:graphics', 'nav:status'],
 };
 
-export function hasPermission(role: UserRole | null, permission: Permission): boolean {
+export function hasPermission(role: UserRole, permission: Permission): boolean {
     if (!role) return false;
     // Superuser has all permissions
     if (role === 'Superuser') return true;
@@ -94,7 +99,7 @@ export const emailToRoleMap: Record<string, UserRole> = {
     'graphics_lead@ns.com': 'Graphics Lead',
 };
 
-export function getRoleFromEmail(email: string | null): UserRole | null {
+export function getRoleFromEmail(email: string | null): UserRole {
     if (!email) return null;
     return emailToRoleMap[email] || null;
 }

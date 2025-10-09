@@ -56,12 +56,13 @@ import {
   PackageSearch,
   LogOut,
   Moon,
-  Sun
+  Sun,
+  Shield,
 } from "lucide-react";
 import { Logo } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import { useAppTitle } from "./app-title-context";
-import { hasPermission, getRoleFromEmail, UserRole } from "@/lib/roles";
+import { hasPermission, UserRole } from "@/lib/roles";
 import { useAuth, useUser } from "@/firebase";
 import { signOut } from "firebase/auth";
 
@@ -106,15 +107,13 @@ function useTheme() {
 
 
 function UserNav() {
-  const { user } = useUser();
+  const { user, role } = useUser();
   const firebaseAuth = useAuth();
   const { setTheme } = useTheme();
 
   const handleLogout = async () => {
       await signOut(firebaseAuth);
   };
-  
-  const role = getRoleFromEmail(user?.email || null);
   
   return (
     <DropdownMenu>
@@ -169,8 +168,7 @@ function UserNav() {
 function MainSidebar() {
   const pathname = usePathname();
   const { title } = useAppTitle();
-  const { user } = useUser();
-  const role = getRoleFromEmail(user?.email || null);
+  const { user, role } = useUser();
 
   const [isReportsOpen, setReportsOpen] = React.useState(pathname.startsWith('/report'));
   const [isLeadFuncsOpen, setLeadFuncsOpen] = React.useState(
@@ -178,7 +176,7 @@ function MainSidebar() {
   );
   const [isDeptAnalyticsOpen, setDeptAnalyticsOpen] = React.useState(pathname.startsWith('/analytics'));
 
-  const can = (permission: Permission) => hasPermission(role, permission);
+  const can = (permission: any) => hasPermission(role, permission);
   
   const visibleReportDepts = departments.filter(dept => can(dept.permission));
   const visibleAnalyticsDepts = analyticsDepartments.filter(dept => can(dept.permission));
@@ -263,6 +261,13 @@ function MainSidebar() {
                 )}
               </SidebarMenuItem>
            )}
+            {can('nav:admin') && (
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname === "/admin"} tooltip="Admin Console">
+                  <Link href="/admin"><Shield /><span>Admin Console</span></Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
         </SidebarMenu>
       </SidebarContent>
       <SidebarFooter className="group-data-[collapsible=icon]:hidden">

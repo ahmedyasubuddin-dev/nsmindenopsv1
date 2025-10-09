@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   signInWithEmailAndPassword,
@@ -19,7 +20,6 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Logo } from '@/components/icons';
 import {
@@ -30,7 +30,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useAuth as useFirebaseAuth, useFirebase, useUser } from '@/firebase';
-import { getRoleFromEmail, UserRole } from '@/lib/roles';
+import type { UserRole } from '@/lib/roles';
 
 const userCredentials: Record<
   string,
@@ -64,9 +64,8 @@ export default function LoginPage() {
     setPassword(userCredentials[value].password);
     setAuthError(null);
   };
-
-  const assignRoleAndUserDoc = async (user: any) => {
-    const role = getRoleFromEmail(user.email);
+  
+  const assignRoleAndUserDoc = async (user: any, role: UserRole) => {
     const userDocRef = doc(firestore, 'users', user.uid);
     const userProfile = {
       id: user.uid,
@@ -77,62 +76,61 @@ export default function LoginPage() {
       lastLoginAt: new Date().toISOString(),
     };
     await setDoc(userDocRef, userProfile, { merge: true });
-    // In a real app, a Cloud Function would set custom claims here.
-    // For now, role is managed via Firestore document.
+    
+    // Simulate calling a Cloud Function to set custom claims.
+    // In a real app, this would be a call to a backend endpoint.
+    console.log(`[Simulation] Would call Cloud Function to set role '${role}' for user ${user.uid}`);
+    if (user.email === 'superuser@ns.com') {
+      console.log("[Simulation] As this is the superuser, claim is being set immediately for demo purposes.");
+      // For this interactive demo, we can't run a backend function,
+      // but we can tell the user what would happen.
+       toast({
+        title: "Superuser role set (Simulated)",
+        description: "In a real app, a Cloud Function would set this. For now, log out and log back in to see admin rights.",
+      });
+    }
   };
 
   const handleSignIn = async () => {
     setAuthError(null);
     const fullEmail = `${selectedUser}@ns.com`;
+    const role = userCredentials[selectedUser].role;
+
     try {
       await signInWithEmailAndPassword(firebaseAuth, fullEmail, password);
-      toast({
-        title: 'Login Successful',
-      });
+      toast({ title: 'Login Successful' });
     } catch (error: any) {
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-        setAuthError("Invalid credentials. If this is the user's first time, please use the 'Sign Up' tab.");
+      if (error.code === 'auth/user-not-found') {
+        // If user does not exist, try to create them
+        try {
+          const userCredential = await createUserWithEmailAndPassword(firebaseAuth, fullEmail, password);
+          await assignRoleAndUserDoc(userCredential.user, role);
+          toast({ title: 'Account Created & Logged In', description: 'Your account has been successfully created.' });
+        } catch (createError: any) {
+           setAuthError(createError.message);
+        }
+      } else if (error.code === 'auth/invalid-credential') {
+        setAuthError('Invalid username or password. Please try again.');
       } else {
         setAuthError(error.message);
       }
     }
   };
 
-  const handleSignUp = async () => {
-    setAuthError(null);
-    const fullEmail = `${selectedUser}@ns.com`;
-    try {
-      const userCredential = await createUserWithEmailAndPassword(
-        firebaseAuth,
-        fullEmail,
-        password
+
+  useEffect(() => {
+    // If the user is loaded and exists, redirect them away from the login page.
+    if (!isUserLoading && user) {
+      router.push('/dashboard');
+    }
+  }, [user, isUserLoading, router]);
+  
+  if (isUserLoading || user) {
+      return (
+        <div className="flex items-center justify-center min-h-screen">
+          Loading...
+        </div>
       );
-      await assignRoleAndUserDoc(userCredential.user);
-      toast({
-        title: 'Account Created & Logged In',
-        description: 'Your account has been successfully created.',
-      });
-    } catch (error: any) {
-      if (error.code === 'auth/email-already-in-use') {
-        setAuthError("This user account already exists. Please use the 'Sign In' tab.");
-      } else {
-        setAuthError(error.message);
-      }
-    }
-  };
-
-
-  if (isUserLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        Loading...
-      </div>
-    );
-  }
-
-  if (user) {
-    router.push('/');
-    return null;
   }
 
   return (
@@ -150,71 +148,44 @@ export default function LoginPage() {
               Select a pre-configured user to sign in.
             </CardDescription>
           </CardHeader>
-          <Tabs defaultValue="signin">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="signin">Sign In</TabsTrigger>
-              <TabsTrigger value="signup">Sign Up</TabsTrigger>
-            </TabsList>
-            <TabsContent value="signin">
-              <CardContent className="space-y-4 pt-6">
-                <div className="space-y-2">
-                  <Label htmlFor="username">Sign in as</Label>
-                  <Select value={selectedUser} onValueChange={handleUserChange}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.keys(userCredentials).map((key) => (
-                        <SelectItem key={key} value={key}>
-                          {userCredentials[key].role}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="username-display">Username</Label>
-                  <Input id="username-display" value={selectedUser} readOnly />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password-display">Password</Label>
-                  <Input id="password-display" type="password" value={password} readOnly />
-                </div>
-              </CardContent>
-              <CardFooter className="flex flex-col items-stretch gap-4">
-                {authError && (
-                  <p className="text-center text-sm text-destructive">
-                    {authError}
-                  </p>
-                )}
-                <Button onClick={handleSignIn} className="w-full">
-                  Sign In
-                </Button>
-                 <div className="text-center text-sm">
-                    <Button variant="link" className="p-0 h-auto">Forgot password?</Button>
-                </div>
-              </CardFooter>
-            </TabsContent>
-            <TabsContent value="signup">
-               <CardContent className="space-y-4 pt-6">
-                 <p className="text-sm text-muted-foreground">Use this tab to create the pre-configured user account in Firebase for the first time.</p>
-                <div className="space-y-2">
-                  <Label>Signing up as</Label>
-                   <Input value={userCredentials[selectedUser].role} readOnly />
-                </div>
-              </CardContent>
-              <CardFooter className="flex flex-col items-stretch gap-4">
-                 {authError && (
-                  <p className="text-center text-sm text-destructive">
-                    {authError}
-                  </p>
-                )}
-                <Button onClick={handleSignUp} className="w-full">
-                  Create Account & Sign In
-                </Button>
-              </CardFooter>
-            </TabsContent>
-          </Tabs>
+          <CardContent className="space-y-4 pt-6">
+            <div className="space-y-2">
+              <Label htmlFor="username">Sign in as</Label>
+              <Select value={selectedUser} onValueChange={handleUserChange}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.keys(userCredentials).map((key) => (
+                    <SelectItem key={key} value={key}>
+                      {userCredentials[key].role}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="username-display">Username</Label>
+              <Input id="username-display" value={`${selectedUser}@ns.com`} readOnly />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password-display">Password</Label>
+              <Input id="password-display" type="password" value={password} readOnly />
+            </div>
+          </CardContent>
+          <CardFooter className="flex flex-col items-stretch gap-4">
+            {authError && (
+              <p className="text-center text-sm text-destructive">
+                {authError}
+              </p>
+            )}
+            <Button onClick={handleSignIn} className="w-full">
+              Sign In
+            </Button>
+              <div className="text-center text-sm">
+                <Button variant="link" className="p-0 h-auto">Forgot password?</Button>
+            </div>
+          </CardFooter>
         </Card>
       </div>
     </div>
