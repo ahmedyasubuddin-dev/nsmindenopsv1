@@ -5,49 +5,10 @@ import './globals.css';
 import { AppLayout } from '@/components/app-layout';
 import { Toaster } from "@/components/ui/toaster"
 import { AppTitleProvider } from '@/components/app-title-context';
-import { usePathname, useRouter } from 'next/navigation';
-import React, { useEffect, ReactNode } from 'react';
-import { FirebaseClientProvider, useUser } from '@/firebase';
+import { FirebaseClientProvider } from '@/firebase';
+import React, { ReactNode } from 'react';
 
 const APP_TITLE = 'SRD: Minden Operations';
-
-function AppContent({ children }: { children: ReactNode }) {
-  const { user, isUserLoading } = useUser();
-  const router = useRouter();
-  const pathname = usePathname();
-  
-  useEffect(() => {
-    if (!isUserLoading) {
-      const isAuthenticated = !!user;
-      if (isAuthenticated && pathname === '/login') {
-         router.push('/dashboard');
-      } else if (!isAuthenticated && pathname !== '/login') {
-        router.push('/login');
-      }
-    }
-  }, [user, isUserLoading, pathname, router]);
-  
-  const isAuthenticated = !!user;
-
-  // This is the gatekeeper. It shows a loading screen until Firebase has determined the auth state.
-  // It also handles redirecting between login/dashboard pages.
-  if (isUserLoading || (!isAuthenticated && pathname !== '/login') || (isAuthenticated && pathname === '/login')) {
-    return <div className="flex h-screen items-center justify-center">Loading...</div>;
-  }
-
-  // If we are on the login page, render it without the main AppLayout
-  if (pathname === '/login') {
-     return <>{children}</>;
-  }
-  
-  // If authenticated and not on the login page, render the main AppLayout
-  return (
-      <AppLayout>
-        {children}
-      </AppLayout>
-  );
-}
-
 
 export default function RootLayout({
   children,
@@ -65,9 +26,9 @@ export default function RootLayout({
       <body className="font-body antialiased">
         <FirebaseClientProvider>
           <AppTitleProvider title={APP_TITLE}>
-              <AppContent>
-                {children}
-              </AppContent>
+            <AppLayout>
+              {children}
+            </AppLayout>
           </AppTitleProvider>
         </FirebaseClientProvider>
         <Toaster />
