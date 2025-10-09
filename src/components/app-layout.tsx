@@ -168,7 +168,7 @@ function UserNav() {
 function MainSidebar() {
   const pathname = usePathname();
   const { title } = useAppTitle();
-  const { role } = useUser();
+  const { user, role } = useUser();
 
   const [isReportsOpen, setReportsOpen] = React.useState(pathname.startsWith('/report'));
   const [isLeadFuncsOpen, setLeadFuncsOpen] = React.useState(
