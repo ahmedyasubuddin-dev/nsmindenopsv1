@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Logo } from '@/components/icons';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/componentsui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth as useFirebaseAuth, useFirebase, useUser } from '@/firebase';
 import { getRoleFromEmail, UserRole } from '@/lib/roles';
 import { doc, setDoc } from 'firebase/firestore';
