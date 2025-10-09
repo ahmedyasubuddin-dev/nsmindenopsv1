@@ -53,7 +53,7 @@ export default function DashboardPage() {
     const graphicsQuery = useMemoFirebase(() => (isUserLoading || !canView('nav:report:graphics')) ? null : query(collection(firestore, 'graphics-tasks')), [firestore, isUserLoading, role]);
     const { data: graphicsTasksData, isLoading: isLoadingGraphics } = useCollection<GraphicsTask>(graphicsQuery);
 
-    const inspectionsQuery = useMemoFirebase(() => (isUserLoading || !canView('nav:qc')) ? null : query(collection(firestore, 'inspections')), [firestore, isUserLoading, role]);
+    const inspectionsQuery = useMemoFirebase(() => (isUserLoading || !canView('nav:qc')) ? null : query(collection(firestore, 'qc_inspections')), [firestore, isUserLoading, role]);
     const { data: inspectionsData, isLoading: isLoadingInspections } = useCollection<InspectionSubmission>(inspectionsQuery);
 
     const loading = isLoadingTapeheads || isLoadingFilms || isLoadingGantry || isLoadingGraphics || isLoadingInspections || isUserLoading;

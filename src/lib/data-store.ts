@@ -189,7 +189,7 @@ export async function addPreggerReport(firestore: Firestore, report: Omit<Pregge
 
 export async function addInspection(firestore: Firestore, inspection: Omit<InspectionSubmission, 'id'>): Promise<void> {
     const newInspection = { ...inspection, id: `qc_${Date.now()}` };
-    const docRef = doc(firestore, 'inspections', newInspection.id);
+    const docRef = doc(firestore, 'qc_inspections', newInspection.id);
     setDocumentNonBlocking(docRef, newInspection, { merge: true });
 }
 
