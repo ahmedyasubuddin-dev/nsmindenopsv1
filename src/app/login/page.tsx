@@ -75,45 +75,50 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
     setAuthError(null);
-    
-    // Append domain for authentication
+
     const fullEmail = `${email}@ns.com`;
 
     try {
+      // 1. Attempt to sign in
       const userCredential = await signInWithEmailAndPassword(firebaseAuth, fullEmail, password);
-      await assignRoleAndUserDoc(userCredential.user); 
+      await assignRoleAndUserDoc(userCredential.user);
       toast({
         title: 'Login Successful',
         description: 'Welcome back!',
       });
-    } catch (error: any) {
-      if (error.code === 'auth/configuration-not-found') {
-        setAuthError('Email/Password sign-in is not enabled for this Firebase project. Please enable it in the Firebase Console under Authentication > Sign-in method.');
-      } else if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+    } catch (signInError: any) {
+      // 2. If user does not exist, create a new account
+      if (signInError.code === 'auth/user-not-found') {
         try {
-          const userCredential = await createUserWithEmailAndPassword(firebaseAuth, fullEmail, password);
-          await assignRoleAndUserDoc(userCredential.user);
+          const newUserCredential = await createUserWithEmailAndPassword(firebaseAuth, fullEmail, password);
+          await assignRoleAndUserDoc(newUserCredential.user);
           toast({
             title: 'Account Created & Logged In',
             description: 'Your user account has been automatically created.',
           });
-        } catch (creationError: any) {
-           if (creationError.code === 'auth/configuration-not-found') {
-                setAuthError('Email/Password sign-in is not enabled for this Firebase project. Please enable it in the Firebase Console under Authentication > Sign-in method.');
-           } else {
-              console.error("User creation error:", creationError);
-              toast({
-                title: 'Login Failed',
-                description: creationError.message || 'An unknown error occurred during account creation.',
-                variant: 'destructive',
-              });
-           }
+        } catch (signUpError: any) {
+          // Handle errors during sign-up (e.g., weak password)
+          setAuthError(signUpError.message);
+          toast({
+            title: 'Sign Up Failed',
+            description: signUpError.message || 'An unknown error occurred during account creation.',
+            variant: 'destructive',
+          });
         }
+      } else if (signInError.code === 'auth/invalid-credential') {
+        // 3. Handle incorrect password for an existing user
+        setAuthError('Invalid username or password. Please try again.');
+         toast({
+          title: 'Authentication Error',
+          description: 'Invalid username or password. Please try again.',
+          variant: 'destructive',
+        });
       } else {
-        console.error("Login error:", error);
+        // 4. Handle other sign-in errors
+        setAuthError(signInError.message);
         toast({
           title: 'Login Failed',
-          description: error.message || 'An unknown error occurred.',
+          description: signInError.message || 'An unknown error occurred.',
           variant: 'destructive',
         });
       }
@@ -151,7 +156,7 @@ export default function LoginPage() {
                 {authError && (
                 <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Configuration Error</AlertTitle>
+                    <AlertTitle>Authentication Error</AlertTitle>
                     <AlertDescription>{authError}</AlertDescription>
                 </Alert>
                 )}
