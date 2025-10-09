@@ -39,8 +39,8 @@ export default function LoginPage() {
   const firebaseAuth = useFirebaseAuth();
   const { firestore } = useFirebase();
   const { user, isUserLoading } = useUser();
-  const [email, setEmail] = useState('b2_supervisor');
-  const [password, setPassword] = useState('B2.Sup.P@ss');
+  const [email, setEmail] = useState('superuser');
+  const [password, setPassword] = useState('Super.P@ssw0rd');
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('signin');
@@ -91,7 +91,7 @@ export default function LoginPage() {
         });
       } catch (error: any) {
          if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-          setAuthError("User not found or invalid password. If this is a pre-configured user's first time, please use the 'Sign Up' tab.");
+          setAuthError("Invalid credentials. If this is the user's first time, please use the 'Sign Up' tab.");
         } else {
           setAuthError(error.message);
         }
