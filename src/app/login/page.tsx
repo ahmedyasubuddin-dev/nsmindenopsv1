@@ -11,12 +11,13 @@ import { useToast } from '@/hooks/use-toast';
 import { Logo } from '@/components/icons';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth as useFirebaseAuth, useFirebase, useUser } from '@/firebase';
-import { getRoleFromEmail, UserRole } from '@/lib/roles';
+import { getRoleFromEmail } from '@/lib/roles';
 import { doc, setDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, User } from 'firebase/auth';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { PrivacyPolicy } from '@/components/privacy-policy';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const users = {
   'superuser': 'Super.P@ssw0rd',
@@ -42,6 +43,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState('B2.Sup.P@ss');
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('signin');
+
 
   const assignRoleAndUserDoc = async (user: User) => {
     const role = getRoleFromEmail(user.email);
@@ -71,59 +74,48 @@ export default function LoginPage() {
     }
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleAuthAction = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setAuthError(null);
-
     const fullEmail = `${email}@ns.com`;
 
-    try {
-      // 1. Attempt to sign in
-      const userCredential = await signInWithEmailAndPassword(firebaseAuth, fullEmail, password);
-      await assignRoleAndUserDoc(userCredential.user);
-      toast({
-        title: 'Login Successful',
-        description: 'Welcome back!',
-      });
-    } catch (signInError: any) {
-      // 2. If user does not exist, create a new account
-      if (signInError.code === 'auth/user-not-found') {
-        try {
-          const newUserCredential = await createUserWithEmailAndPassword(firebaseAuth, fullEmail, password);
-          await assignRoleAndUserDoc(newUserCredential.user);
-          toast({
-            title: 'Account Created & Logged In',
-            description: 'Your user account has been automatically created.',
-          });
-        } catch (signUpError: any) {
-          // Handle errors during sign-up (e.g., weak password)
-          setAuthError(signUpError.message);
-          toast({
-            title: 'Sign Up Failed',
-            description: signUpError.message || 'An unknown error occurred during account creation.',
-            variant: 'destructive',
-          });
-        }
-      } else if (signInError.code === 'auth/invalid-credential') {
-        // 3. Handle incorrect password for an existing user
-        setAuthError('Invalid username or password. Please try again.');
-         toast({
-          title: 'Authentication Error',
-          description: 'Invalid username or password. Please try again.',
-          variant: 'destructive',
-        });
-      } else {
-        // 4. Handle other sign-in errors
-        setAuthError(signInError.message);
+    if (activeTab === 'signin') {
+      // --- SIGN IN LOGIC ---
+      try {
+        const userCredential = await signInWithEmailAndPassword(firebaseAuth, fullEmail, password);
+        await assignRoleAndUserDoc(userCredential.user);
         toast({
-          title: 'Login Failed',
-          description: signInError.message || 'An unknown error occurred.',
-          variant: 'destructive',
+          title: 'Login Successful',
+          description: 'Welcome back!',
         });
+      } catch (error: any) {
+         if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+          setAuthError("User not found or invalid password. If this is a pre-configured user's first time, please use the 'Sign Up' tab.");
+        } else {
+          setAuthError(error.message);
+        }
+      } finally {
+        setIsLoading(false);
       }
-    } finally {
-      setIsLoading(false);
+    } else {
+      // --- SIGN UP LOGIC ---
+      try {
+        const userCredential = await createUserWithEmailAndPassword(firebaseAuth, fullEmail, password);
+        await assignRoleAndUserDoc(userCredential.user);
+        toast({
+          title: 'Account Created & Logged In',
+          description: 'Your user account has been successfully created.',
+        });
+      } catch (error: any) {
+        if (error.code === 'auth/email-already-in-use') {
+          setAuthError("This user account already exists. Please use the 'Sign In' tab.");
+        } else {
+          setAuthError(error.message);
+        }
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
   
@@ -151,59 +143,92 @@ export default function LoginPage() {
             <CardTitle className="text-2xl font-headline">North Sails Minden Operations</CardTitle>
             <CardDescription>SRD application for plant operations.</CardDescription>
             </CardHeader>
-            <form onSubmit={handleLogin}>
-                <CardContent className="space-y-4">
-                {authError && (
-                <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Authentication Error</AlertTitle>
-                    <AlertDescription>{authError}</AlertDescription>
-                </Alert>
-                )}
-                <div className="space-y-2">
-                <Label>Select a user to sign in as:</Label>
-                <Select value={email} onValueChange={handleUserSelection}>
-                    <SelectTrigger>
-                    <SelectValue placeholder="Select a user role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                    {Object.keys(users).map((userEmail) => (
-                        <SelectItem key={userEmail} value={userEmail}>
-                        {userEmail}
-                        </SelectItem>
-                    ))}
-                    </SelectContent>
-                </Select>
-                </div>
-                <div className="space-y-2">
-                    <Label htmlFor="email">Username</Label>
-                    <Input
-                    id="email"
-                    type="text"
-                    placeholder="e.g. b2_supervisor"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    readOnly
-                    />
-                </div>
-                <div className="space-y-2">
-                    <Label htmlFor="password">Password</Label>
-                    <Input 
-                    id="password" 
-                    type="password" 
-                    required 
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    />
-                </div>
-                </CardContent>
-                <CardFooter>
-                <Button className="w-full" type="submit" disabled={isLoading}>
-                    {isLoading ? 'Signing In...' : 'Sign In'}
-                </Button>
-                </CardFooter>
-            </form>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="signin">Sign In</TabsTrigger>
+                    <TabsTrigger value="signup">Sign Up</TabsTrigger>
+                </TabsList>
+                <form onSubmit={handleAuthAction}>
+                    <TabsContent value="signin">
+                        <CardContent className="space-y-4 pt-6">
+                             {authError && (
+                                <Alert variant="destructive">
+                                    <AlertCircle className="h-4 w-4" />
+                                    <AlertTitle>Authentication Error</AlertTitle>
+                                    <AlertDescription>{authError}</AlertDescription>
+                                </Alert>
+                            )}
+                            <div className="space-y-2">
+                                <Label>Select a user to sign in as:</Label>
+                                <Select value={email} onValueChange={handleUserSelection}>
+                                    <SelectTrigger>
+                                    <SelectValue placeholder="Select a user role" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                    {Object.keys(users).map((userEmail) => (
+                                        <SelectItem key={userEmail} value={userEmail}>
+                                        {userEmail}
+                                        </SelectItem>
+                                    ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="email">Username</Label>
+                                <Input id="email" type="text" placeholder="e.g. b2_supervisor" required value={email} onChange={(e) => setEmail(e.target.value)} readOnly />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="password">Password</Label>
+                                <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+                            </div>
+                        </CardContent>
+                        <CardFooter>
+                            <Button className="w-full" type="submit" disabled={isLoading}>
+                                {isLoading ? 'Signing In...' : 'Sign In'}
+                            </Button>
+                        </CardFooter>
+                    </TabsContent>
+                    <TabsContent value="signup">
+                       <CardContent className="space-y-4 pt-6">
+                             {authError && (
+                                <Alert variant="destructive">
+                                    <AlertCircle className="h-4 w-4" />
+                                    <AlertTitle>Sign Up Error</AlertTitle>
+                                    <AlertDescription>{authError}</AlertDescription>
+                                </Alert>
+                            )}
+                            <div className="space-y-2">
+                                <Label>Select a user to create:</Label>
+                                <Select value={email} onValueChange={handleUserSelection}>
+                                    <SelectTrigger>
+                                    <SelectValue placeholder="Select a user role" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                    {Object.keys(users).map((userEmail) => (
+                                        <SelectItem key={userEmail} value={userEmail}>
+                                        {userEmail}
+                                        </SelectItem>
+                                    ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                             <div className="space-y-2">
+                                <Label htmlFor="email-signup">Username</Label>
+                                <Input id="email-signup" type="text" placeholder="e.g. b2_supervisor" required value={email} onChange={(e) => setEmail(e.target.value)} readOnly />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="password-signup">Password</Label>
+                                <Input id="password-signup" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+                            </div>
+                        </CardContent>
+                         <CardFooter>
+                            <Button className="w-full" type="submit" disabled={isLoading}>
+                                {isLoading ? 'Creating Account...' : 'Create Account & Sign In'}
+                            </Button>
+                        </CardFooter>
+                    </TabsContent>
+                </form>
+            </Tabs>
         </Card>
         <div className="mt-6 text-center">
             <PrivacyPolicy />
