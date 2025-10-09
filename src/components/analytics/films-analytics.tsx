@@ -12,7 +12,7 @@ export function FilmsAnalytics() {
 
   const filmsQuery = useMemoFirebase(() => {
     if (isUserLoading) return null;
-    return query(collection(firestore, 'films'))
+    return query(collection(firestore, 'films_reports'))
   }, [firestore, isUserLoading]);
 
   const { data: filmsData, isLoading } = useCollection<FilmsReport>(filmsQuery);

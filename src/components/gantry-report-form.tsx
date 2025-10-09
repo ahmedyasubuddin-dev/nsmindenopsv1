@@ -264,7 +264,7 @@ export function GantryReportForm() {
                     <Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={() => removeMaintenance(index)}><Trash2 className="size-4" /></Button>
                  </div>
                  <FormField
-                    control={control}
+                    control={form.control}
                     name={`maintenance.${index}.images`}
                     render={({ field }) => (
                       <FormItem>
@@ -305,7 +305,7 @@ function MoldField({ moldIndex, control, removeMold }: { moldIndex: number, cont
 
   const filmsQuery = useMemoFirebase(() => {
     if (isUserLoading) return null;
-    return query(collection(firestore, 'films'))
+    return query(collection(firestore, 'films_reports'))
   }, [firestore, isUserLoading]);
   const { data: filmsData, isLoading: isLoadingFilms } = useCollection<FilmsReport>(filmsQuery);
 
