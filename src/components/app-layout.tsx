@@ -62,7 +62,7 @@ import {
 import { Logo } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import { useAppTitle } from "./app-title-context";
-import { hasPermission, UserRole } from "@/lib/roles";
+import { hasPermission } from "@/lib/roles";
 import { useAuth, useUser } from "@/firebase";
 import { signOut } from "firebase/auth";
 
@@ -168,7 +168,7 @@ function UserNav() {
 function MainSidebar() {
   const pathname = usePathname();
   const { title } = useAppTitle();
-  const { user, role } = useUser();
+  const { role } = useUser();
 
   const [isReportsOpen, setReportsOpen] = React.useState(pathname.startsWith('/report'));
   const [isLeadFuncsOpen, setLeadFuncsOpen] = React.useState(
@@ -182,7 +182,7 @@ function MainSidebar() {
   const visibleAnalyticsDepts = analyticsDepartments.filter(dept => can(dept.permission));
 
   const canSeeAnyReports = visibleReportDepts.length > 0;
-  const canSeeLeadFunctions = can('nav:file-processing') || can('nav:status') || can('nav:review:tapeheads') || can('nav:qc') || visibleAnalyticsDepts.length > 0;
+  const canSeeLeadFunctions = can('nav:file-processing') || can('nav:status') || can('nav:review:tapeheads') || can('nav:qc') || can('nav:analytics');
   const canSeeAnyAnalytics = visibleAnalyticsDepts.length > 0;
 
   return (
@@ -240,7 +240,7 @@ function MainSidebar() {
                     {can('nav:review:tapeheads') && (<SidebarMenuSubItem><SidebarMenuSubButton asChild isActive={pathname === '/review/tapeheads'}><Link href="/review/tapeheads"><Users /><span>Tapeheads Review</span></Link></SidebarMenuSubButton></SidebarMenuSubItem>)}
                     {can('nav:qc') && (<SidebarMenuSubItem><SidebarMenuSubButton asChild isActive={pathname === '/qc/inspection'}><Link href="/qc/inspection"><ShieldCheck /><span>QC Inspection</span></Link></SidebarMenuSubButton></SidebarMenuSubItem>)}
                     
-                    {canSeeAnyAnalytics && (
+                    {can('nav:analytics') && canSeeAnyAnalytics && (
                         <SidebarMenuSubItem>
                             <SidebarMenuSubButton onClick={() => setDeptAnalyticsOpen(!isDeptAnalyticsOpen)} isActive={pathname.startsWith('/analytics')}>
                                 <AreaChart/><span>Department Analytics</span>

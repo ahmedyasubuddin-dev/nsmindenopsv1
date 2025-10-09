@@ -1,7 +1,5 @@
 
-import type { UserRole as DeprecatedUserRole } from './types';
-
-export type UserRole = 
+export type UserRole =
   | 'Superuser'
   | 'B2 Supervisor'
   | 'B1 Supervisor'
@@ -24,7 +22,7 @@ export type Permission =
   | 'nav:report:films'
   | 'nav:report:graphics'
   | 'nav:review:tapeheads'
-  | 'nav:analytics'
+  | 'nav:analytics' // A parent permission to see the main menu
   | 'nav:analytics:pregger'
   | 'nav:analytics:tapeheads'
   | 'nav:analytics:gantry'
@@ -35,12 +33,21 @@ export type Permission =
   | 'nav:file-processing'
   | 'nav:admin';
 
+const allAnalytics: Permission[] = [
+    'nav:analytics',
+    'nav:analytics:pregger',
+    'nav:analytics:tapeheads',
+    'nav:analytics:gantry',
+    'nav:analytics:films',
+    'nav:analytics:graphics',
+];
+
 const roles: Record<Exclude<UserRole, null>, Permission[]> = {
     'Superuser': [
         'nav:dashboard',
         'nav:report:pregger', 'nav:report:tapeheads', 'nav:report:gantry', 'nav:report:films', 'nav:report:graphics',
         'nav:review:tapeheads',
-        'nav:analytics', 'nav:analytics:pregger', 'nav:analytics:tapeheads', 'nav:analytics:gantry', 'nav:analytics:films', 'nav:analytics:graphics',
+        ...allAnalytics,
         'nav:qc',
         'nav:status',
         'nav:file-processing',
@@ -48,31 +55,34 @@ const roles: Record<Exclude<UserRole, null>, Permission[]> = {
     ],
     'B2 Supervisor': [
         'nav:dashboard',
-        'nav:report:pregger', 'nav:report:tapeheads',
+        'nav:report:pregger', 
+        'nav:report:tapeheads',
         'nav:review:tapeheads',
-        'nav:analytics', 'nav:analytics:pregger', 'nav:analytics:tapeheads', 'nav:analytics:gantry', 'nav:analytics:films', 'nav:analytics:graphics',
+        ...allAnalytics,
         'nav:status',
     ],
     'B1 Supervisor': [
         'nav:dashboard',
-        'nav:report:gantry', 'nav:report:films', 'nav:report:graphics',
-        'nav:analytics', 'nav:analytics:pregger', 'nav:analytics:tapeheads', 'nav:analytics:gantry', 'nav:analytics:films', 'nav:analytics:graphics',
+        'nav:report:gantry', 
+        'nav:report:films', 
+        'nav:report:graphics',
+        ...allAnalytics,
         'nav:status',
     ],
     'Quality Manager': [
         'nav:dashboard',
         'nav:qc',
         'nav:status',
-        'nav:analytics', 'nav:analytics:pregger', 'nav:analytics:tapeheads', 'nav:analytics:gantry', 'nav:analytics:films', 'nav:analytics:graphics',
+        ...allAnalytics,
     ],
     'Management': [
         'nav:dashboard',
         'nav:status',
-        'nav:analytics', 'nav:analytics:pregger', 'nav:analytics:tapeheads', 'nav:analytics:gantry', 'nav:analytics:films', 'nav:analytics:graphics',
+        ...allAnalytics,
     ],
     'Pregger Lead': ['nav:dashboard', 'nav:report:pregger', 'nav:status'],
     'Tapehead Operator': ['nav:dashboard', 'nav:report:tapeheads'],
-    'Tapehead Lead': ['nav:dashboard', 'nav:report:tapeheads', 'nav:status', 'nav:review:tapeheads'],
+    'Tapehead Lead': ['nav:dashboard', 'nav:report:tapeheads', 'nav:review:tapeheads', 'nav:status'],
     'Gantry Lead': ['nav:dashboard', 'nav:report:gantry', 'nav:status'],
     'Films Lead': ['nav:dashboard', 'nav:report:films', 'nav:status'],
     'Graphics Lead': ['nav:dashboard', 'nav:report:graphics', 'nav:status'],
@@ -80,8 +90,6 @@ const roles: Record<Exclude<UserRole, null>, Permission[]> = {
 
 export function hasPermission(role: UserRole, permission: Permission): boolean {
     if (!role) return false;
-    // Superuser has all permissions
-    if (role === 'Superuser') return true;
     return roles[role]?.includes(permission) || false;
 }
 
@@ -99,7 +107,7 @@ export const emailToRoleMap: Record<string, UserRole> = {
     'graphics_lead@ns.com': 'Graphics Lead',
 };
 
-export function getRoleFromEmail(email: string | null): UserRole {
+export function getRoleFromEmail(email?: string | null): UserRole {
     if (!email) return null;
     return emailToRoleMap[email] || null;
 }

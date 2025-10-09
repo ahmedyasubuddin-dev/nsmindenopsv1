@@ -13,6 +13,8 @@ import { hasPermission } from '@/lib/roles';
 
 const APP_TITLE = 'SRD: Minden Operations';
 
+const publicRoutes = ['/login'];
+
 function AuthGuard({ children }: { children: ReactNode }) {
   const { user, isUserLoading, role } = useUser();
   const pathname = usePathname();
@@ -21,24 +23,52 @@ function AuthGuard({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (isUserLoading) return; // Wait until user is loaded
 
-    if (!user && pathname !== '/login') {
+    const isPublicRoute = publicRoutes.includes(pathname);
+
+    if (!user && !isPublicRoute) {
       router.push('/login');
       return;
     }
     
-    if (user && pathname === '/login') {
+    if (user && isPublicRoute) {
         router.push('/dashboard');
         return;
     }
-    
-    // Admin route guard
-    if (pathname.startsWith('/admin') && !hasPermission(role, 'nav:admin')) {
-      router.push('/dashboard'); // Or a dedicated "not-authorized" page
+
+    if (user && !isPublicRoute) {
+      // Check permissions for the current route
+      const routePermissionMap: { [key: string]: any } = {
+        '/admin': 'nav:admin',
+        '/report/pregger': 'nav:report:pregger',
+        '/report/tapeheads': 'nav:report:tapeheads',
+        '/report/gantry': 'nav:report:gantry',
+        '/report/films': 'nav:report:films',
+        '/report/graphics': 'nav:report:graphics',
+        '/review/tapeheads': 'nav:review:tapeheads',
+        '/qc/inspection': 'nav:qc',
+        '/file-processing': 'nav:file-processing',
+        '/status/tapeheads': 'nav:status',
+        '/analytics/pregger': 'nav:analytics:pregger',
+        '/analytics/tapeheads': 'nav:analytics:tapeheads',
+        '/analytics/gantry': 'nav:analytics:gantry',
+        '/analytics/films': 'nav:analytics:films',
+        '/analytics/graphics': 'nav:analytics:graphics',
+      };
+
+      // Find the permission required for the current route
+      const requiredPermission = Object.keys(routePermissionMap).find(
+        (key) => pathname.startsWith(key)
+      );
+      
+      if (requiredPermission && !hasPermission(role, routePermissionMap[requiredPermission])) {
+         router.push('/dashboard'); // Or a dedicated "not-authorized" page
+      }
     }
+
 
   }, [user, isUserLoading, pathname, router, role]);
 
-  if (pathname === '/login') {
+  if (publicRoutes.includes(pathname)) {
     return <>{children}</>;
   }
 
