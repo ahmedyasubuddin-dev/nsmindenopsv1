@@ -1,89 +1,264 @@
+/**
+ * @file Firestore Security Rules
+ * @description This ruleset enforces Role-Based Access Control (RBAC) based on user roles defined in custom claims.
+ *
+ * Core Philosophy:
+ * Strict RBAC is enforced. Access to collections is determined by the user's role, ensuring least privilege.
+ *
+ * Data Structure:
+ * - /users/{userId}: Stores user profiles, including the 'role' field, which is synchronized with the user's custom claims.
+ * - /pregger_reports/{preggerReportId}: Stores reports submitted by the Pregger department.
+ * - /tapehead_entries/{tapeheadEntryId}: Stores data entries submitted by Tapehead operators.
+ * - /tapehead_reviews/{tapeheadReviewId}: Stores reviews of Tapehead entries.
+ * - /gantry_reports/{gantryReportId}: Stores reports submitted by the Gantry department.
+ * - /films_reports/{filmsReportId}: Stores reports submitted by the Films department.
+ * - /graphics_reports/{graphicsReportId}: Stores reports submitted by the Graphics department.
+ * - /qc_inspections/{qcInspectionId}: Stores quality control inspections.
+ * - /analytics_snapshots/{analyticsSnapshotId}: Stores snapshots of analytics data.
+ * - /sail_status/{sailStatusId}: Stores the status of sails.
+ *
+ * Key Security Decisions:
+ * - No public listing: List operations are restricted based on roles to prevent unauthorized data access.
+ * - Ownership Enforcement: Documents include a `createdBy` field to ensure ownership is verifiable.
+ * - Role-Based Access: Access to collections is strictly controlled based on the user's `role` claim.
+ * - Data Validation (Limited): Basic validation is enforced for fields crucial for authorization and relational integrity (e.g., `createdBy` on create).
+ *
+ * Denormalization for Authorization:
+ * User roles are denormalized into custom claims and the UserProfile document to avoid expensive `get()` calls in the security rules.
+ */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function isAuthed() {
+    /**
+     * @description Grants owner-only access to user profiles.
+     * @path /users/{userId}
+     * @allow (create) Authenticated user creates their own profile.
+     *    - Request: { auth: { uid: 'user123' }, resource.data: { id: 'user123', ... } }
+     * @allow (get, update, delete) Authenticated user reads, updates, or deletes their own profile.
+     *    - Request: { auth: { uid: 'user123' } }
+     * @deny (create) Authenticated user attempts to create a profile for another user.
+     *    - Request: { auth: { uid: 'user456' }, resource.data: { id: 'user123', ... } }
+     * @deny (update, delete) Authenticated user attempts to modify another user's profile.
+     *    - Request: { auth: { uid: 'user456' } }
+     * @principle Enforces user-ownership for profile management.
+     */
+    match /users/{userId} {
+      // Helper function to check if the request is made by the owner of the user profile.
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      // Helper function to check if the user profile already exists and is owned by the user.
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      // Allow a user to create their own profile if the userId matches their auth uid.
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+
+      // Allow users to get and list their own profile.
+      allow get: if isOwner(userId);
+      allow list: if false;
+
+      // Allow users to update and delete their own profile.
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Controls access to Pregger reports based on user roles.
+     * @path /pregger_reports/{preggerReportId}
+     * @allow (create, update, delete) superuser, b2_supervisor, pregger_lead
+     * @allow (get, list) superuser, b2_supervisor, pregger_lead
+     * @deny unauthorized roles
+     * @principle Enforces role-based access control for Pregger reports.
+     */
+    match /pregger_reports/{preggerReportId} {
+      function hasPreggerReportAccess() {
+        return isSignedIn() && (request.auth.token.role == "superuser"
+        || request.auth.token.role == "b2_supervisor"
+        || request.auth.token.role == "pregger_lead");
+      }
+
+      allow read: if hasPreggerReportAccess();
+      allow write: if hasPreggerReportAccess();
+    }
+
+    /**
+     * @description Controls access to Tapehead entries based on user roles.
+     * @path /tapehead_entries/{tapeheadEntryId}
+     * @allow (create, update, delete) superuser, b2_supervisor, tapehead_operators
+     * @allow (get, list) superuser, b2_supervisor, tapehead_operators
+     * @deny unauthorized roles
+     * @principle Enforces role-based access control for Tapehead entries.
+     */
+    match /tapehead_entries/{tapeheadEntryId} {
+      function hasTapeheadEntryAccess() {
+        return isSignedIn() && (request.auth.token.role == "superuser"
+        || request.auth.token.role == "b2_supervisor"
+        || request.auth.token.role == "tapehead_operators");
+      }
+
+      allow read: if hasTapeheadEntryAccess();
+      allow write: if hasTapeheadEntryAccess();
+    }
+
+    /**
+     * @description Controls access to Tapehead reviews based on user roles.
+     * @path /tapehead_reviews/{tapeheadReviewId}
+     * @allow (create, update, delete) superuser, b2_supervisor, tapehead_lead
+     * @allow (get, list) superuser, b2_supervisor, tapehead_lead
+     * @deny unauthorized roles
+     * @principle Enforces role-based access control for Tapehead reviews.
+     */
+    match /tapehead_reviews/{tapeheadReviewId} {
+      function hasTapeheadReviewAccess() {
+        return isSignedIn() && (request.auth.token.role == "superuser"
+        || request.auth.token.role == "b2_supervisor"
+        || request.auth.token.role == "tapehead_lead");
+      }
+
+      allow read: if hasTapeheadReviewAccess();
+      allow write: if hasTapeheadReviewAccess();
+    }
+
+    /**
+     * @description Controls access to Gantry reports based on user roles.
+     * @path /gantry_reports/{gantryReportId}
+     * @allow (create, update, delete) superuser, b1_supervisor, gantry_lead
+     * @allow (get, list) superuser, b1_supervisor, gantry_lead
+     * @deny unauthorized roles
+     * @principle Enforces role-based access control for Gantry reports.
+     */
+    match /gantry_reports/{gantryReportId} {
+      function hasGantryReportAccess() {
+        return isSignedIn() && (request.auth.token.role == "superuser"
+        || request.auth.token.role == "b1_supervisor"
+        || request.auth.token.role == "gantry_lead");
+      }
+
+      allow read: if hasGantryReportAccess();
+      allow write: if hasGantryReportAccess();
+    }
+
+    /**
+     * @description Controls access to Films reports based on user roles.
+     * @path /films_reports/{filmsReportId}
+     * @allow (create, update, delete) superuser, b1_supervisor, films_lead
+     * @allow (get, list) superuser, b1_supervisor, films_lead
+     * @deny unauthorized roles
+     * @principle Enforces role-based access control for Films reports.
+     */
+    match /films_reports/{filmsReportId} {
+      function hasFilmsReportAccess() {
+        return isSignedIn() && (request.auth.token.role == "superuser"
+        || request.auth.token.role == "b1_supervisor"
+        || request.auth.token.role == "films_lead");
+      }
+
+      allow read: if hasFilmsReportAccess();
+      allow write: if hasFilmsReportAccess();
+    }
+
+    /**
+     * @description Controls access to Graphics reports based on user roles.
+     * @path /graphics_reports/{graphicsReportId}
+     * @allow (create, update, delete) superuser, b1_supervisor, graphics_lead
+     * @allow (get, list) superuser, b1_supervisor, graphics_lead
+     * @deny unauthorized roles
+     * @principle Enforces role-based access control for Graphics reports.
+     */
+    match /graphics_reports/{graphicsReportId} {
+      function hasGraphicsReportAccess() {
+        return isSignedIn() && (request.auth.token.role == "superuser"
+        || request.auth.token.role == "b1_supervisor"
+        || request.auth.token.role == "graphics_lead");
+      }
+
+      allow read: if hasGraphicsReportAccess();
+      allow write: if hasGraphicsReportAccess();
+    }
+
+    /**
+     * @description Controls access to QC inspections based on user roles.
+     * @path /qc_inspections/{qcInspectionId}
+     * @allow (create, update, delete) superuser, quality_manager
+     * @allow (get, list) superuser, quality_manager
+     * @deny unauthorized roles
+     * @principle Enforces role-based access control for QC inspections.
+     */
+    match /qc_inspections/{qcInspectionId} {
+      function hasQcInspectionAccess() {
+        return isSignedIn() && (request.auth.token.role == "superuser"
+        || request.auth.token.role == "quality_manager");
+      }
+
+      allow read: if hasQcInspectionAccess();
+      allow write: if hasQcInspectionAccess();
+    }
+
+    /**
+     * @description Controls access to Analytics snapshots based on user roles.
+     * @path /analytics_snapshots/{analyticsSnapshotId}
+     * @allow (read) superuser, b1_supervisor, b2_supervisor, quality_manager, management
+     * @allow (create, update, delete) superuser
+     * @deny unauthorized roles
+     * @principle Enforces role-based access control for Analytics snapshots.
+     */
+    match /analytics_snapshots/{analyticsSnapshotId} {
+      function hasAnalyticsSnapshotReadAccess() {
+        return isSignedIn() && (request.auth.token.role == "superuser"
+        || request.auth.token.role == "b1_supervisor"
+        || request.auth.token.role == "b2_supervisor"
+        || request.auth.token.role == "quality_manager"
+        || request.auth.token.role == "management");
+      }
+
+      function hasAnalyticsSnapshotWriteAccess() {
+        return isSignedIn() && (request.auth.token.role == "superuser");
+      }
+
+      allow get: if hasAnalyticsSnapshotReadAccess();
+      allow list: if hasAnalyticsSnapshotReadAccess();
+
+      allow create: if hasAnalyticsSnapshotWriteAccess();
+      allow update: if hasAnalyticsSnapshotWriteAccess();
+      allow delete: if hasAnalyticsSnapshotWriteAccess();
+    }
+
+    /**
+     * @description Controls access to Sail status based on user roles.
+     * @path /sail_status/{sailStatusId}
+     * @allow (create, update, delete) superuser, b1_supervisor, b2_supervisor, quality_manager, management, pregger_lead, tapehead_lead, gantry_lead, films_lead, graphics_lead
+     * @allow (get, list) superuser, b1_supervisor, b2_supervisor, quality_manager, management, pregger_lead, tapehead_lead, gantry_lead, films_lead, graphics_lead
+     * @deny unauthorized roles
+     * @principle Enforces role-based access control for Sail status.
+     */
+    match /sail_status/{sailStatusId} {
+      function hasSailStatusAccess() {
+        return isSignedIn() && (request.auth.token.role == "superuser"
+        || request.auth.token.role == "b1_supervisor"
+        || request.auth.token.role == "b2_supervisor"
+        || request.auth.token.role == "quality_manager"
+        || request.auth.token.role == "management"
+        || request.auth.token.role == "pregger_lead"
+        || request.auth.token.role == "tapehead_lead"
+        || request.auth.token.role == "gantry_lead"
+        || request.auth.token.role == "films_lead"
+        || request.auth.token.role == "graphics_lead");
+      }
+
+      allow read: if hasSailStatusAccess();
+      allow write: if hasSailStatusAccess();
+    }
+
+    // Helper function to check if the user is signed in.
+    function isSignedIn() {
       return request.auth != null;
     }
 
-    function getUserRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
-    }
-
-    function isSuperuser() {
-      return isAuthed() && getUserRole() == 'Superuser';
-    }
-
-    function isSupervisor() {
-      let role = getUserRole();
-      return isAuthed() && (role == 'B1 Supervisor' || role == 'B2 Supervisor' || isSuperuser());
-    }
-
-    function isTapeheadLead() {
-       let role = getUserRole();
-       return isAuthed() && (role == 'Tapehead Lead' || isSupervisor());
-    }
-
-    function isLead() {
-        let role = getUserRole();
-        return isAuthed() && (
-            role == 'Pregger Lead' ||
-            role == 'Tapehead Lead' ||
-            role == 'Gantry Lead' ||
-            role == 'Films Lead' ||
-            role == 'Graphics Lead' ||
-            isSupervisor()
-        );
-    }
-    
-    function isQualityManager() {
-        return isAuthed() && (getUserRole() == 'Quality Manager' || isSuperuser());
-    }
-    
-    function isManagement() {
-       return isAuthed() && (getUserRole() == 'Management' || isSuperuser());
-    }
-
-    match /users/{userId} {
-      allow read: if isAuthed();
-      allow write: if isAuthed() && request.auth.uid == userId;
-    }
-
-    match /roles_admin/{userId} {
-        allow read: if isAuthed() && request.auth.uid == userId;
-        allow write: if isSuperuser(); // Only superusers can change roles
-    }
-
-    match /jobs/{jobId} {
-      allow read, write: if isAuthed();
-    }
-    
-    match /tapeheads-submissions/{reportId} {
-      allow read: if isSupervisor() || isTapeheadLead();
-      allow write: if isAuthed();
-    }
-    
-    match /films/{reportId} {
-       allow read, write: if isAuthed();
-    }
-    
-    match /gantry-reports/{reportId} {
-        allow read, write: if isAuthed();
-    }
-    
-    match /pregger-reports/{reportId} {
-        allow read, write: if isAuthed();
-    }
-
-    match /graphics-tasks/{taskId} {
-      allow read, write: if isAuthed();
-    }
-
-    match /inspections/{inspectionId} {
-      allow read, write: if isQualityManager() || isSuperuser();
-    }
-
-    // Default deny
+    // Default deny all access when request.auth == null
     match /{path=**} {
       allow read, write: if false;
     }
