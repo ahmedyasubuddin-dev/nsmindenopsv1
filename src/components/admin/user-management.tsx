@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { useToast } from '@/hooks/use-toast';
 import { PlusCircle, Edit } from 'lucide-react';
 import { Badge } from '../ui/badge';
-import { useCollection, useFirebase, useUser } from '@/firebase';
+import { useCollection, useFirebase, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
 
 // This is a placeholder. In a real app, this would be a server action calling a Cloud Function.
@@ -58,7 +58,7 @@ export function UserManagement() {
     const [isUpdateDialogOpen, setUpdateDialogOpen] = useState(false);
     const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
 
-    const usersQuery = useMemo(() => query(collection(firestore, 'users')), [firestore]);
+    const usersQuery = useMemoFirebase(() => query(collection(firestore, 'users')), [firestore]);
     const { data: users, isLoading } = useCollection<UserProfile>(usersQuery);
 
     const form = useForm<NewUserFormValues>({
