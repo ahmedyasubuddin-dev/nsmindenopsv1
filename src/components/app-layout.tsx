@@ -107,12 +107,11 @@ function useTheme() {
 
 function UserNav() {
   const { user, role } = useUser();
+  const auth = useAuth();
   const { setTheme } = useTheme();
 
   const handleLogout = async () => {
-      // In a real app, this would sign the user out.
-      // Since we removed the login module, we can just reload the page.
-      window.location.reload();
+    await auth.signOut();
   };
   
   return (
@@ -120,8 +119,8 @@ function UserNav() {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
           <Avatar className="h-8 w-8">
-            <AvatarImage src="https://placehold.co/40x40" alt="@shadcn" />
-            <AvatarFallback>SL</AvatarFallback>
+            <AvatarImage src={user?.photoURL || undefined} alt="User avatar" />
+            <AvatarFallback>{user?.email?.charAt(0).toUpperCase()}</AvatarFallback>
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
@@ -273,8 +272,8 @@ function MainSidebar() {
       <SidebarFooter className="group-data-[collapsible=icon]:hidden">
         <div className="flex items-center gap-3 p-2 border-t border-sidebar-border">
           <Avatar className="h-9 w-9">
-            <AvatarImage src="https://placehold.co/40x40" alt="@shadcn" />
-            <AvatarFallback>SL</AvatarFallback>
+            <AvatarImage src={user?.photoURL || ''} alt="User Avatar" />
+            <AvatarFallback>{user?.email?.charAt(0).toUpperCase()}</AvatarFallback>
           </Avatar>
           <div className="flex flex-col">
             <span className="text-sm font-medium text-sidebar-foreground">{role || 'User'}</span>
@@ -287,16 +286,6 @@ function MainSidebar() {
 }
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
-
-  React.useEffect(() => {
-    // Since we're discarding the login module, we ensure the user is always on a valid page.
-    // If they land on the root, redirect to the dashboard.
-    if (window.location.pathname === '/') {
-      router.replace('/dashboard');
-    }
-  }, [router]);
-
   return (
     <SidebarProvider>
       <MainSidebar />

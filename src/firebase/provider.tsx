@@ -4,37 +4,9 @@
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import { FirebaseApp } from 'firebase/app';
 import { Firestore } from 'firebase/firestore';
-import { Auth, User } from 'firebase/auth';
-import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
-import type { UserRole } from '@/lib/roles';
-
-// MOCK USER DATA - Simulates a Superuser being logged in at all times
-const MOCK_USER: User = {
-  uid: 'mock-superuser-uid',
-  email: 'superuser@ns.com',
-  displayName: 'Superuser',
-  emailVerified: true,
-  isAnonymous: false,
-  photoURL: null,
-  providerData: [],
-  providerId: 'password',
-  tenantId: null,
-  refreshToken: '',
-  delete: async () => {},
-  getIdToken: async () => 'mock-token',
-  getIdTokenResult: async () => ({
-    token: 'mock-token',
-    expirationTime: '',
-    authTime: '',
-    issuedAtTime: '',
-    signInProvider: null,
-    signInSecondFactor: null,
-    claims: { role: 'Superuser' },
-  }),
-  reload: async () => {},
-  toJSON: () => ({}),
-};
-
+import { Auth, User, onAuthStateChanged } from 'firebase/auth';
+import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
+import { type UserRole, getRoleFromEmail } from '@/lib/roles';
 
 interface FirebaseProviderProps {
   children: ReactNode;
@@ -80,20 +52,52 @@ export interface UserHookResult {
 
 export const FirebaseContext = createContext<FirebaseContextState | undefined>(undefined);
 
+function useFirebaseAuth(auth: Auth): UserAuthState {
+  const [user, setUser] = useState<User | null>(null);
+  const [isUserLoading, setIsUserLoading] = useState(true);
+  const [userError, setUserError] = useState<Error | null>(null);
+  const [role, setRole] = useState<UserRole | null>(null);
+  const [claims, setClaims] = useState<any>(null);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setIsUserLoading(true);
+      if (user) {
+        setUser(user);
+        try {
+          const idTokenResult = await user.getIdTokenResult();
+          setRole(idTokenResult.claims.role as UserRole || null);
+          setClaims(idTokenResult.claims);
+        } catch (error) {
+          console.error("Error fetching user claims:", error);
+          setUserError(error as Error);
+          setRole(null);
+        }
+      } else {
+        setUser(null);
+        setRole(null);
+        setClaims(null);
+      }
+      setIsUserLoading(false);
+    }, (error) => {
+      setUserError(error);
+      setIsUserLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [auth]);
+
+  return { user, isUserLoading, userError, role };
+}
+
+
 export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   children,
   firebaseApp,
   firestore,
   auth,
 }) => {
-  // We now use a static mock user state instead of listening to auth changes
-  const userAuthState: UserAuthState = {
-    user: MOCK_USER,
-    isUserLoading: false, // Never loading
-    userError: null,
-    role: 'Superuser', // Hardcoded role
-  };
-
+  const userAuthState = useFirebaseAuth(auth);
 
   const contextValue = useMemo((): FirebaseContextState => {
     const servicesAvailable = !!(firebaseApp && firestore && auth);
