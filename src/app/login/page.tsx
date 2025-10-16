@@ -15,8 +15,10 @@ import { Logo } from '@/components/icons';
 import { PrivacyPolicy } from '@/components/privacy-policy';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFirebase } from '@/firebase';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { getRoleFromEmail } from '@/lib/roles';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Label } from '@/components/ui/label';
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -31,6 +33,8 @@ export default function LoginPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('signin');
+  const [resetEmail, setResetEmail] = useState('');
+  const [isResetDialogOpen, setResetDialogOpen] = useState(false);
 
 
   const form = useForm<LoginFormValues>({
@@ -50,7 +54,7 @@ export default function LoginPage() {
       console.error("Sign In Error:", error);
       toast({
         title: 'Authentication Error',
-        description: "Invalid credentials. If this is the user's first time, please use the 'Sign Up' tab.",
+        description: "Invalid credentials. Please check your email and password.",
         variant: 'destructive',
       });
     } finally {
@@ -95,105 +99,159 @@ export default function LoginPage() {
     }
   };
   
-   const handleForgotPassword = () => {
-    toast({
-      title: "Forgot Password",
-      description: "Password reset functionality is not yet implemented.",
-    });
+   const handleForgotPassword = async () => {
+    if (!resetEmail) {
+      toast({
+        title: "Email Required",
+        description: "Please enter your email address to reset your password.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsLoading(true);
+    try {
+      await sendPasswordResetEmail(firebaseAuth, resetEmail);
+      toast({
+        title: "Password Reset Email Sent",
+        description: `If an account exists for ${resetEmail}, a password reset link has been sent.`,
+      });
+      setResetDialogOpen(false);
+      setResetEmail('');
+    } catch (error: any) {
+      console.error("Forgot Password Error:", error);
+      toast({
+        title: "Error Sending Reset Email",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center login-background p-4">
-      <Card className="w-full max-w-md shadow-2xl bg-card/90 backdrop-blur-sm">
-         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <CardHeader className="text-center">
-              <Logo className="mx-auto h-12 w-12 text-primary" />
-              <CardTitle className="text-2xl font-headline mt-4">SRD: Minden Ops</CardTitle>
-              <CardDescription>Please sign in to continue</CardDescription>
-               <TabsList className="grid w-full grid-cols-2 mt-4">
-                    <TabsTrigger value="signin">Sign In</TabsTrigger>
-                    <TabsTrigger value="signup">Sign Up</TabsTrigger>
-                </TabsList>
-            </CardHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)}>
-                <TabsContent value="signin">
-                  <CardContent className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email</FormLabel>
-                          <FormControl>
-                            <Input type="email" placeholder="user@ns.com" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="password"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Password</FormLabel>
-                          <FormControl>
-                            <Input type="password" placeholder="••••••••" {...field} />
-                          </FormControl>
-                           <div className="text-right">
-                               <Button variant="link" size="sm" type="button" onClick={handleForgotPassword} className="h-auto p-0 text-xs">
-                                  Forgot password?
-                               </Button>
-                           </div>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </CardContent>
-                </TabsContent>
-                 <TabsContent value="signup">
+    <>
+      <div className="min-h-screen flex items-center justify-center login-background p-4">
+        <Card className="w-full max-w-md shadow-2xl bg-card/90 backdrop-blur-sm">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <CardHeader className="text-center">
+                <Logo className="mx-auto h-12 w-12 text-primary" />
+                <CardTitle className="text-2xl font-headline mt-4">SRD: Minden Ops</CardTitle>
+                <CardDescription>Please sign in to continue</CardDescription>
+                <TabsList className="grid w-full grid-cols-2 mt-4">
+                      <TabsTrigger value="signin">Sign In</TabsTrigger>
+                      <TabsTrigger value="signup">Sign Up</TabsTrigger>
+                  </TabsList>
+              </CardHeader>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)}>
+                  <TabsContent value="signin">
                     <CardContent className="space-y-4">
-                        <FormField
-                            control={form.control}
-                            name="email"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Email</FormLabel>
-                                    <FormControl>
-                                        <Input type="email" placeholder="user@ns.com" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="password"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Password</FormLabel>
-                                    <FormControl>
-                                        <Input type="password" placeholder="••••••••" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+                      <FormField
+                        control={form.control}
+                        name="email"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Email</FormLabel>
+                            <FormControl>
+                              <Input type="email" placeholder="user@ns.com" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="password"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Password</FormLabel>
+                            <FormControl>
+                              <Input type="password" placeholder="••••••••" {...field} />
+                            </FormControl>
+                            <div className="text-right">
+                                <AlertDialogTrigger asChild>
+                                 <Button variant="link" size="sm" type="button" onClick={() => setResetDialogOpen(true)} className="h-auto p-0 text-xs">
+                                    Forgot password?
+                                 </Button>
+                                </AlertDialogTrigger>
+                            </div>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </CardContent>
-                </TabsContent>
-                <CardFooter className="flex flex-col gap-4">
-                   <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? 'Processing...' : (activeTab === 'signin' ? 'Sign In' : 'Sign Up')}
-                  </Button>
-                </CardFooter>
-              </form>
-            </Form>
-        </Tabs>
-         <CardFooter className="justify-center items-center text-xs text-center text-muted-foreground pb-4">
-            <PrivacyPolicy />
-        </CardFooter>
-      </Card>
-    </div>
+                  </TabsContent>
+                  <TabsContent value="signup">
+                      <CardContent className="space-y-4">
+                          <FormField
+                              control={form.control}
+                              name="email"
+                              render={({ field }) => (
+                                  <FormItem>
+                                      <FormLabel>Email</FormLabel>
+                                      <FormControl>
+                                          <Input type="email" placeholder="user@ns.com" {...field} />
+                                      </FormControl>
+                                      <FormMessage />
+                                  </FormItem>
+                              )}
+                          />
+                          <FormField
+                              control={form.control}
+                              name="password"
+                              render={({ field }) => (
+                                  <FormItem>
+                                      <FormLabel>Password</FormLabel>
+                                      <FormControl>
+                                          <Input type="password" placeholder="••••••••" {...field} />
+                                      </FormControl>
+                                      <FormMessage />
+                                  </FormItem>
+                              )}
+                          />
+                      </CardContent>
+                  </TabsContent>
+                  <CardFooter className="flex flex-col gap-4">
+                    <Button type="submit" className="w-full" disabled={isLoading}>
+                      {isLoading ? 'Processing...' : (activeTab === 'signin' ? 'Sign In' : 'Sign Up')}
+                    </Button>
+                  </CardFooter>
+                </form>
+              </Form>
+          </Tabs>
+          <CardFooter className="justify-center items-center text-xs text-center text-muted-foreground pb-4">
+              <PrivacyPolicy />
+          </CardFooter>
+        </Card>
+      </div>
+
+      <AlertDialog open={isResetDialogOpen} onOpenChange={setResetDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset Password</AlertDialogTitle>
+            <AlertDialogDescription>
+              Enter your email address and we will send you a link to reset your password.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="grid gap-2">
+            <Label htmlFor="reset-email">Email</Label>
+            <Input
+              id="reset-email"
+              type="email"
+              placeholder="user@ns.com"
+              value={resetEmail}
+              onChange={(e) => setResetEmail(e.target.value)}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleForgotPassword} disabled={isLoading}>
+              {isLoading ? 'Sending...' : 'Send Reset Link'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
