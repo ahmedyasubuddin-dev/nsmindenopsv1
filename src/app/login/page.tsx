@@ -75,10 +75,14 @@ export default function LoginPage() {
       console.error("Sign Up Error:", error);
       if (error.code === 'auth/email-already-in-use') {
          toast({
-          title: 'Sign Up Error',
-          description: "This user account already exists. Please use the 'Sign In' tab.",
+          title: 'Account Already Exists',
+          description: "Please sign in or use the 'Forgot password?' link.",
           variant: 'destructive',
         });
+        // Switch to the sign-in tab and pre-fill email
+        setActiveTab('signin');
+        form.setValue('email', values.email);
+        form.setValue('password', ''); // Clear password field
       } else {
         toast({
           title: 'Sign Up Error',
