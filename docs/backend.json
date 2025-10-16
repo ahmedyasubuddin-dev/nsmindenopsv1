@@ -1,601 +1,167 @@
 {
   "entities": {
     "UserProfile": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "UserProfile",
+      "title": "User Profile",
       "type": "object",
-      "description": "Represents a user profile within the ShiftView application.",
+      "description": "Stores public-facing user information.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the user profile."
-        },
-        "email": {
-          "type": "string",
-          "description": "User's email address.",
-          "format": "email"
-        },
-        "displayName": {
-          "type": "string",
-          "description": "User's display name."
-        },
-        "role": {
-          "type": "string",
-          "description": "User's role within the application (e.g., superuser, b2_supervisor)."
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp of when the user profile was created.",
-          "format": "date-time"
-        },
-        "lastLoginAt": {
-          "type": "string",
-          "description": "Timestamp of the user's last login.",
-          "format": "date-time"
-        }
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": [
-        "id",
-        "email",
-        "displayName",
-        "role",
-        "createdAt",
-        "lastLoginAt"
-      ]
+      "required": ["email", "role", "createdAt"]
     },
     "PreggerReport": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "PreggerReport",
+      "title": "Pregger Report",
       "type": "object",
-      "description": "Represents a report submitted by the Pregger department.",
+      "description": "Report from the Pregger department.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Pregger report."
-        },
-        "createdBy": {
-          "type": "string",
-          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N PreggerReport)"
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp of when the report was created.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "Timestamp of when the report was last updated.",
-          "format": "date-time"
-        },
-        "department": {
-          "type": "string",
-          "description": "Department to which the report belongs (e.g., 'Pregger')."
-        },
-        "shift": {
-          "type": "string",
-          "description": "Shift for which the report was submitted."
-        },
-        "reportData": {
-          "type": "string",
-          "description": "Stringified Json data representing report values"
-        }
-      },
-      "required": [
-        "id",
-        "createdBy",
-        "createdAt",
-        "updatedAt",
-        "department",
-        "shift"
-      ]
+        "report_date": { "type": "string", "format": "date-time" },
+        "shift": { "type": "string" },
+        "workCompleted": { "type": "array", "items": { "type": "object" } },
+        "personnel": { "type": "array", "items": { "type": "object" } }
+      }
     },
     "TapeheadEntry": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "TapeheadEntry",
+      "title": "Tapehead Entry",
       "type": "object",
-      "description": "Represents a data entry submitted by a Tapehead operator.",
+      "description": "Entry from a Tapehead operator.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Tapehead entry."
-        },
-        "createdBy": {
-          "type": "string",
-          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N TapeheadEntry)"
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp of when the entry was created.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "Timestamp of when the entry was last updated.",
-          "format": "date-time"
-        },
-        "department": {
-          "type": "string",
-          "description": "Department to which the entry belongs (e.g., 'Tapeheads')."
-        },
-        "shift": {
-          "type": "string",
-          "description": "Shift for which the entry was submitted."
-        },
-        "reportData": {
-          "type": "string",
-          "description": "Stringified Json data representing report values"
-        }
-      },
-      "required": [
-        "id",
-        "createdBy",
-        "createdAt",
-        "updatedAt",
-        "department",
-        "shift"
-      ]
-    },
-    "TapeheadReview": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "TapeheadReview",
-      "type": "object",
-      "description": "Represents a review of Tapehead entries by a shift lead.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Tapehead review."
-        },
-        "tapeheadEntryId": {
-          "type": "string",
-          "description": "Reference to TapeheadEntry. (Relationship: TapeheadEntry 1:1 TapeheadReview)"
-        },
-        "reviewedBy": {
-          "type": "string",
-          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N TapeheadReview)"
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp of when the review was created.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "Timestamp of when the review was last updated.",
-          "format": "date-time"
-        },
-        "comments": {
-          "type": "string",
-          "description": "Comments added by the shift lead during the review."
-        },
-        "reportData": {
-          "type": "string",
-          "description": "Stringified Json data representing report values"
-        }
-      },
-      "required": [
-        "id",
-        "tapeheadEntryId",
-        "reviewedBy",
-        "createdAt",
-        "updatedAt",
-        "comments"
-      ]
+        "date": { "type": "string", "format": "date-time" },
+        "shift": { "type": "number" },
+        "operatorName": { "type": "string" },
+        "workItems": { "type": "array", "items": { "type": "object" } }
+      }
     },
     "GantryReport": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "GantryReport",
+      "title": "Gantry Report",
       "type": "object",
-      "description": "Represents a report submitted by the Gantry department.",
+      "description": "Report from the Gantry department.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Gantry report."
-        },
-        "createdBy": {
-          "type": "string",
-          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N GantryReport)"
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp of when the report was created.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "Timestamp of when the report was last updated.",
-          "format": "date-time"
-        },
-        "department": {
-          "type": "string",
-          "description": "Department to which the report belongs (e.g., 'Gantry')."
-        },
-        "shift": {
-          "type": "string",
-          "description": "Shift for which the report was submitted."
-        },
-        "reportData": {
-          "type": "string",
-          "description": "Stringified Json data representing report values"
-        }
-      },
-      "required": [
-        "id",
-        "createdBy",
-        "createdAt",
-        "updatedAt",
-        "department",
-        "shift"
-      ]
+        "report_date": { "type": "string", "format": "date-time" },
+        "shift": { "type": "string" },
+        "molds": { "type": "array", "items": { "type": "object" } }
+      }
     },
     "FilmsReport": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "FilmsReport",
+      "title": "Films Report",
       "type": "object",
-      "description": "Represents a report submitted by the Films department.",
+      "description": "Report from the Films department.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Films report."
-        },
-        "createdBy": {
-          "type": "string",
-          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N FilmsReport)"
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp of when the report was created.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "Timestamp of when the report was last updated.",
-          "format": "date-time"
-        },
-        "department": {
-          "type": "string",
-          "description": "Department to which the report belongs (e.g., 'Films')."
-        },
-        "shift": {
-          "type": "string",
-          "description": "Shift for which the report was submitted."
-        },
-        "reportData": {
-          "type": "string",
-          "description": "Stringified Json data representing report values"
-        }
-      },
-      "required": [
-        "id",
-        "createdBy",
-        "createdAt",
-        "updatedAt",
-        "department",
-        "shift"
-      ]
+        "report_date": { "type": "string", "format": "date-time" },
+        "gantry_number": { "type": "string" }
+      }
     },
     "GraphicsReport": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "GraphicsReport",
+      "title": "Graphics Report",
       "type": "object",
-      "description": "Represents a report submitted by the Graphics department.",
+      "description": "Task tracking for the Graphics department.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Graphics report."
-        },
-        "createdBy": {
-          "type": "string",
-          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N GraphicsReport)"
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp of when the report was created.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "Timestamp of when the report was last updated.",
-          "format": "date-time"
-        },
-        "department": {
-          "type": "string",
-          "description": "Department to which the report belongs (e.g., 'Graphics')."
-        },
-        "shift": {
-          "type": "string",
-          "description": "Shift for which the report was submitted."
-        },
-        "reportData": {
-          "type": "string",
-          "description": "Stringified Json data representing report values"
-        }
-      },
-      "required": [
-        "id",
-        "createdBy",
-        "createdAt",
-        "updatedAt",
-        "department",
-        "shift"
-      ]
+        "tagId": { "type": "string" },
+        "status": { "type": "string" },
+        "type": { "type": "string" }
+      }
     },
     "QcInspection": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "QcInspection",
+      "title": "QC Inspection",
       "type": "object",
-      "description": "Represents a quality control inspection.",
+      "description": "Quality control inspection report.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the QC inspection."
-        },
-        "createdBy": {
-          "type": "string",
-          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N QcInspection)"
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp of when the inspection was created.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "Timestamp of when the inspection was last updated.",
-          "format": "date-time"
-        },
-        "inspectionData": {
-          "type": "string",
-          "description": "Stringified Json data representing inspection values"
-        }
-      },
-      "required": [
-        "id",
-        "createdBy",
-        "createdAt",
-        "updatedAt"
-      ]
+        "inspectionDate": { "type": "string", "format": "date-time" },
+        "oeNumber": { "type": "string" },
+        "totalScore": { "type": "number" },
+        "status": { "type": "string" }
+      }
     },
     "AnalyticsSnapshot": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "AnalyticsSnapshot",
+      "title": "Analytics Snapshot",
       "type": "object",
-      "description": "Represents a snapshot of analytics data.",
+      "description": "Aggregated data for analytics.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the analytics snapshot."
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp of when the snapshot was created.",
-          "format": "date-time"
-        },
-        "department": {
-          "type": "string",
-          "description": "Department to which the analytics belong (e.g., 'Pregger')."
-        },
-        "shift": {
-          "type": "string",
-          "description": "Shift for which the analytics were generated."
-        },
-        "analyticData": {
-          "type": "string",
-          "description": "Stringified Json data representing analytics values"
-        }
-      },
-      "required": [
-        "id",
-        "createdAt",
-        "department"
-      ]
+        "createdAt": { "type": "string", "format": "date-time" },
+        "data": { "type": "object" }
+      }
     },
     "SailStatus": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "SailStatus",
+      "title": "Sail Status",
       "type": "object",
-      "description": "Represents the status of a sail.",
+      "description": "Current status of a sail through the production process.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the sail status."
-        },
-        "sailId": {
-          "type": "string",
-          "description": "Unique identifier for the sail."
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp of when the status was created.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "Timestamp of when the status was last updated.",
-          "format": "date-time"
-        },
-        "currentStatus": {
-          "type": "string",
-          "description": "The current status of the sail."
-        }
-      },
-      "required": [
-        "id",
-        "sailId",
-        "createdAt",
-        "updatedAt",
-        "currentStatus"
-      ]
+        "sailId": { "type": "string" },
+        "status": { "type": "string" }
+      }
+    },
+    "OeJob": {
+      "title": "OE Job",
+      "type": "object",
+      "description": "Defines an Order Entry job and its sections.",
+      "properties": {
+        "oeBase": { "type": "string" },
+        "status": { "type": "string" },
+        "sections": { "type": "array", "items": { "type": "object" } }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Stores user profiles."
+    },
+    "/pregger_reports/{docId}": {
+      "schema": { "$ref": "#/entities/PreggerReport" },
+      "description": "Stores reports from the Pregger department."
+    },
+    "/tapehead_entries/{docId}": {
+      "schema": { "$ref": "#/entities/TapeheadEntry" },
+      "description": "Stores entries from Tapehead operators."
+    },
+     "/tapeheads-submissions/{docId}": {
+      "schema": { "$ref": "#/entities/TapeheadEntry" },
+      "description": "Stores entries from Tapehead operators."
+    },
+    "/tapehead_reviews/{docId}": {
+      "schema": { "$ref": "#/entities/TapeheadReview" },
+      "description": "Stores reviews of Tapehead entries."
+    },
+    "/gantry_reports/{docId}": {
+      "schema": { "$ref": "#/entities/GantryReport" },
+      "description": "Stores reports from the Gantry department."
+    },
+     "/gantry-reports/{docId}": {
+      "schema": { "$ref": "#/entities/GantryReport" },
+      "description": "Stores reports from the Gantry department."
+    },
+    "/films_reports/{docId}": {
+      "schema": { "$ref": "#/entities/FilmsReport" },
+      "description": "Stores reports from the Films department."
+    },
+    "/graphics_reports/{docId}": {
+      "schema": { "$ref": "#/entities/GraphicsReport" },
+      "description": "Stores tasks for the Graphics department."
+    },
+     "/graphics-tasks/{docId}": {
+      "schema": { "$ref": "#/entities/GraphicsReport" },
+      "description": "Stores tasks for the Graphics department."
+    },
+    "/qc_inspections/{docId}": {
+      "schema": { "$ref": "#/entities/QcInspection" },
+      "description": "Stores QC inspection reports."
+    },
+    "/analytics_snapshots/{docId}": {
+      "schema": { "$ref": "#/entities/AnalyticsSnapshot" },
+      "description": "Stores aggregated analytics data."
+    },
+    "/sail_status/{docId}": {
+      "schema": { "$ref": "#/entities/SailStatus" },
+      "description": "Stores sail status information."
+    },
+    "/jobs/{docId}": {
+      "schema": { "$ref": "#/entities/OeJob" },
+      "description": "Stores Order Entry job definitions."
     }
   },
   "auth": {
-    "providers": [
-      "password",
-      "anonymous"
-    ]
-  },
-  "firestore": {
-    "structure": [
-      {
-        "path": "/users/{userId}",
-        "definition": {
-          "entityName": "UserProfile",
-          "schema": {
-            "$ref": "#/backend/entities/UserProfile"
-          },
-          "description": "Stores user profiles. Includes 'role' to be used for role-based access control.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier of the user."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/pregger_reports/{preggerReportId}",
-        "definition": {
-          "entityName": "PreggerReport",
-          "schema": {
-            "$ref": "#/backend/entities/PreggerReport"
-          },
-          "description": "Stores reports submitted by the Pregger department.",
-          "params": [
-            {
-              "name": "preggerReportId",
-              "description": "The unique identifier of the Pregger Report."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/tapehead_entries/{tapeheadEntryId}",
-        "definition": {
-          "entityName": "TapeheadEntry",
-          "schema": {
-            "$ref": "#/backend/entities/TapeheadEntry"
-          },
-          "description": "Stores data entries submitted by Tapehead operators.",
-          "params": [
-            {
-              "name": "tapeheadEntryId",
-              "description": "The unique identifier of the Tapehead Entry."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/tapehead_reviews/{tapeheadReviewId}",
-        "definition": {
-          "entityName": "TapeheadReview",
-          "schema": {
-            "$ref": "#/backend/entities/TapeheadReview"
-          },
-          "description": "Stores reviews of Tapehead entries by shift leads.",
-          "params": [
-            {
-              "name": "tapeheadReviewId",
-              "description": "The unique identifier of the Tapehead Review."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/gantry_reports/{gantryReportId}",
-        "definition": {
-          "entityName": "GantryReport",
-          "schema": {
-            "$ref": "#/backend/entities/GantryReport"
-          },
-          "description": "Stores reports submitted by the Gantry department.",
-          "params": [
-            {
-              "name": "gantryReportId",
-              "description": "The unique identifier of the Gantry Report."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/films_reports/{filmsReportId}",
-        "definition": {
-          "entityName": "FilmsReport",
-          "schema": {
-            "$ref": "#/backend/entities/FilmsReport"
-          },
-          "description": "Stores reports submitted by the Films department.",
-          "params": [
-            {
-              "name": "filmsReportId",
-              "description": "The unique identifier of the Films Report."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/graphics_reports/{graphicsReportId}",
-        "definition": {
-          "entityName": "GraphicsReport",
-          "schema": {
-            "$ref": "#/backend/entities/GraphicsReport"
-          },
-          "description": "Stores reports submitted by the Graphics department.",
-          "params": [
-            {
-              "name": "graphicsReportId",
-              "description": "The unique identifier of the Graphics Report."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/qc_inspections/{qcInspectionId}",
-        "definition": {
-          "entityName": "QcInspection",
-          "schema": {
-            "$ref": "#/backend/entities/QcInspection"
-          },
-          "description": "Stores quality control inspections.",
-          "params": [
-            {
-              "name": "qcInspectionId",
-              "description": "The unique identifier of the QC Inspection."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/analytics_snapshots/{analyticsSnapshotId}",
-        "definition": {
-          "entityName": "AnalyticsSnapshot",
-          "schema": {
-            "$ref": "#/backend/entities/AnalyticsSnapshot"
-          },
-          "description": "Stores snapshots of analytics data.",
-          "params": [
-            {
-              "name": "analyticsSnapshotId",
-              "description": "The unique identifier of the Analytics Snapshot."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/sail_status/{sailStatusId}",
-        "definition": {
-          "entityName": "SailStatus",
-          "schema": {
-            "$ref": "#/backend/entities/SailStatus"
-          },
-          "description": "Stores the status of sails.",
-          "params": [
-            {
-              "name": "sailStatusId",
-              "description": "The unique identifier of the Sail Status."
-            }
-          ]
-        }
-      }
-    ],
-    "reasoning": "This Firestore structure prioritizes Authorization Independence and QAPs using denormalization and structural segregation. User roles are stored in the UserProfile and used in security rules to control access to different collections.  Each data collection (pregger_reports, tapehead_entries, etc.) is segregated to represent distinct modules with specific access control requirements. The 'createdBy' field, referencing the UserProfile, is included in each document to maintain ownership information.\n\nAuthorization Independence is achieved by relying on the request.auth.token.role property, set via custom claims, instead of using get() calls to fetch user roles. This ensures that security rules can be evaluated independently of the document data.  \n\nQAPs are supported by structuring the database with dedicated collections per module, enabling secure list operations based on user roles."
+    "providers": ["password"]
   }
 }
