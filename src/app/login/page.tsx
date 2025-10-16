@@ -10,12 +10,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { Logo } from '@/components/icons';
 import { PrivacyPolicy } from '@/components/privacy-policy';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFirebase } from '@/firebase';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { getRoleFromEmail } from '@/lib/roles';
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -60,9 +61,7 @@ export default function LoginPage() {
   const handleSignUp = async (values: LoginFormValues) => {
     setIsLoading(true);
     try {
-      // This is a simplified sign-up. In a real scenario, this should be a protected action.
       const userCredential = await createUserWithEmailAndPassword(firebaseAuth, values.email, values.password);
-      // You would typically assign a default role here via a Cloud Function
       toast({
         title: 'Account Created',
         description: "You have been successfully signed up and logged in.",
@@ -95,6 +94,13 @@ export default function LoginPage() {
       handleSignUp(values);
     }
   };
+  
+   const handleForgotPassword = () => {
+    toast({
+      title: "Forgot Password",
+      description: "Password reset functionality is not yet implemented.",
+    });
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center login-background p-4">
@@ -113,14 +119,67 @@ export default function LoginPage() {
               <form onSubmit={form.handleSubmit(onSubmit)}>
                 <TabsContent value="signin">
                   <CardContent className="space-y-4">
-                    <FormField control={form.control} name="email" render={({ field }) => ( <FormItem> <FormLabel>Email</FormLabel> <FormControl> <Input type="email" placeholder="user@ns.com" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
-                    <FormField control={form.control} name="password" render={({ field }) => ( <FormItem> <FormLabel>Password</FormLabel> <FormControl> <Input type="password" placeholder="••••••••" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
+                    <FormField
+                      control={form.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email</FormLabel>
+                          <FormControl>
+                            <Input type="email" placeholder="user@ns.com" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Password</FormLabel>
+                          <FormControl>
+                            <Input type="password" placeholder="••••••••" {...field} />
+                          </FormControl>
+                           <div className="text-right">
+                               <Button variant="link" size="sm" type="button" onClick={handleForgotPassword} className="h-auto p-0 text-xs">
+                                  Forgot password?
+                               </Button>
+                           </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </CardContent>
                 </TabsContent>
                  <TabsContent value="signup">
                     <CardContent className="space-y-4">
-                        <FormField control={form.control} name="email" render={({ field }) => ( <FormItem> <FormLabel>Email</FormLabel> <FormControl> <Input type="email" placeholder="user@ns.com" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
-                        <FormField control={form.control} name="password" render={({ field }) => ( <FormItem> <FormLabel>Password</FormLabel> <FormControl> <Input type="password" placeholder="••••••••" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
+                        <FormField
+                            control={form.control}
+                            name="email"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Email</FormLabel>
+                                    <FormControl>
+                                        <Input type="email" placeholder="user@ns.com" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="password"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Password</FormLabel>
+                                    <FormControl>
+                                        <Input type="password" placeholder="••••••••" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
                     </CardContent>
                 </TabsContent>
                 <CardFooter className="flex flex-col gap-4">
