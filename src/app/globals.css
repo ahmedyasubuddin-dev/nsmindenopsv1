@@ -90,6 +90,6 @@ body {
 @layer components {
   .login-background {
     @apply bg-cover bg-center bg-no-repeat;
-    background-image: url('/images/login-background.jpg');
+    background-image: url('https://storage.googleapis.com/srd-minden-v1-51058531-83402.appspot.com/login-background.jpg');
   }
 }

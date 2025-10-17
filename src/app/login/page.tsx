@@ -133,7 +133,7 @@ export default function LoginPage() {
 
   return (
     <>
-      <div className="min-h-screen flex items-center justify-center login-background p-4">
+      <div className="min-h-screen flex flex-col items-center justify-center login-background p-4">
         <Card className="w-full max-w-md shadow-2xl bg-card/90 backdrop-blur-sm">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <CardHeader className="text-center">
@@ -248,10 +248,13 @@ export default function LoginPage() {
                 </form>
               </Form>
           </Tabs>
-          <CardFooter className="justify-center items-center text-xs text-center text-muted-foreground pb-4">
-              <PrivacyPolicy />
+          <CardFooter className="flex-col items-center justify-center gap-3 text-xs text-center text-muted-foreground pb-4">
+            <p className="px-6">By signing in, you acknowledge and agree to our <PrivacyPolicy /></p>
           </CardFooter>
         </Card>
+         <footer className="py-4 text-center text-sm text-white/60">
+            © 2025 North Sails LLC | All rights reserved.
+        </footer>
       </div>
     </>
   );
