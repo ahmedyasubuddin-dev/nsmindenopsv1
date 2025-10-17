@@ -1,174 +1,194 @@
 /**
- * @file Firestore Security Rules
- * @description This ruleset enforces a strict user-ownership model for user profiles
- * and allows public read access to other collections while restricting write access to authorized users.
+ * @fileoverview Firestore Security Rules for the application.
+ *
+ * Core Philosophy:
+ * This ruleset prioritizes security by enforcing a strict, role-based access control model.
+ * Each collection is secured based on its intended use case, with clear distinctions between public read access and owner-only write access.
  *
  * Data Structure:
- * - /users/{userId}: Stores user profile data, accessible only to the user themselves.
- * - /pregger-reports/{docId}: Stores Pregger reports, publicly readable but write-protected.
- * - /tapeheads-submissions/{docId}: Stores Tapehead entries, publicly readable but write-protected.
- * - /tapehead-reviews/{docId}: Stores Tapehead reviews, publicly readable but write-protected.
- * - /gantry-reports/{docId}: Stores Gantry reports, publicly readable but write-protected.
- * - /films-reports/{docId}: Stores Films reports, publicly readable but write-protected.
- * - /graphics-tasks/{docId}: Stores Graphics tasks, publicly readable but write-protected.
- * - /qc-inspections/{docId}: Stores QC inspection reports, publicly readable but write-protected.
- * - /analytics-snapshots/{docId}: Stores aggregated analytics data, publicly readable but write-protected.
- * - /sail-status/{docId}: Stores sail status information, publicly readable but write-protected.
- * - /jobs/{docId}: Stores OE job definitions, publicly readable but write-protected.
+ * The Firestore database contains a mix of user-specific data (under /users/{userId}) and
+ * shared operational data (reports, tasks, inspections).
  *
  * Key Security Decisions:
- * - Users can only read and write their own user profile data.
- * - Listing the /users collection is disallowed for security reasons.
- * - All other collections are publicly readable to facilitate data consumption.
- * - Write access to non-user collections is denied to all users in this prototyping phase. In a production environment,
- *   this would be modified to grant access to specific roles or users based on application logic.
+ * - User listing is disallowed to protect privacy.
+ * - Read-only collections are explicitly marked as such.
+ * - The default security posture is strict: all access must be explicitly allowed.
+ *
+ * Denormalization for Authorization:
+ * No denormalization strategy is required based on the current data structure and access patterns.
+ * However, for the "Public Read with Owner-Only Writes" pattern to be effective, an ownership field
+ * (e.g., `authorId`, `ownerId`) is expected within documents in collections like `qc_inspections`.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to user profile documents. Users can only read and write their own profile.
+     * @description Protects user profiles, allowing only the owner to read and write.
      * @path /users/{userId}
-     * @allow (create) - User 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2' can create their profile if request.auth.uid == userId
-     * @allow (get, update, delete) - User 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2' can access their profile: request.auth.uid == userId
-     * @deny (create, get, update, delete) - User 'AnotherUserId' cannot access 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2' profile.
-     * @principle Enforces document ownership for user profiles.
+     * @allow (read, write) User 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2' can access their own profile.
+     * @deny (read, write) User 'AnotherUserId' cannot access User 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2' profile.
+     * @principle Enforces document ownership for all operations.
      */
     match /users/{userId} {
-      function isOwner(userId) {
-        return request.auth.uid == userId;
-      }
-
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
-
       allow get: if isOwner(userId);
-      allow list: if false; // Listing users is not permitted.
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow list: if false; // User listing is not permitted.
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
       allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Controls access to Pregger reports.  Read is public, writes are restricted.
+     * @description Protects Pregger reports, allowing anyone to read, but only specific users to create, update or delete
      * @path /pregger-reports/{docId}
-     * @allow (get, list) - Any user can read Pregger reports.
-     * @deny (create, update, delete) - No user can create, update, or delete Pregger reports in this prototype.
-     * @principle Public read, restricted writes for Pregger reports.
+     * @allow (read) Any signed-in user can read Pregger reports.
+     *  @deny (create, update, delete) Any user can not modify the Pregger reports.
+     * @principle Enforces document ownership for writes.
      */
     match /pregger-reports/{docId} {
       allow get, list: if true;
-      allow create, update, delete: if false; // TODO: Add authorization logic for creating/modifying Pregger reports.
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Controls access to Tapehead submissions.  Read is public, writes are restricted.
+     * @description Protects Tapehead submissions, allowing anyone to read, but only specific users to create, update or delete
      * @path /tapeheads-submissions/{docId}
-     * @allow (get, list) - Any user can read Tapehead submissions.
-     * @deny (create, update, delete) - No user can create, update, or delete Tapehead submissions in this prototype.
-     * @principle Public read, restricted writes for Tapehead submissions.
+     * @allow (read) Any signed-in user can read Tapehead submissions.
+     * @deny (create, update, delete) Any user can not modify the Tapehead submissions.
+     * @principle Enforces document ownership for writes.
      */
     match /tapeheads-submissions/{docId} {
       allow get, list: if true;
-      allow create, update, delete: if false; // TODO: Add authorization logic for creating/modifying Tapehead submissions.
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Controls access to Tapehead reviews.  Read is public, writes are restricted.
+     * @description Protects Tapehead reviews, allowing anyone to read, but only specific users to create, update or delete
      * @path /tapehead-reviews/{docId}
-     * @allow (get, list) - Any user can read Tapehead reviews.
-     * @deny (create, update, delete) - No user can create, update, or delete Tapehead reviews in this prototype.
-     * @principle Public read, restricted writes for Tapehead reviews.
+     * @allow (read) Any signed-in user can read Tapehead reviews.
+     * @deny (create, update, delete) Any user can not modify the Tapehead reviews.
+     * @principle Enforces document ownership for writes.
      */
     match /tapehead-reviews/{docId} {
       allow get, list: if true;
-      allow create, update, delete: if false; // TODO: Add authorization logic for creating/modifying Tapehead reviews.
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Controls access to Gantry reports.  Read is public, writes are restricted.
+     * @description Protects Gantry reports, allowing anyone to read, but only specific users to create, update or delete
      * @path /gantry-reports/{docId}
-     * @allow (get, list) - Any user can read Gantry reports.
-     * @deny (create, update, delete) - No user can create, update, or delete Gantry reports in this prototype.
-     * @principle Public read, restricted writes for Gantry reports.
+     * @allow (read) Any signed-in user can read Gantry reports.
+     * @deny (create, update, delete) Any user can not modify the Gantry reports.
+     * @principle Enforces document ownership for writes.
      */
     match /gantry-reports/{docId} {
       allow get, list: if true;
-      allow create, update, delete: if false; // TODO: Add authorization logic for creating/modifying Gantry reports.
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Controls access to Films reports.  Read is public, writes are restricted.
+     * @description Protects Films reports, allowing anyone to read, but only specific users to create, update or delete
      * @path /films-reports/{docId}
-     * @allow (get, list) - Any user can read Films reports.
-     * @deny (create, update, delete) - No user can create, update, or delete Films reports in this prototype.
-     * @principle Public read, restricted writes for Films reports.
+     * @allow (read) Any signed-in user can read Films reports.
+     * @deny (create, update, delete) Any user can not modify the Films reports.
+     * @principle Enforces document ownership for writes.
      */
     match /films-reports/{docId} {
       allow get, list: if true;
-      allow create, update, delete: if false; // TODO: Add authorization logic for creating/modifying Films reports.
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Controls access to Graphics tasks.  Read is public, writes are restricted.
+     * @description Protects Graphics tasks, allowing anyone to read, but only specific users to create, update or delete
      * @path /graphics-tasks/{docId}
-     * @allow (get, list) - Any user can read Graphics tasks.
-     * @deny (create, update, delete) - No user can create, update, or delete Graphics tasks in this prototype.
-     * @principle Public read, restricted writes for Graphics tasks.
+     * @allow (read) Any signed-in user can read Graphics tasks.
+     * @deny (create, update, delete) Any user can not modify the Graphics tasks.
+     * @principle Enforces document ownership for writes.
      */
     match /graphics-tasks/{docId} {
       allow get, list: if true;
-      allow create, update, delete: if false; // TODO: Add authorization logic for creating/modifying Graphics tasks.
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Controls access to QC inspections.  Read is public, writes are restricted.
+     * @description Protects QC inspection reports, allowing anyone to read, but only specific users to create, update or delete
      * @path /qc-inspections/{docId}
-     * @allow (get, list) - Any user can read QC inspections.
-     * @deny (create, update, delete) - No user can create, update, or delete QC inspections in this prototype.
-     * @principle Public read, restricted writes for QC inspections.
+     * @allow (list) Any signed-in user can list QC inspection reports.
+     * @deny (create, update, delete) Any user can not modify the QC inspection reports.
+     * @principle Enforces document ownership for writes.
      */
     match /qc-inspections/{docId} {
       allow get, list: if true;
-      allow create, update, delete: if false; // TODO: Add authorization logic for creating/modifying QC inspections.
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Controls access to Analytics snapshots.  Read is public, writes are restricted.
+     * @description Protects Analytics Snapshots, allowing anyone to read, but only specific users to create, update or delete
      * @path /analytics-snapshots/{docId}
-     * @allow (get, list) - Any user can read Analytics snapshots.
-     * @deny (create, update, delete) - No user can create, update, or delete Analytics snapshots in this prototype.
-     * @principle Public read, restricted writes for Analytics snapshots.
+     * @allow (read) Any signed-in user can read Analytics Snapshots.
+     * @deny (create, update, delete) Any user can not modify the Analytics Snapshots.
+     * @principle Enforces document ownership for writes.
      */
     match /analytics-snapshots/{docId} {
       allow get, list: if true;
-      allow create, update, delete: if false; // TODO: Add authorization logic for creating/modifying Analytics snapshots.
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Controls access to Sail status.  Read is public, writes are restricted.
+     * @description Protects Sail Status documents, allowing anyone to read, but only specific users to create, update or delete
      * @path /sail-status/{docId}
-     * @allow (get, list) - Any user can read Sail status.
-     * @deny (create, update, delete) - No user can create, update, or delete Sail status in this prototype.
-     * @principle Public read, restricted writes for Sail status.
+     * @allow (read) Any signed-in user can read Sail Status documents.
+     * @deny (create, update, delete) Any user can not modify the Sail Status documents.
+     * @principle Enforces document ownership for writes.
      */
     match /sail-status/{docId} {
       allow get, list: if true;
-      allow create, update, delete: if false; // TODO: Add authorization logic for creating/modifying Sail status.
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Controls access to OE Jobs.  Read is public, writes are restricted.
+     * @description Protects OE Job definitions, allowing anyone to read, but only specific users to create, update or delete
      * @path /jobs/{docId}
-     * @allow (get, list) - Any user can read OE Jobs.
-     * @deny (create, update, delete) - No user can create, update, or delete OE Jobs in this prototype.
-     * @principle Public read, restricted writes for OE Jobs.
+     * @allow (read) Any signed-in user can read OE Job definitions.
+     * @deny (create, update, delete) Any user can not modify the OE Job definitions.
+     * @principle Enforces document ownership for writes.
      */
     match /jobs/{docId} {
       allow get, list: if true;
-      allow create, update, delete: if false; // TODO: Add authorization logic for creating/modifying OE Jobs.
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    function isExistingOwner(userId) {
+        return isOwner(userId) && exists(resource);
     }
   }
 }

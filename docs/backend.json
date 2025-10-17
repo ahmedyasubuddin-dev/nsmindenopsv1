@@ -123,7 +123,7 @@
       "schema": { "$ref": "#/entities/UserProfile" },
       "description": "Stores user profiles."
     },
-    "/pregger-reports/{docId}": {
+    "/pregger_reports/{docId}": {
       "schema": { "$ref": "#/entities/PreggerReport" },
       "description": "Stores reports from the Pregger department."
     },
@@ -139,7 +139,7 @@
       "schema": { "$ref": "#/entities/GantryReport" },
       "description": "Stores reports from the Gantry department."
     },
-    "/films-reports/{docId}": {
+    "/films_reports/{docId}": {
       "schema": { "$ref": "#/entities/FilmsReport" },
       "description": "Stores reports from the Films department."
     },
@@ -147,7 +147,7 @@
       "schema": { "$ref": "#/entities/GraphicsReport" },
       "description": "Stores tasks for the Graphics department."
     },
-    "/qc-inspections/{docId}": {
+    "/qc_inspections/{docId}": {
       "schema": { "$ref": "#/entities/QcInspection" },
       "description": "Stores QC inspection reports."
     },
