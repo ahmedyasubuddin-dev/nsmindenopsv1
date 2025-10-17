@@ -29,7 +29,7 @@ async function signInWithUsernameAndPassword(auth: any, { username, password }: 
   
   // For now, we'll simulate a successful login for 'superuser' using anonymous auth.
   // This allows access to the app UI while the real backend is built.
-  if (username === 'superuser' && password === 'password') {
+  if (username === 'superuser' && password.toLowerCase() === 'password') {
      try {
         // We sign in anonymously, and the Firebase provider will treat this
         // anonymous user as the 'superuser' for UI purposes.
