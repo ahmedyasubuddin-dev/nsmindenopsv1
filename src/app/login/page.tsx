@@ -19,8 +19,10 @@ import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswor
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 
+const DUMMY_DOMAIN = 'srd-minden.app';
+
 const loginSchema = z.object({
-  email: z.string().email(),
+  username: z.string().min(1, 'Username is required.'),
   password: z.string().min(6, 'Password must be at least 6 characters.'),
 });
 
@@ -32,27 +34,28 @@ export default function LoginPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('signin');
-  const [resetEmail, setResetEmail] = useState('');
+  const [resetUsername, setResetUsername] = useState('');
 
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: '',
+      username: '',
       password: '',
     },
   });
 
   const handleSignIn = async (values: LoginFormValues) => {
     setIsLoading(true);
+    const email = `${values.username}@${DUMMY_DOMAIN}`;
     try {
-      await signInWithEmailAndPassword(firebaseAuth, values.email, values.password);
+      await signInWithEmailAndPassword(firebaseAuth, email, values.password);
       router.push('/dashboard');
     } catch (error: any) {
       console.error("Sign In Error:", error);
       toast({
         title: 'Authentication Error',
-        description: "Invalid credentials. Please check your email and password.",
+        description: "Invalid credentials. Please check your username and password.",
         variant: 'destructive',
       });
     } finally {
@@ -62,8 +65,9 @@ export default function LoginPage() {
 
   const handleSignUp = async (values: LoginFormValues) => {
     setIsLoading(true);
+    const email = `${values.username}@${DUMMY_DOMAIN}`;
     try {
-      const userCredential = await createUserWithEmailAndPassword(firebaseAuth, values.email, values.password);
+      await createUserWithEmailAndPassword(firebaseAuth, email, values.password);
       toast({
         title: 'Account Created',
         description: "You have been successfully signed up and logged in.",
@@ -77,10 +81,9 @@ export default function LoginPage() {
           description: "Please sign in or use the 'Forgot password?' link.",
           variant: 'destructive',
         });
-        // Switch to the sign-in tab and pre-fill email
         setActiveTab('signin');
-        form.setValue('email', values.email);
-        form.setValue('password', ''); // Clear password field
+        form.setValue('username', values.username);
+        form.setValue('password', ''); 
       } else {
         toast({
           title: 'Sign Up Error',
@@ -102,22 +105,22 @@ export default function LoginPage() {
   };
   
    const handleForgotPassword = async () => {
-    if (!resetEmail) {
+    if (!resetUsername) {
       toast({
-        title: "Email Required",
-        description: "Please enter your email address to reset your password.",
+        title: "Username Required",
+        description: "Please enter your username to reset your password.",
         variant: "destructive",
       });
       return;
     }
     setIsLoading(true);
+    const email = `${resetUsername}@${DUMMY_DOMAIN}`;
     try {
-      await sendPasswordResetEmail(firebaseAuth, resetEmail);
+      await sendPasswordResetEmail(firebaseAuth, email);
       toast({
         title: "Password Reset Email Sent",
-        description: `If an account exists for ${resetEmail}, a password reset link has been sent.`,
+        description: `If an account exists for username ${resetUsername}, a password reset link has been sent to its associated email.`,
       });
-      // Close the dialog after sending
       document.getElementById('reset-dialog-close')?.click();
     } catch (error: any) {
       console.error("Forgot Password Error:", error);
@@ -151,12 +154,12 @@ export default function LoginPage() {
                     <CardContent className="space-y-4">
                       <FormField
                         control={form.control}
-                        name="email"
+                        name="username"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Email</FormLabel>
+                            <FormLabel>Username</FormLabel>
                             <FormControl>
-                              <Input type="email" placeholder="user@example.com" {...field} />
+                              <Input type="text" placeholder="e.g., superuser" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -171,7 +174,7 @@ export default function LoginPage() {
                             <FormControl>
                               <Input type="password" placeholder="••••••••" {...field} />
                             </FormControl>
-                            <div className="text-right">
+                             <div className="text-right">
                                 <AlertDialog>
                                   <AlertDialogTrigger asChild>
                                    <Button variant="link" size="sm" type="button" className="h-auto p-0 text-xs">
@@ -182,17 +185,17 @@ export default function LoginPage() {
                                     <AlertDialogHeader>
                                       <AlertDialogTitle>Reset Password</AlertDialogTitle>
                                       <AlertDialogDescription>
-                                        Enter your email address and we will send you a link to reset your password.
+                                        Enter your username and we will send you a link to reset your password.
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <div className="grid gap-2">
-                                      <Label htmlFor="reset-email">Email</Label>
+                                      <Label htmlFor="reset-username">Username</Label>
                                       <Input
-                                        id="reset-email"
-                                        type="email"
-                                        placeholder="user@example.com"
-                                        value={resetEmail}
-                                        onChange={(e) => setResetEmail(e.target.value)}
+                                        id="reset-username"
+                                        type="text"
+                                        placeholder="e.g., superuser"
+                                        value={resetUsername}
+                                        onChange={(e) => setResetUsername(e.target.value)}
                                       />
                                     </div>
                                     <AlertDialogFooter>
@@ -214,12 +217,12 @@ export default function LoginPage() {
                       <CardContent className="space-y-4">
                           <FormField
                               control={form.control}
-                              name="email"
+                              name="username"
                               render={({ field }) => (
                                   <FormItem>
-                                      <FormLabel>Email</FormLabel>
+                                      <FormLabel>Username</FormLabel>
                                       <FormControl>
-                                          <Input type="email" placeholder="user@example.com" {...field} />
+                                          <Input type="text" placeholder="e.g., superuser" {...field} />
                                       </FormControl>
                                       <FormMessage />
                                   </FormItem>
@@ -259,3 +262,5 @@ export default function LoginPage() {
     </>
   );
 }
+
+    
