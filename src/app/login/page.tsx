@@ -14,8 +14,7 @@ import { useRouter } from 'next/navigation';
 import { Logo } from '@/components/icons';
 import { PrivacyPolicy } from '@/components/privacy-policy';
 import { useFirebase } from '@/firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
+import { signInAnonymously } from 'firebase/auth';
 
 const loginSchema = z.object({
   username: z.string().min(1, 'Username is required.'),
@@ -24,28 +23,24 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
-// This function will eventually call our backend. For now, it's a placeholder.
+// This function is a temporary placeholder for development.
 async function signInWithUsernameAndPassword(auth: any, { username, password }: LoginFormValues) {
   console.log("Attempting sign-in for:", username);
-  // In the future, this will make a secure call to a Cloud Function
-  // which finds the user, checks the password hash, and returns a custom token.
   
-  // For now, we'll simulate a successful login for 'superuser'
+  // For now, we'll simulate a successful login for 'superuser' using anonymous auth.
+  // This allows access to the app UI while the real backend is built.
   if (username === 'superuser' && password === 'password') {
-     // This is a mock sign-in with a dummy email to make the Firebase Auth state work.
-     // In the next step, this will be replaced with a custom token.
-     const dummyEmail = 'superuser@srd-minden.app';
      try {
-        const userCredential = await signInWithEmailAndPassword(auth, dummyEmail, password);
+        // We sign in anonymously, and the Firebase provider will treat this
+        // anonymous user as the 'superuser' for UI purposes.
+        const userCredential = await signInAnonymously(auth);
         return userCredential;
-     } catch (error: any) {
-        if (error.code === 'auth/user-not-found') {
-            // If the dummy user doesn't exist, create it for the demo to work
-            return await auth.createUserWithEmailAndPassword(dummyEmail, password);
-        }
-        throw error;
+     } catch (error) {
+        console.error("Anonymous sign-in for placeholder failed:", error);
+        throw new Error("Could not create a temporary session.");
      }
   } else {
+    // In the future, this will throw an error from the backend.
     throw new Error("Invalid username or password.");
   }
 }

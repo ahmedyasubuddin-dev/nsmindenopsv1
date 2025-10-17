@@ -15,7 +15,7 @@ interface FirebaseProviderProps {
   auth: Auth;
 }
 
-// This will be our user object, derived from the custom token.
+// This is our user object, which will eventually be derived from a custom token.
 interface CustomUser {
   uid: string;
   username: string; // The primary identifier
@@ -71,20 +71,28 @@ function useFirebaseAuth(auth: Auth): UserAuthState {
       setIsUserLoading(true);
       if (firebaseUser) {
         try {
-          const idTokenResult = await firebaseUser.getIdTokenResult();
-          const claims = idTokenResult.claims;
+          // Placeholder logic for anonymous superuser
+          if (firebaseUser.isAnonymous) {
+            const superUser: CustomUser = {
+              uid: firebaseUser.uid,
+              username: 'superuser (anonymous)',
+              role: 'superuser',
+            };
+            setUser(superUser);
+            setRole('superuser');
+          } else {
+             const idTokenResult = await firebaseUser.getIdTokenResult();
+             const claims = idTokenResult.claims;
           
-          const customUser: CustomUser = {
-            uid: firebaseUser.uid,
-            // The username will come from our custom claims.
-            // We use a fallback for the temporary mock user.
-            username: claims.username as string || 'superuser', 
-            role: claims.role as UserRole || 'superuser', // Fallback for mock user
-          };
+             const customUser: CustomUser = {
+                uid: firebaseUser.uid,
+                username: claims.username as string, 
+                role: claims.role as UserRole,
+             };
           
-          setUser(customUser);
-          setRole(customUser.role);
-
+             setUser(customUser);
+             setRole(customUser.role);
+          }
         } catch (error) {
           console.error("Error fetching user claims:", error);
           setUserError(error as Error);
