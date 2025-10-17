@@ -1,9 +1,3 @@
-/**
- * @file Firestore Security Rules
- * @core_philosophy This ruleset enforces a strict user-ownership model for user profiles and allows public read access to all other data collections. Write access to non-user collections is completely disabled.
- * @data_structure User profiles are stored under `/users/{userId}`. All other data collections are stored at the top level (e.g., `/pregger-reports/{docId}`).
- * @key_security_decisions User listing is explicitly denied to protect user privacy. Read-only access is granted to non-user collections.  Writes to non-user collection is denied.
- */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -11,158 +5,175 @@ service cloud.firestore {
     /**
      * @description Controls access to user profile documents.
      * @path /users/{userId}
-     * @allow (create) Authenticated user can create their own profile if the userId matches their auth.uid.
-     * @allow (get, list) Authenticated user can read their own profile if the userId matches their auth.uid.
-     * @allow (update) Authenticated user can update their own profile if the userId matches their auth.uid.
-     * @allow (delete) Authenticated user can delete their own profile if the userId matches their auth.uid.
-     * @deny (list) Listing all users is forbidden.
-     * @deny (create) Creating a profile for another user is forbidden.
-     * @deny (get) Reading another user's profile is forbidden.
-     * @deny (update) Updating another user's profile is forbidden.
-     * @deny (delete) Deleting another user's profile is forbidden.
-     * @principle Enforces document ownership for all operations.
+     * @allow (get, update, delete): Authenticated user can access their own profile.
+     * @allow (create): Authenticated user can create their own profile, if the userId matches.
+     * @deny (get, update, delete): Authenticated user cannot access another user's profile.
+     * @deny (create): Authenticated user cannot create a profile with a mismatched userId.
+     * @principle Enforces document ownership for user profiles.
      */
     match /users/{userId} {
-      allow get: if isOwner(userId);
-      allow list: if false;
-      allow create: if isOwner(userId) && request.resource.data.email is string;
-      allow update: if isExistingOwner(userId) && request.resource.data.email == resource.data.email;
-      allow delete: if isExistingOwner(userId);
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if false; // User listing is not permitted
+
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isSignedIn() && isOwner(userId);
+      allow delete: if isSignedIn() && isOwner(userId);
+    }
+
+    function isOwnerOfDocument(resource) {
+      return resource.data.ownerId == request.auth.uid || resource.data.authorId == request.auth.uid;
+    }
+
+    function isCreatingOwnedDocument() {
+      return request.resource.data.ownerId == request.auth.uid || request.resource.data.authorId == request.auth.uid;
     }
 
     /**
-     * @description Grants read-only access to Pregger reports.
+     * @description Controls access to Pregger reports.
      * @path /pregger-reports/{docId}
-     * @allow (get, list) Any authenticated user can read Pregger reports.
-     * @deny (create, update, delete) No user can create, update, or delete Pregger reports.
-     * @principle Limits access to read-only for public data.
+     * @allow (get, list): Anyone can read Pregger reports.
+     * @deny (create, update, delete): Only the owner can modify Pregger reports.  Requires an `ownerId` or `authorId` field in the document.
+     * @principle Allows public read access with owner-only writes.
      */
     match /pregger-reports/{docId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if false;
+        allow get, list: if true;
+        allow create: if isSignedIn() && isCreatingOwnedDocument();
+        allow update: if isSignedIn() && isOwnerOfDocument(resource);
+        allow delete: if isSignedIn() && isOwnerOfDocument(resource);
     }
 
     /**
-     * @description Grants read-only access to Tapehead submissions.
+     * @description Controls access to Tapehead submissions.
      * @path /tapeheads-submissions/{docId}
-     * @allow (get, list) Any authenticated user can read Tapehead submissions.
-     * @deny (create, update, delete) No user can create, update, or delete Tapehead submissions.
-     * @principle Limits access to read-only for public data.
+     * @allow (get, list): Anyone can read Tapehead submissions.
+     * @deny (create, update, delete): Only the owner can modify Tapehead submissions. Requires an `ownerId` or `authorId` field in the document.
+     * @principle Allows public read access with owner-only writes.
      */
     match /tapeheads-submissions/{docId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if false;
+        allow get, list: if true;
+        allow create: if isSignedIn() && isCreatingOwnedDocument();
+        allow update: if isSignedIn() && isOwnerOfDocument(resource);
+        allow delete: if isSignedIn() && isOwnerOfDocument(resource);
     }
 
-    /**
-     * @description Grants read-only access to Tapehead reviews.
-     * @path /tapehead-reviews/{docId}
-     * @allow (get, list) Any authenticated user can read Tapehead reviews.
-     * @deny (create, update, delete) No user can create, update, or delete Tapehead reviews.
-     * @principle Limits access to read-only for public data.
-     */
+      /**
+       * @description Controls access to Tapehead Reviews.
+       * @path /tapehead-reviews/{docId}
+       * @allow (get, list): Anyone can read Tapehead reviews.
+       * @deny (create, update, delete): Only the owner can modify Tapehead reviews. Requires an `ownerId` or `authorId` field in the document.
+       * @principle Allows public read access with owner-only writes.
+       */
     match /tapehead-reviews/{docId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if false;
+        allow get, list: if true;
+        allow create: if isSignedIn() && isCreatingOwnedDocument();
+        allow update: if isSignedIn() && isOwnerOfDocument(resource);
+        allow delete: if isSignedIn() && isOwnerOfDocument(resource);
     }
 
     /**
-     * @description Grants read-only access to Gantry reports.
+     * @description Controls access to Gantry reports.
      * @path /gantry-reports/{docId}
-     * @allow (get, list) Any authenticated user can read Gantry reports.
-     * @deny (create, update, delete) No user can create, update, or delete Gantry reports.
-     * @principle Limits access to read-only for public data.
+     * @allow (get, list): Anyone can read Gantry reports.
+     * @deny (create, update, delete): Only the owner can modify Gantry reports. Requires an `ownerId` or `authorId` field in the document.
+     * @principle Allows public read access with owner-only writes.
      */
     match /gantry-reports/{docId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if false;
+        allow get, list: if true;
+        allow create: if isSignedIn() && isCreatingOwnedDocument();
+        allow update: if isSignedIn() && isOwnerOfDocument(resource);
+        allow delete: if isSignedIn() && isOwnerOfDocument(resource);
     }
 
     /**
-     * @description Grants read-only access to Films reports.
+     * @description Controls access to Films reports.
      * @path /films-reports/{docId}
-     * @allow (get, list) Any authenticated user can read Films reports.
-     * @deny (create, update, delete) No user can create, update, or delete Films reports.
-     * @principle Limits access to read-only for public data.
+     * @allow (get, list): Anyone can read Films reports.
+     * @deny (create, update, delete): Only the owner can modify Films reports. Requires an `ownerId` or `authorId` field in the document.
+     * @principle Allows public read access with owner-only writes.
      */
     match /films-reports/{docId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if false;
+        allow get, list: if true;
+        allow create: if isSignedIn() && isCreatingOwnedDocument();
+        allow update: if isSignedIn() && isOwnerOfDocument(resource);
+        allow delete: if isSignedIn() && isOwnerOfDocument(resource);
     }
 
     /**
-     * @description Grants read-only access to Graphics tasks.
+     * @description Controls access to Graphics tasks.
      * @path /graphics-tasks/{docId}
-     * @allow (get, list) Any authenticated user can read Graphics tasks.
-     * @deny (create, update, delete) No user can create, update, or delete Graphics tasks.
-     * @principle Limits access to read-only for public data.
+     * @allow (get, list): Anyone can read Graphics tasks.
+     * @deny (create, update, delete): Only the owner can modify Graphics tasks. Requires an `ownerId` or `authorId` field in the document.
+     * @principle Allows public read access with owner-only writes.
      */
     match /graphics-tasks/{docId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if false;
+        allow get, list: if true;
+        allow create: if isSignedIn() && isCreatingOwnedDocument();
+        allow update: if isSignedIn() && isOwnerOfDocument(resource);
+        allow delete: if isSignedIn() && isOwnerOfDocument(resource);
     }
 
     /**
-     * @description Grants read-only access to QC inspections.
+     * @description Controls access to QC inspections.
      * @path /qc-inspections/{docId}
-     * @allow (get, list) Any authenticated user can read QC inspections.
-     * @deny (create, update, delete) No user can create, update, or delete QC inspections.
-     * @principle Limits access to read-only for public data.
+     * @allow (get, list): Anyone can read QC inspection reports.
+     * @deny (create, update, delete): Only the owner can modify QC inspection reports. Requires an `ownerId` or `authorId` field in the document.
+     * @principle Allows public read access with owner-only writes.
      */
     match /qc-inspections/{docId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if false;
+        allow get, list: if true;
+        allow create: if isSignedIn() && isCreatingOwnedDocument();
+        allow update: if isSignedIn() && isOwnerOfDocument(resource);
+        allow delete: if isSignedIn() && isOwnerOfDocument(resource);
     }
 
     /**
-     * @description Grants read-only access to Analytics snapshots.
+     * @description Controls access to analytics snapshots.
      * @path /analytics-snapshots/{docId}
-     * @allow (get, list) Any authenticated user can read Analytics snapshots.
-     * @deny (create, update, delete) No user can create, update, or delete Analytics snapshots.
-     * @principle Limits access to read-only for public data.
+     * @allow (get, list): Anyone can read analytics snapshots.
+     * @deny (create, update, delete): Only the owner can modify analytics snapshots. Requires an `ownerId` or `authorId` field in the document.
+     * @principle Allows public read access with owner-only writes.
      */
     match /analytics-snapshots/{docId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if false;
+        allow get, list: if true;
+        allow create: if isSignedIn() && isCreatingOwnedDocument();
+        allow update: if isSignedIn() && isOwnerOfDocument(resource);
+        allow delete: if isSignedIn() && isOwnerOfDocument(resource);
     }
 
     /**
-     * @description Grants read-only access to Sail status.
+     * @description Controls access to sail status.
      * @path /sail-status/{docId}
-     * @allow (get, list) Any authenticated user can read Sail status.
-     * @deny (create, update, delete) No user can create, update, or delete Sail status.
-     * @principle Limits access to read-only for public data.
+     * @allow (get, list): Anyone can read sail status.
+     * @deny (create, update, delete): Only the owner can modify sail status. Requires an `ownerId` or `authorId` field in the document.
+     * @principle Allows public read access with owner-only writes.
      */
     match /sail-status/{docId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if false;
+        allow get, list: if true;
+        allow create: if isSignedIn() && isCreatingOwnedDocument();
+        allow update: if isSignedIn() && isOwnerOfDocument(resource);
+        allow delete: if isSignedIn() && isOwnerOfDocument(resource);
     }
 
     /**
-     * @description Grants read-only access to OE Jobs.
+     * @description Controls access to OE jobs.
      * @path /jobs/{docId}
-     * @allow (get, list) Any authenticated user can read OE Jobs.
-     * @deny (create, update, delete) No user can create, update, or delete OE Jobs.
-     * @principle Limits access to read-only for public data.
+     * @allow (get, list): Anyone can read OE jobs.
+     * @deny (create, update, delete): Only the owner can modify OE jobs. Requires an `ownerId` or `authorId` field in the document.
+     * @principle Allows public read access with owner-only writes.
      */
     match /jobs/{docId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if false;
+        allow get, list: if true;
+        allow create: if isSignedIn() && isCreatingOwnedDocument();
+        allow update: if isSignedIn() && isOwnerOfDocument(resource);
+        allow delete: if isSignedIn() && isOwnerOfDocument(resource);
     }
-  }
-
-  // Helper function to determine if the user is signed in.
-  function isSignedIn() {
-    return request.auth != null;
-  }
-
-  // Helper function to determine if the user is the owner of the document.
-  function isOwner(userId) {
-    return request.auth.uid == userId;
-  }
-
-    // Helper function to determine if the user is the owner of the document and the document exists.
-  function isExistingOwner(userId) {
-    return isOwner(userId) && resource != null;
   }
 }
