@@ -13,13 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { Logo } from '@/components/icons';
 import { PrivacyPolicy } from '@/components/privacy-policy';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFirebase } from '@/firebase';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Label } from '@/components/ui/label';
-
-const DUMMY_DOMAIN = 'srd-minden.app';
 
 const loginSchema = z.object({
   username: z.string().min(1, 'Username is required.'),
@@ -33,9 +27,6 @@ export default function LoginPage() {
   const { auth: firebaseAuth } = useFirebase();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('signin');
-  const [resetUsername, setResetUsername] = useState('');
-
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -45,212 +36,82 @@ export default function LoginPage() {
     },
   });
 
-  const handleSignIn = async (values: LoginFormValues) => {
+  const onSubmit = async (values: LoginFormValues) => {
     setIsLoading(true);
-    const email = `${values.username}@${DUMMY_DOMAIN}`;
-    try {
-      await signInWithEmailAndPassword(firebaseAuth, email, values.password);
-      router.push('/dashboard');
-    } catch (error: any) {
-      console.error("Sign In Error:", error);
+    // This will be replaced with a call to a custom auth Cloud Function
+    console.log("Attempting to sign in with:", values);
+    
+    // Mock successful login for now
+    setTimeout(() => {
       toast({
-        title: 'Authentication Error',
-        description: "Invalid credentials. Please check your username and password.",
-        variant: 'destructive',
+        title: 'Login Successful (Mock)',
+        description: `Welcome, ${values.username}!`,
       });
-    } finally {
+      // In a real scenario, we'd get a custom token and sign in with it
+      // For now, we just redirect. The AuthGuard will need to be adjusted.
+      router.push('/dashboard'); 
       setIsLoading(false);
-    }
-  };
-
-  const handleSignUp = async (values: LoginFormValues) => {
-    setIsLoading(true);
-    const email = `${values.username}@${DUMMY_DOMAIN}`;
-    try {
-      await createUserWithEmailAndPassword(firebaseAuth, email, values.password);
-      toast({
-        title: 'Account Created',
-        description: "You have been successfully signed up and logged in.",
-      });
-      router.push('/dashboard');
-    } catch (error: any) {
-      console.error("Sign Up Error:", error);
-      if (error.code === 'auth/email-already-in-use') {
-         toast({
-          title: 'Account Already Exists',
-          description: "Please sign in or use the 'Forgot password?' link.",
-          variant: 'destructive',
-        });
-        setActiveTab('signin');
-        form.setValue('username', values.username);
-        form.setValue('password', ''); 
-      } else {
-        toast({
-          title: 'Sign Up Error',
-          description: error.message,
-          variant: 'destructive',
-        });
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  const onSubmit = (values: LoginFormValues) => {
-    if (activeTab === 'signin') {
-      handleSignIn(values);
-    } else {
-      handleSignUp(values);
-    }
+    }, 1000);
   };
   
    const handleForgotPassword = async () => {
-    if (!resetUsername) {
-      toast({
-        title: "Username Required",
-        description: "Please enter your username to reset your password.",
-        variant: "destructive",
+    toast({
+        title: "Password Reset Request",
+        description: "A request has been sent to the Superuser to reset your password.",
       });
-      return;
-    }
-    setIsLoading(true);
-    const email = `${resetUsername}@${DUMMY_DOMAIN}`;
-    try {
-      await sendPasswordResetEmail(firebaseAuth, email);
-      toast({
-        title: "Password Reset Email Sent",
-        description: `If an account exists for username ${resetUsername}, a password reset link has been sent to its associated email.`,
-      });
-      document.getElementById('reset-dialog-close')?.click();
-    } catch (error: any) {
-      console.error("Forgot Password Error:", error);
-      toast({
-        title: "Error Sending Reset Email",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   return (
     <>
       <div className="min-h-screen flex flex-col items-center justify-center login-background p-4">
         <Card className="w-full max-w-md shadow-2xl bg-card/90 backdrop-blur-sm">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <CardHeader className="text-center">
-                <Logo className="mx-auto h-12 w-12 text-primary" />
-                <CardTitle className="text-2xl font-headline mt-4">SRD: Minden Ops</CardTitle>
-                <CardDescription>Please sign in to continue</CardDescription>
-                <TabsList className="grid w-full grid-cols-2 mt-4">
-                      <TabsTrigger value="signin">Sign In</TabsTrigger>
-                      <TabsTrigger value="signup">Sign Up</TabsTrigger>
-                  </TabsList>
-              </CardHeader>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)}>
-                  <TabsContent value="signin">
-                    <CardContent className="space-y-4">
-                      <FormField
-                        control={form.control}
-                        name="username"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Username</FormLabel>
-                            <FormControl>
-                              <Input type="text" placeholder="e.g., superuser" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="password"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Password</FormLabel>
-                            <FormControl>
-                              <Input type="password" placeholder="••••••••" {...field} />
-                            </FormControl>
-                             <div className="text-right">
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                   <Button variant="link" size="sm" type="button" className="h-auto p-0 text-xs">
-                                      Forgot password?
-                                   </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>Reset Password</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        Enter your username and we will send you a link to reset your password.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <div className="grid gap-2">
-                                      <Label htmlFor="reset-username">Username</Label>
-                                      <Input
-                                        id="reset-username"
-                                        type="text"
-                                        placeholder="e.g., superuser"
-                                        value={resetUsername}
-                                        onChange={(e) => setResetUsername(e.target.value)}
-                                      />
-                                    </div>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel id="reset-dialog-close">Cancel</AlertDialogCancel>
-                                      <AlertDialogAction onClick={handleForgotPassword} disabled={isLoading}>
-                                        {isLoading ? 'Sending...' : 'Send Reset Link'}
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                            </div>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </CardContent>
-                  </TabsContent>
-                  <TabsContent value="signup">
-                      <CardContent className="space-y-4">
-                          <FormField
-                              control={form.control}
-                              name="username"
-                              render={({ field }) => (
-                                  <FormItem>
-                                      <FormLabel>Username</FormLabel>
-                                      <FormControl>
-                                          <Input type="text" placeholder="e.g., superuser" {...field} />
-                                      </FormControl>
-                                      <FormMessage />
-                                  </FormItem>
-                              )}
-                          />
-                          <FormField
-                              control={form.control}
-                              name="password"
-                              render={({ field }) => (
-                                  <FormItem>
-                                      <FormLabel>Password</FormLabel>
-                                      <FormControl>
-                                          <Input type="password" placeholder="••••••••" {...field} />
-                                      </FormControl>
-                                      <FormMessage />
-                                  </FormItem>
-                              )}
-                          />
-                      </CardContent>
-                  </TabsContent>
-                  <CardFooter className="flex flex-col gap-4">
-                    <Button type="submit" className="w-full" disabled={isLoading}>
-                      {isLoading ? 'Processing...' : (activeTab === 'signin' ? 'Sign In' : 'Sign Up')}
-                    </Button>
-                  </CardFooter>
-                </form>
-              </Form>
-          </Tabs>
+            <CardHeader className="text-center">
+              <Logo className="mx-auto h-12 w-12 text-primary" />
+              <CardTitle className="text-2xl font-headline mt-4">SRD: Minden Ops</CardTitle>
+              <CardDescription>Please sign in to continue</CardDescription>
+            </CardHeader>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)}>
+                <CardContent className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="username"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Username</FormLabel>
+                          <FormControl>
+                            <Input type="text" placeholder="e.g., superuser" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Password</FormLabel>
+                          <FormControl>
+                            <Input type="password" placeholder="••••••••" {...field} />
+                          </FormControl>
+                           <div className="text-right">
+                              <Button variant="link" size="sm" type="button" onClick={handleForgotPassword} className="h-auto p-0 text-xs">
+                                 Forgot password?
+                              </Button>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </CardContent>
+                <CardFooter className="flex flex-col gap-4">
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading ? 'Processing...' : 'Sign In'}
+                  </Button>
+                </CardFooter>
+              </form>
+            </Form>
           <CardFooter className="flex-col items-center justify-center gap-3 text-xs text-center text-muted-foreground pb-4">
             <p className="px-6">By signing in, you acknowledge and agree to our <PrivacyPolicy /></p>
           </CardFooter>
@@ -262,5 +123,3 @@ export default function LoginPage() {
     </>
   );
 }
-
-    

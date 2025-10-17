@@ -4,9 +4,9 @@
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import { FirebaseApp } from 'firebase/app';
 import { Firestore } from 'firebase/firestore';
-import { Auth, User, onAuthStateChanged } from 'firebase/auth';
+import { Auth, User, onIdTokenChanged } from 'firebase/auth';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
-import { type UserRole, getRoleFromEmail } from '@/lib/roles';
+import { type UserRole } from '@/lib/roles';
 
 interface FirebaseProviderProps {
   children: ReactNode;
@@ -15,8 +15,17 @@ interface FirebaseProviderProps {
   auth: Auth;
 }
 
+// This will be our simplified user object for the custom auth system.
+// The standard Firebase `User` object is less relevant here.
+interface CustomUser {
+  uid: string;
+  username: string;
+  role: UserRole | null;
+  // any other claims from the custom token can be added here
+}
+
 interface UserAuthState {
-  user: User | null;
+  user: CustomUser | null;
   isUserLoading: boolean;
   userError: Error | null;
   role: UserRole | null;
@@ -27,7 +36,7 @@ export interface FirebaseContextState {
   firebaseApp: FirebaseApp | null;
   firestore: Firestore | null;
   auth: Auth | null;
-  user: User | null;
+  user: CustomUser | null;
   isUserLoading: boolean;
   userError: Error | null;
   role: UserRole | null;
@@ -37,14 +46,14 @@ export interface FirebaseServicesAndUser {
   firebaseApp: FirebaseApp;
   firestore: Firestore;
   auth: Auth;
-  user: User | null;
+  user: CustomUser | null;
   isUserLoading: boolean;
   userError: Error | null;
   role: UserRole | null;
 }
 
 export interface UserHookResult {
-  user: User | null;
+  user: CustomUser | null;
   isUserLoading: boolean;
   userError: Error | null;
   role: UserRole | null;
@@ -53,30 +62,37 @@ export interface UserHookResult {
 export const FirebaseContext = createContext<FirebaseContextState | undefined>(undefined);
 
 function useFirebaseAuth(auth: Auth): UserAuthState {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<CustomUser | null>(null);
   const [isUserLoading, setIsUserLoading] = useState(true);
   const [userError, setUserError] = useState<Error | null>(null);
   const [role, setRole] = useState<UserRole | null>(null);
-  const [claims, setClaims] = useState<any>(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onIdTokenChanged(auth, async (firebaseUser) => {
       setIsUserLoading(true);
-      if (user) {
-        setUser(user);
+      if (firebaseUser) {
         try {
-          const idTokenResult = await user.getIdTokenResult();
-          setRole(idTokenResult.claims.role as UserRole || null);
-          setClaims(idTokenResult.claims);
+          const idTokenResult = await firebaseUser.getIdTokenResult();
+          const claims = idTokenResult.claims;
+          
+          const customUser: CustomUser = {
+            uid: firebaseUser.uid,
+            username: claims.username as string || 'N/A', // get username from claims
+            role: claims.role as UserRole || null,
+          };
+          
+          setUser(customUser);
+          setRole(customUser.role);
+
         } catch (error) {
           console.error("Error fetching user claims:", error);
           setUserError(error as Error);
+          setUser(null);
           setRole(null);
         }
       } else {
         setUser(null);
         setRole(null);
-        setClaims(null);
       }
       setIsUserLoading(false);
     }, (error) => {
