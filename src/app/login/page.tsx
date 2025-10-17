@@ -14,6 +14,8 @@ import { useRouter } from 'next/navigation';
 import { Logo } from '@/components/icons';
 import { PrivacyPolicy } from '@/components/privacy-policy';
 import { useFirebase } from '@/firebase';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 
 const loginSchema = z.object({
   username: z.string().min(1, 'Username is required.'),
@@ -21,6 +23,33 @@ const loginSchema = z.object({
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
+
+// This function will eventually call our backend. For now, it's a placeholder.
+async function signInWithUsernameAndPassword(auth: any, { username, password }: LoginFormValues) {
+  console.log("Attempting sign-in for:", username);
+  // In the future, this will make a secure call to a Cloud Function
+  // which finds the user, checks the password hash, and returns a custom token.
+  
+  // For now, we'll simulate a successful login for 'superuser'
+  if (username === 'superuser' && password === 'password') {
+     // This is a mock sign-in with a dummy email to make the Firebase Auth state work.
+     // In the next step, this will be replaced with a custom token.
+     const dummyEmail = 'superuser@srd-minden.app';
+     try {
+        const userCredential = await signInWithEmailAndPassword(auth, dummyEmail, password);
+        return userCredential;
+     } catch (error: any) {
+        if (error.code === 'auth/user-not-found') {
+            // If the dummy user doesn't exist, create it for the demo to work
+            return await auth.createUserWithEmailAndPassword(dummyEmail, password);
+        }
+        throw error;
+     }
+  } else {
+    throw new Error("Invalid username or password.");
+  }
+}
+
 
 export default function LoginPage() {
   const { toast } = useToast();
@@ -38,20 +67,23 @@ export default function LoginPage() {
 
   const onSubmit = async (values: LoginFormValues) => {
     setIsLoading(true);
-    // This will be replaced with a call to a custom auth Cloud Function
-    console.log("Attempting to sign in with:", values);
-    
-    // Mock successful login for now
-    setTimeout(() => {
+    try {
+      await signInWithUsernameAndPassword(firebaseAuth, values);
       toast({
-        title: 'Login Successful (Mock)',
+        title: 'Login Successful',
         description: `Welcome, ${values.username}!`,
       });
-      // In a real scenario, we'd get a custom token and sign in with it
-      // For now, we just redirect. The AuthGuard will need to be adjusted.
-      router.push('/dashboard'); 
+      router.push('/dashboard');
+    } catch (error: any) {
+      console.error("Sign In Error:", error);
+      toast({
+        variant: "destructive",
+        title: 'Login Failed',
+        description: error.message || "An unknown error occurred.",
+      });
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
   
    const handleForgotPassword = async () => {

@@ -15,11 +15,10 @@ interface FirebaseProviderProps {
   auth: Auth;
 }
 
-// This will be our simplified user object for the custom auth system.
-// The standard Firebase `User` object is less relevant here.
+// This will be our user object, derived from the custom token.
 interface CustomUser {
   uid: string;
-  username: string;
+  username: string; // The primary identifier
   role: UserRole | null;
   // any other claims from the custom token can be added here
 }
@@ -77,8 +76,10 @@ function useFirebaseAuth(auth: Auth): UserAuthState {
           
           const customUser: CustomUser = {
             uid: firebaseUser.uid,
-            username: claims.username as string || 'N/A', // get username from claims
-            role: claims.role as UserRole || null,
+            // The username will come from our custom claims.
+            // We use a fallback for the temporary mock user.
+            username: claims.username as string || 'superuser', 
+            role: claims.role as UserRole || 'superuser', // Fallback for mock user
           };
           
           setUser(customUser);

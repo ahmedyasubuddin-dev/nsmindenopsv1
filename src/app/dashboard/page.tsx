@@ -35,9 +35,8 @@ type ActivityItem = {
 
 export default function DashboardPage() {
     const { firestore } = useFirebase();
-    const { user, isUserLoading } = useUser();
+    const { user, isUserLoading, role } = useUser();
     const [isClient, setIsClient] = useState(false);
-    const role = getRoleFromEmail(user?.email);
 
     const canView = useCallback((permission: any) => hasPermission(role, permission), [role]);
 
@@ -278,5 +277,3 @@ export default function DashboardPage() {
     </div>
   )
 }
-
-    
