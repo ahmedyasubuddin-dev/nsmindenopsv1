@@ -84,7 +84,7 @@ export function GraphicsReportForm() {
     
     const tasksQuery = useMemoFirebase(() => {
       if (isUserLoading) return null;
-      return query(collection(firestore, 'graphics-tasks'));
+      return query(collection(firestore, 'graphics_tasks'));
     }, [firestore, isUserLoading]);
     
     const { data: tasks, isLoading: isLoadingTasks } = useCollection<Task>(tasksQuery);
@@ -303,3 +303,5 @@ export function GraphicsReportForm() {
         </Form>
     )
 }
+
+    

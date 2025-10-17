@@ -54,7 +54,7 @@ export default function TapeheadsStatusPage() {
   
   const canView = (permission: any) => hasPermission(role, permission);
 
-  const tapeheadsQuery = useMemoFirebase(() => (isUserLoading || !canView('nav:report:tapeheads')) ? null : query(collection(firestore, 'tapehead_entries')), [firestore, isUserLoading, role]);
+  const tapeheadsQuery = useMemoFirebase(() => (isUserLoading || !canView('nav:report:tapeheads')) ? null : query(collection(firestore, 'tapeheads_submissions')), [firestore, isUserLoading, role]);
   const { data: tapeheadsSubmissions, isLoading: isLoadingTapeheads } = useCollection<Report>(tapeheadsQuery);
 
   const filmsQuery = useMemoFirebase(() => (isUserLoading || !canView('nav:report:films')) ? null : query(collection(firestore, 'films_reports')), [firestore, isUserLoading, role]);

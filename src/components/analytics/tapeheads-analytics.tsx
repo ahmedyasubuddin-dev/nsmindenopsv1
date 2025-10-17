@@ -57,7 +57,7 @@ export function TapeheadsAnalytics() {
     operatorName: '',
   });
 
-  const reportsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'tapeheads-submissions')), [firestore, isUserLoading]);
+  const reportsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'tapeheads_submissions')), [firestore, isUserLoading]);
   const { data: allData, isLoading: loading } = useCollection<Report>(reportsQuery);
 
   const handleFilterChange = (key: keyof typeof filters, value: string) => {
@@ -306,3 +306,5 @@ export function TapeheadsAnalytics() {
     </div>
   )
 }
+
+    

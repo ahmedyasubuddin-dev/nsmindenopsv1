@@ -18,7 +18,7 @@ import { collection, query } from 'firebase/firestore';
 export function GraphicsAnalytics() {
     const { firestore } = useFirebase();
     const [date, setDate] = useState<Date | undefined>(new Date());
-    const tasksQuery = useMemoFirebase(() => query(collection(firestore, 'graphics-tasks')), [firestore]);
+    const tasksQuery = useMemoFirebase(() => query(collection(firestore, 'graphics_tasks')), [firestore]);
     const { data: allTasks, isLoading: loading } = useCollection<GraphicsTask>(tasksQuery);
     
     const [notifiedTags, setNotifiedTags] = useState<Set<string>>(new Set());
@@ -214,3 +214,5 @@ export function GraphicsAnalytics() {
         </div>
     );
 }
+
+    

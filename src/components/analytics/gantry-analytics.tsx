@@ -52,7 +52,7 @@ export function GantryAnalytics() {
 
   const gantryQuery = useMemoFirebase(() => {
     if (isUserLoading) return null;
-    return query(collection(firestore, 'gantry-reports'))
+    return query(collection(firestore, 'gantry_reports'))
   }, [firestore, isUserLoading]);
   const { data: allReports, isLoading: loading } = useCollection<GantryReport>(gantryQuery);
 
@@ -388,3 +388,5 @@ export function GantryAnalytics() {
     </div>
   )
 }
+
+    

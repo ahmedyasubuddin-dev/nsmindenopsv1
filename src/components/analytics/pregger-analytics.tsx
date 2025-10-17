@@ -45,7 +45,7 @@ export function PreggerAnalytics() {
 
   const preggerQuery = useMemoFirebase(() => {
     if (isUserLoading) return null;
-    return query(collection(firestore, 'pregger-reports'))
+    return query(collection(firestore, 'pregger_reports'))
   }, [firestore, isUserLoading]);
   const { data: allData, isLoading: loading } = useCollection<PreggerReport>(preggerQuery);
 
@@ -268,3 +268,5 @@ export function PreggerAnalytics() {
     </div>
   )
 }
+
+    

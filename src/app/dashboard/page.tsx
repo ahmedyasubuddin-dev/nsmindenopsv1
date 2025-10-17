@@ -40,7 +40,7 @@ export default function DashboardPage() {
 
     const canView = useCallback((permission: any) => hasPermission(role, permission), [role]);
 
-    const tapeheadsQuery = useMemoFirebase(() => (isUserLoading || !canView('nav:report:tapeheads')) ? null : query(collection(firestore, 'tapehead_entries')), [firestore, isUserLoading, role]);
+    const tapeheadsQuery = useMemoFirebase(() => (isUserLoading || !canView('nav:report:tapeheads')) ? null : query(collection(firestore, 'tapeheads_submissions')), [firestore, isUserLoading, role]);
     const { data: tapeheadsSubmissions, isLoading: isLoadingTapeheads } = useCollection<Report>(tapeheadsQuery);
 
     const filmsQuery = useMemoFirebase(() => (isUserLoading || !canView('nav:report:films')) ? null : query(collection(firestore, 'films_reports')), [firestore, isUserLoading, role]);
@@ -49,7 +49,7 @@ export default function DashboardPage() {
     const gantryQuery = useMemoFirebase(() => (isUserLoading || !canView('nav:report:gantry')) ? null : query(collection(firestore, 'gantry_reports')), [firestore, isUserLoading, role]);
     const { data: gantryReportsData, isLoading: isLoadingGantry } = useCollection<GantryReport>(gantryQuery);
 
-    const graphicsQuery = useMemoFirebase(() => (isUserLoading || !canView('nav:report:graphics')) ? null : query(collection(firestore, 'graphics_reports')), [firestore, isUserLoading, role]);
+    const graphicsQuery = useMemoFirebase(() => (isUserLoading || !canView('nav:report:graphics')) ? null : query(collection(firestore, 'graphics_tasks')), [firestore, isUserLoading, role]);
     const { data: graphicsTasksData, isLoading: isLoadingGraphics } = useCollection<GraphicsTask>(graphicsQuery);
 
     const inspectionsQuery = useMemoFirebase(() => (isUserLoading || !canView('nav:qc')) ? null : query(collection(firestore, 'qc_inspections')), [firestore, isUserLoading, role]);
@@ -277,3 +277,5 @@ export default function DashboardPage() {
     </div>
   )
 }
+
+    

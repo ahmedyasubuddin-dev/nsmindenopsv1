@@ -127,15 +127,15 @@
       "schema": { "$ref": "#/entities/PreggerReport" },
       "description": "Stores reports from the Pregger department."
     },
-    "/tapeheads-submissions/{docId}": {
+    "/tapeheads_submissions/{docId}": {
       "schema": { "$ref": "#/entities/TapeheadEntry" },
       "description": "Stores entries from Tapehead operators."
     },
-    "/tapehead-reviews/{docId}": {
+    "/tapehead_reviews/{docId}": {
       "schema": { "$ref": "#/entities/TapeheadReview" },
       "description": "Stores reviews of Tapehead entries."
     },
-    "/gantry-reports/{docId}": {
+    "/gantry_reports/{docId}": {
       "schema": { "$ref": "#/entities/GantryReport" },
       "description": "Stores reports from the Gantry department."
     },
@@ -143,7 +143,7 @@
       "schema": { "$ref": "#/entities/FilmsReport" },
       "description": "Stores reports from the Films department."
     },
-    "/graphics-tasks/{docId}": {
+    "/graphics_tasks/{docId}": {
       "schema": { "$ref": "#/entities/GraphicsReport" },
       "description": "Stores tasks for the Graphics department."
     },
@@ -151,11 +151,11 @@
       "schema": { "$ref": "#/entities/QcInspection" },
       "description": "Stores QC inspection reports."
     },
-    "/analytics-snapshots/{docId}": {
+    "/analytics_snapshots/{docId}": {
       "schema": { "$ref": "#/entities/AnalyticsSnapshot" },
       "description": "Stores aggregated analytics data."
     },
-    "/sail-status/{docId}": {
+    "/sail_status/{docId}": {
       "schema": { "$ref": "#/entities/SailStatus" },
       "description": "Stores sail status information."
     },
@@ -168,3 +168,5 @@
     "providers": ["password"]
   }
 }
+
+    
