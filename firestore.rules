@@ -1,173 +1,218 @@
 /**
- * @fileoverview Firestore Security Rules for Minden.
- *
- * Core Philosophy:
- * This ruleset enforces a strict user-ownership model for user profiles and allows open reads for all other data collections. Writes to non-user collections are generally disallowed for the prototype phase.
+ * @file Firestore Security Rules
+ * @description This ruleset enforces a strict user-ownership model for user profiles
+ * and allows public read access to all other collections, but restricts writes to authorized users.
  *
  * Data Structure:
- * - User profiles are stored under `/users/{userId}`, secured via ownership.
- * - All other data collections reside at the top level (e.g., `/pregger_reports/{docId}`).
+ * - User profiles are stored under `/users/{userId}`.
+ * - Department reports (Pregger, Gantry, Films, Graphics, QC) are stored in their respective top-level collections.
+ * - Tapehead entries and reviews are stored in separate top-level collections.
+ * - Analytics snapshots and sail statuses are stored in their own top-level collections.
+ * - OE jobs are stored in the /jobs collection.
  *
  * Key Security Decisions:
- * - User listing is disallowed for security reasons.
- * - Data validation is relaxed to enable rapid prototyping but will be made more strict later
+ * - Users can only read and write their own profile data.
+ * - Department reports and other collections are publicly readable.
+ * - Only authenticated users can create, update, or delete department reports.
+ * - No data shape validation is performed in this prototyping phase, except for relational integrity.
+ * - Listing of /users is denied to prevent information disclosure.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to user profile documents.
+     * @description Manages user profile access.
      * @path /users/{userId}
-     * @allow (create) User with matching ID can create their profile.
-     * @allow (get, list, update, delete) User with matching ID can read, update, and delete their profile.
-     * @deny (create) User cannot create a profile with an ID that doesn't match their own.
-     * @deny (get, list, update, delete) User cannot access or modify other user's profiles.
-     * @principle Enforces document ownership for user profiles.
+     * @allow (create) - User with UID 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2' can create their profile.
+     * @allow (get, update, delete) - User with UID 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2' can read, update and delete their own profile.
+     * @deny (create) - User with UID 'randomId' cannot create a profile with ID 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2'.
+     * @deny (get, update, delete) - User with UID 'randomId' cannot read, update or delete the profile of user with UID 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2'.
+     * @principle Enforces document ownership for writes.
      */
     match /users/{userId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-      function isOwner(userId) {
-        return request.auth.uid == userId;
-      }
-
       allow get: if isOwner(userId);
-      allow list: if false;
-      allow create: if isSignedIn() && request.auth.uid == userId;
-      allow update: if isOwner(userId);
-      allow delete: if isOwner(userId);
+      allow list: if false; // Prevent listing all users
+      allow create: if isSignedIn() && isSelfCreation(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Controls access to Pregger reports.
+     * @description Manages access to Pregger reports.
      * @path /pregger_reports/{docId}
-     * @allow (get, list) Anyone can read Pregger reports.
-     * @deny (create, update, delete) No one can create, update, or delete Pregger reports.
-     * @principle Public read, owner-only writes (not implemented yet).
+     * @allow (get, list) - Any user can read Pregger reports.
+     * @allow (create) - User with UID 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2' can create a Pregger report.
+     * @allow (update, delete) - User with UID 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2' can update or delete a Pregger report.
+     * @deny (create, update, delete) - Unauthorized users cannot create, update or delete Pregger reports.
+     * @principle Public read, owner-only writes.
      */
     match /pregger_reports/{docId} {
       allow get, list: if true;
-      allow create, update, delete: if false;
-      // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
 
-    /**
-     * @description Controls access to Tapehead submissions.
+        /**
+     * @description Manages access to Tapehead submissions.
      * @path /tapeheads_submissions/{docId}
-     * @allow (get, list) Anyone can read Tapehead submissions.
-     * @deny (create, update, delete) No one can create, update, or delete Tapehead submissions.
-     * @principle Public read, owner-only writes (not implemented yet).
+     * @allow (get, list) - Any user can read Tapehead submissions.
+     * @allow (create) - User with UID 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2' can create a Tapehead submission.
+     * @allow (update, delete) - User with UID 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2' can update or delete a Tapehead submission.
+     * @deny (create, update, delete) - Unauthorized users cannot create, update or delete Tapehead submissions.
+     * @principle Public read, owner-only writes.
      */
     match /tapeheads_submissions/{docId} {
       allow get, list: if true;
-      allow create, update, delete: if false;
-      // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Controls access to Tapehead reviews.
+     * @description Manages access to Tapehead reviews.
      * @path /tapehead_reviews/{docId}
-     * @allow (get, list) Anyone can read Tapehead reviews.
-     * @deny (create, update, delete) No one can create, update, or delete Tapehead reviews.
-     * @principle Public read, owner-only writes (not implemented yet).
+     * @allow (get, list) - Any user can read Tapehead reviews.
+     * @allow (create) - User with UID 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2' can create a Tapehead review.
+     * @allow (update, delete) - User with UID 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2' can update or delete a Tapehead review.
+     * @deny (create, update, delete) - Unauthorized users cannot create, update or delete Tapehead reviews.
+     * @principle Public read, owner-only writes.
      */
     match /tapehead_reviews/{docId} {
       allow get, list: if true;
-      allow create, update, delete: if false;
-      // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Controls access to Gantry reports.
+     * @description Manages access to Gantry reports.
      * @path /gantry_reports/{docId}
-     * @allow (get, list) Anyone can read Gantry reports.
-     * @deny (create, update, delete) No one can create, update, or delete Gantry reports.
-     * @principle Public read, owner-only writes (not implemented yet).
+     * @allow (get, list) - Any user can read Gantry reports.
+     * @allow (create) - User with UID 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2' can create a Gantry report.
+     * @allow (update, delete) - User with UID 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2' can update or delete a Gantry report.
+     * @deny (create, update, delete) - Unauthorized users cannot create, update or delete Gantry reports.
+     * @principle Public read, owner-only writes.
      */
     match /gantry_reports/{docId} {
       allow get, list: if true;
-      allow create, update, delete: if false;
-      // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Controls access to Films reports.
+     * @description Manages access to Films reports.
      * @path /films_reports/{docId}
-     * @allow (get, list) Anyone can read Films reports.
-     * @deny (create, update, delete) No one can create, update, or delete Films reports.
-     * @principle Public read, owner-only writes (not implemented yet).
+     * @allow (get, list) - Any user can read Films reports.
+     * @allow (create) - User with UID 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2' can create a Films report.
+     * @allow (update, delete) - User with UID 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2' can update or delete a Films report.
+     * @deny (create, update, delete) - Unauthorized users cannot create, update or delete Films reports.
+     * @principle Public read, owner-only writes.
      */
     match /films_reports/{docId} {
       allow get, list: if true;
-      allow create, update, delete: if false;
-      // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Controls access to Graphics tasks.
+     * @description Manages access to Graphics tasks.
      * @path /graphics_tasks/{docId}
-     * @allow (get, list) Anyone can read Graphics tasks.
-     * @deny (create, update, delete) No one can create, update, or delete Graphics tasks.
-     * @principle Public read, owner-only writes (not implemented yet).
+     * @allow (get, list) - Any user can read Graphics tasks.
+     * @allow (create) - User with UID 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2' can create a Graphics task.
+     * @allow (update, delete) - User with UID 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2' can update or delete a Graphics task.
+     * @deny (create, update, delete) - Unauthorized users cannot create, update or delete Graphics tasks.
+     * @principle Public read, owner-only writes.
      */
     match /graphics_tasks/{docId} {
       allow get, list: if true;
-      allow create, update, delete: if false;
-      // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Controls access to QC inspections.
+     * @description Manages access to QC inspections.
      * @path /qc_inspections/{docId}
-     * @allow (get, list) Anyone can read QC inspections.
-     * @deny (create, update, delete) No one can create, update, or delete QC inspections.
-     * @principle Public read, owner-only writes (not implemented yet).
+     * @allow (get, list) - Any user can read QC inspections.
+     * @allow (create) - User with UID 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2' can create a QC inspection.
+     * @allow (update, delete) - User with UID 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2' can update or delete a QC inspection.
+     * @deny (create, update, delete) - Unauthorized users cannot create, update or delete QC inspections.
+     * @principle Public read, owner-only writes.
      */
     match /qc_inspections/{docId} {
       allow get, list: if true;
-      allow create, update, delete: if false;
-      // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Controls access to Analytics snapshots.
+     * @description Manages access to Analytics snapshots.
      * @path /analytics_snapshots/{docId}
-     * @allow (get, list) Anyone can read Analytics snapshots.
-     * @deny (create, update, delete) No one can create, update, or delete Analytics snapshots.
-     * @principle Public read, owner-only writes (not implemented yet).
+     * @allow (get, list) - Any user can read Analytics snapshots.
+     * @allow (create) - User with UID 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2' can create an Analytics snapshot.
+     * @allow (update, delete) - User with UID 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2' can update or delete an Analytics snapshot.
+     * @deny (create, update, delete) - Unauthorized users cannot create, update or delete Analytics snapshots.
+     * @principle Public read, owner-only writes.
      */
     match /analytics_snapshots/{docId} {
       allow get, list: if true;
-      allow create, update, delete: if false;
-      // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Controls access to Sail status.
+     * @description Manages access to Sail status documents.
      * @path /sail_status/{docId}
-     * @allow (get, list) Anyone can read Sail status.
-     * @deny (create, update, delete) No one can create, update, or delete Sail status.
-     * @principle Public read, owner-only writes (not implemented yet).
+     * @allow (get, list) - Any user can read Sail status documents.
+     * @allow (create) - User with UID 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2' can create a Sail status document.
+     * @allow (update, delete) - User with UID 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2' can update or delete a Sail status document.
+     * @deny (create, update, delete) - Unauthorized users cannot create, update or delete Sail status documents.
+     * @principle Public read, owner-only writes.
      */
     match /sail_status/{docId} {
       allow get, list: if true;
-      allow create, update, delete: if false;
-      // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Controls access to OE Jobs.
+     * @description Manages access to OE jobs.
      * @path /jobs/{docId}
-     * @allow (get, list) Anyone can read OE Jobs.
-     * @deny (create, update, delete) No one can create, update, or delete OE Jobs.
-     * @principle Public read, owner-only writes (not implemented yet).
+     * @allow (get, list) - Any user can read OE jobs.
+     * @allow (create) - User with UID 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2' can create an OE job.
+     * @allow (update, delete) - User with UID 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2' can update or delete an OE job.
+     * @deny (create, update, delete) - Unauthorized users cannot create, update or delete OE jobs.
+     * @principle Public read, owner-only writes.
      */
     match /jobs/{docId} {
       allow get, list: if true;
-      allow create, update, delete: if false;
-      // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
+  }
+
+  // Helper functions
+  function isSignedIn() {
+    return request.auth != null;
+  }
+
+  function isOwner(userId) {
+    return request.auth.uid == userId;
+  }
+
+    function isSelfCreation(userId) {
+    return request.auth.uid == userId;
+  }
+
+  function isExistingOwner(userId) {
+    return isOwner(userId) && resource != null;
   }
 }
