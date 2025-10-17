@@ -8,9 +8,11 @@
         "email": { "type": "string", "format": "email" },
         "displayName": { "type": "string" },
         "role": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "lastLoginAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["email", "role", "createdAt"]
+      "required": ["email", "role", "active", "createdAt"]
     },
     "PreggerReport": {
       "title": "Pregger Report",
@@ -33,6 +35,18 @@
         "operatorName": { "type": "string" },
         "workItems": { "type": "array", "items": { "type": "object" } }
       }
+    },
+    "TapeheadReview": {
+        "title": "Tapehead Review",
+        "type": "object",
+        "description": "A shift lead's review and finalization of operator submissions.",
+        "properties": {
+            "date": { "type": "string", "format": "date" },
+            "shift": { "type": "number" },
+            "shiftLeadName": { "type": "string" },
+            "aiSummary": { "type": "string" },
+            "finalComments": { "type": "string" }
+        }
     },
     "GantryReport": {
       "title": "Gantry Report",

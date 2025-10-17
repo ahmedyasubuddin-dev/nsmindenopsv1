@@ -169,11 +169,13 @@ function MainSidebar() {
   const { title } = useAppTitle();
   const { user, role } = useUser();
 
-  const [isReportsOpen, setReportsOpen] = React.useState(pathname.startsWith('/report'));
-  const [isLeadFuncsOpen, setLeadFuncsOpen] = React.useState(
-      pathname.startsWith("/analytics") || pathname.startsWith('/review') || pathname.startsWith('/file-processing') || pathname.startsWith('/qc') || pathname.startsWith('/status')
-  );
-  const [isDeptAnalyticsOpen, setDeptAnalyticsOpen] = React.useState(pathname.startsWith('/analytics'));
+  const isReportEntryActive = pathname.startsWith('/report');
+  const isLeadFunctionsActive = pathname.startsWith('/analytics') || pathname.startsWith('/review') || pathname.startsWith('/file-processing') || pathname.startsWith('/qc') || pathname.startsWith('/status');
+  const isDeptAnalyticsActive = pathname.startsWith('/analytics');
+  
+  const [isReportsOpen, setReportsOpen] = React.useState(isReportEntryActive);
+  const [isLeadFuncsOpen, setLeadFuncsOpen] = React.useState(isLeadFunctionsActive);
+  const [isDeptAnalyticsOpen, setDeptAnalyticsOpen] = React.useState(isDeptAnalyticsActive);
 
   const can = (permission: any) => hasPermission(role, permission);
   
@@ -206,7 +208,7 @@ function MainSidebar() {
 
           {canSeeAnyReports && (
              <SidebarMenuItem>
-                <SidebarMenuButton onClick={() => setReportsOpen(!isReportsOpen)} isActive={pathname.startsWith("/report")}>
+                <SidebarMenuButton onClick={() => setReportsOpen(!isReportsOpen)} isActive={isReportEntryActive}>
                   <FileText />
                   <span>Report Entry</span>
                   <ChevronDown className={cn("ml-auto h-4 w-4 transition-transform duration-200", isReportsOpen && "rotate-180")} />
@@ -227,7 +229,7 @@ function MainSidebar() {
 
            {canSeeLeadFunctions && (
               <SidebarMenuItem>
-                <SidebarMenuButton onClick={() => setLeadFuncsOpen(!isLeadFuncsOpen)} isActive={isLeadFuncsOpen}>
+                <SidebarMenuButton onClick={() => setLeadFuncsOpen(!isLeadFuncsOpen)} isActive={isLeadFunctionsActive}>
                   <AreaChart />
                   <span>Lead Functions</span>
                   <ChevronDown className={cn("ml-auto h-4 w-4 transition-transform duration-200", isLeadFuncsOpen && "rotate-180")}/>

@@ -1,16 +1,16 @@
 
 export type UserRole =
-  | 'Superuser'
-  | 'B2 Supervisor'
-  | 'B1 Supervisor'
-  | 'Quality Manager'
-  | 'Management'
-  | 'Pregger Lead'
-  | 'Tapehead Operator'
-  | 'Tapehead Lead'
-  | 'Gantry Lead'
-  | 'Films Lead'
-  | 'Graphics Lead'
+  | 'superuser'
+  | 'b2_supervisor'
+  | 'b1_supervisor'
+  | 'quality_manager'
+  | 'management'
+  | 'pregger_lead'
+  | 'tapehead_operator'
+  | 'tapehead_lead'
+  | 'gantry_lead'
+  | 'films_lead'
+  | 'graphics_lead'
   | null;
 
 export type Permission = 
@@ -36,78 +36,72 @@ export type Permission =
 const allAnalytics: Permission[] = [
     'nav:analytics',
     'nav:analytics:pregger',
-    'nav:analytics:tapeheads',
+    'nav_analytics_tapeheads',
     'nav:analytics:gantry',
     'nav:analytics:films',
     'nav:analytics:graphics',
 ];
 
 const roles: Record<Exclude<UserRole, null>, Permission[]> = {
-    'Superuser': [
+    'superuser': [
         'nav:dashboard',
         'nav:report:pregger', 'nav:report:tapeheads', 'nav:report:gantry', 'nav:report:films', 'nav:report:graphics',
         'nav:review:tapeheads',
-        ...allAnalytics,
+        'nav:analytics', 'nav:analytics:pregger', 'nav:analytics:tapeheads', 'nav:analytics:gantry', 'nav:analytics:films', 'nav-analytics:graphics',
         'nav:qc',
         'nav:status',
         'nav:file-processing',
         'nav:admin',
     ],
-    'B2 Supervisor': [
+    'b2_supervisor': [
         'nav:dashboard',
         'nav:report:pregger', 
         'nav:report:tapeheads',
         'nav:review:tapeheads',
-        ...allAnalytics,
+        'nav:analytics', 'nav:analytics:pregger', 'nav:analytics:tapeheads',
         'nav:status',
     ],
-    'B1 Supervisor': [
+    'b1_supervisor': [
         'nav:dashboard',
         'nav:report:gantry', 
         'nav:report:films', 
         'nav:report:graphics',
-        ...allAnalytics,
+        'nav:analytics', 'nav:analytics:gantry', 'nav:analytics:films', 'nav:analytics:graphics',
         'nav:status',
     ],
-    'Quality Manager': [
+    'quality_manager': [
         'nav:dashboard',
         'nav:qc',
         'nav:status',
-        ...allAnalytics,
+        'nav:analytics',
     ],
-    'Management': [
+    'management': [
         'nav:dashboard',
         'nav:status',
-        ...allAnalytics,
+        'nav:analytics',
     ],
-    'Pregger Lead': ['nav:dashboard', 'nav:report:pregger', 'nav:status'],
-    'Tapehead Operator': ['nav:dashboard', 'nav:report:tapeheads'],
-    'Tapehead Lead': ['nav:dashboard', 'nav:report:tapeheads', 'nav:review:tapeheads', 'nav:status'],
-    'Gantry Lead': ['nav:dashboard', 'nav:report:gantry', 'nav:status'],
-    'Films Lead': ['nav:dashboard', 'nav:report:films', 'nav:status'],
-    'Graphics Lead': ['nav:dashboard', 'nav:report:graphics', 'nav:status'],
+    'pregger_lead': ['nav:dashboard', 'nav:report:pregger', 'nav:status'],
+    'tapehead_operator': ['nav:dashboard', 'nav:report:tapeheads'],
+    'tapehead_lead': ['nav:dashboard', 'nav:report:tapeheads', 'nav:review:tapeheads', 'nav:status'],
+    'gantry_lead': ['nav:dashboard', 'nav:report:gantry', 'nav:status'],
+    'films_lead': ['nav:dashboard', 'nav:report:films', 'nav:status'],
+    'graphics_lead': ['nav:dashboard', 'nav:report:graphics', 'nav:status'],
 };
 
 export function hasPermission(role: UserRole, permission: Permission): boolean {
     if (!role) return false;
+    // Superuser has all permissions
+    if (role === 'superuser') return true;
+    
+    // Check for parent analytics permission
+    if (permission.startsWith('nav:analytics:') && roles[role]?.includes('nav:analytics')) {
+        return true;
+    }
+
     return roles[role]?.includes(permission) || false;
 }
 
-export const emailToRoleMap: Record<string, UserRole> = {
-    'superuser@ns.com': 'Superuser',
-    'b2_supervisor@ns.com': 'B2 Supervisor',
-    'b1_supervisor@ns.com': 'B1 Supervisor',
-    'quality_manager@ns.com': 'Quality Manager',
-    'management@ns.com': 'Management',
-    'pregger_lead@ns.com': 'Pregger Lead',
-    'tapehead_operator@ns.com': 'Tapehead Operator',
-    'tapehead_lead@ns.com': 'Tapehead Lead',
-    'gantry_lead@ns.com': 'Gantry Lead',
-    'films_lead@ns.com': 'Films Lead',
-    'graphics_lead@ns.com': 'Graphics Lead',
-};
-
+// This function is now deprecated in favor of custom claims, but kept for reference.
 export function getRoleFromEmail(email?: string | null): UserRole {
-    if (!email) return null;
-    return emailToRoleMap[email] || null;
+    return null;
 }

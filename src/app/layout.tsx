@@ -9,11 +9,13 @@ import { FirebaseClientProvider, useUser } from '@/firebase';
 import React, { useEffect }from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Logo } from '@/components/icons';
+import LoginPage from './login/page';
+import { hasPermission } from '@/lib/roles';
 
 const APP_TITLE = 'SRD: Minden Operations';
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { user, isUserLoading } = useUser();
+  const { user, role, isUserLoading } = useUser();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -28,8 +30,34 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
       router.replace('/login');
     } else if (user && isLoginPage) {
       router.replace('/dashboard');
+    } else if (user && !isLoginPage) {
+        // Route protection logic
+        const routePermissionMap: Record<string, any> = {
+            '/admin': 'nav:admin',
+            '/analytics': 'nav:analytics',
+            '/dashboard': 'nav:dashboard',
+            '/file-processing': 'nav:file-processing',
+            '/qc': 'nav:qc',
+            '/report/pregger': 'nav:report:pregger',
+            '/report/tapeheads': 'nav:report:tapeheads',
+            '/report/gantry': 'nav:report:gantry',
+            '/report/films': 'nav:report:films',
+            '/report/graphics': 'nav:report:graphics',
+            '/review': 'nav:review:tapeheads',
+            '/status': 'nav:status',
+        };
+
+        const requiredPermission = Object.keys(routePermissionMap).find(
+            key => pathname.startsWith(key)
+        );
+
+        if (requiredPermission && !hasPermission(role, routePermissionMap[requiredPermission])) {
+            console.warn(`Redirecting: Role '${role}' lacks permission for '${pathname}'`);
+            router.replace('/dashboard');
+        }
     }
-  }, [user, isUserLoading, router, pathname]);
+
+  }, [user, role, isUserLoading, router, pathname]);
 
   if (isUserLoading || (!user && pathname !== '/login')) {
     return (
@@ -40,15 +68,11 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!user && pathname === '/login') {
-    return <>{children}</>;
+  if (!user) {
+    return <LoginPage />;
   }
   
-  if (user) {
-    return <AppLayout>{children}</AppLayout>;
-  }
-
-  return null;
+  return <AppLayout>{children}</AppLayout>;
 }
 
 export default function RootLayout({

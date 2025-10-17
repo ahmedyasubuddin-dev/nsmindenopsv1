@@ -1,298 +1,384 @@
 /**
- * @fileoverview Firestore Security Rules for ShiftView application.
+ * @fileoverview Firestore Security Rules for SRD (Shift Report Dashboard).
  *
  * Core Philosophy:
- * This ruleset enforces a user-ownership model for user profiles and a creator-ownership model for reports and other data entries.
- * It also leverages role-based access control to restrict access to certain functionalities based on the user's role.
+ * This ruleset enforces strict role-based access control to Firestore data,
+ * leveraging Firebase Authentication custom claims ("role" and "active") for authorization.
+ * Only authenticated and active users can access the database.
+ * Access to specific collections and documents is then granted based on the user's assigned role.
+ * Users can only manage their own profiles. A superuser role has full access.
  *
  * Data Structure:
- * - User profiles are stored under `/users/{userId}`.
- * - Reports from different departments (Pregger, Tapehead, Gantry, Films, Graphics) are stored in their respective collections: `/pregger_reports/{preggerReportId}`, `/tapehead_entries/{tapeheadEntryId}`, etc.
- * - Tapehead reviews are stored under `/tapehead_reviews/{tapeheadReviewId}`.
- * - QC inspections are stored under `/qc_inspections/{qcInspectionId}`.
- * - Analytics snapshots are stored under `/analytics_snapshots/{analyticsSnapshotId}`.
- * - Sail statuses are stored under `/sail_status/{sailStatusId}`.
+ * - User profiles are stored in `/users/{userId}`.
+ * - Department-specific reports are stored in top-level collections (e.g., `/pregger_reports/{reportId}`).
+ * - Analytics and Sail Status data are stored in top-level collections (`/analytics_snapshots/{snapshotId}`, `/sail_status/{sailId}`).
  *
  * Key Security Decisions:
- * - Users can only read and write their own user profile.
- * - Reports and other data entries can only be created by authenticated users.
- * - Only the creator of a report or data entry can update or delete it.
- * - List operations are allowed for all collections.
- * - Data validation is minimal in this prototyping phase, focusing on ownership and relational integrity.
+ * - User listing is denied to all roles except the superuser.
+ * - Custom claims are the source of truth for authorization, NOT data in Firestore documents.
+ * - Documents are not listable unless explicitly allowed.
  *
  * Denormalization for Authorization:
- * - Each report/entry includes a `createdBy` field which is set to `request.auth.uid` on creation. This enables ownership checks without additional reads.
+ * - The user's role and active status are stored in custom claims, eliminating the need to read the `/users/{userId}` document for every request.
+ *
+ * Structural Segregation:
+ * - Private user data (profiles) is stored in a separate `/users/{userId}` collection, while public data (reports, analytics) is stored in top-level collections. This ensures that user data is not accidentally exposed.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Manages user profiles, ensuring users can only access their own profile.
+     * @description Checks if the user is signed in and active.
+     * @return {boolean} True if the user is signed in and active, false otherwise.
+     */
+    function isSignedInAndActive() {
+      return request.auth != null && request.auth.token.active == true;
+    }
+
+    /**
+     * @description Checks if the user has the superuser role.
+     * @return {boolean} True if the user has the superuser role, false otherwise.
+     */
+    function isSuperuser() {
+      return isSignedInAndActive() && request.auth.token.role == 'superuser';
+    }
+
+    /**
+     * @description Checks if the user is the owner of the resource.
+     * @param {string} userId The user ID to check against.
+     * @return {boolean} True if the user is the owner, false otherwise.
+     */
+    function isOwner(userId) {
+      return isSignedInAndActive() && request.auth.uid == userId;
+    }
+
+    /**
+     * @description Checks if the user is the owner of the resource and the resource exists.
+     * @param {string} userId The user ID to check against.
+     * @return {boolean} True if the user is the owner and the resource exists, false otherwise.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && exists(resource);
+    }
+
+    /**
+     * @description Checks if the user has the specified role.
+     * @param {string} role The role to check for.
+     * @return {boolean} True if the user has the role, false otherwise.
+     */
+    function hasRole(role) {
+      return isSignedInAndActive() && request.auth.token.role == role;
+    }
+
+    /**
+     * @description Checks if the user has at least one of the specified roles.
+     * @param {array} roles An array of roles to check for.
+     * @return {boolean} True if the user has at least one of the roles, false otherwise.
+     */
+    function hasAnyRole(roles) {
+      return isSignedInAndActive() && roles.hasAny(request.auth.token.role);
+    }
+
+    /**
+     * @description Checks if the user has the 'b2_supervisor' role.
+     * @return {boolean} True if the user has the 'b2_supervisor' role, false otherwise.
+     */
+    function isB2Supervisor() {
+        return hasRole('b2_supervisor');
+    }
+
+    /**
+     * @description Checks if the user has the 'b1_supervisor' role.
+     * @return {boolean} True if the user has the 'b1_supervisor' role, false otherwise.
+     */
+    function isB1Supervisor() {
+        return hasRole('b1_supervisor');
+    }
+
+    /**
+     * @description Checks if the user has the 'quality_manager' role.
+     * @return {boolean} True if the user has the 'quality_manager' role, false otherwise.
+     */
+    function isQualityManager() {
+        return hasRole('quality_manager');
+    }
+
+    /**
+     * @description Checks if the user has the 'management' role.
+     * @return {boolean} True if the user has the 'management' role, false otherwise.
+     */
+    function isManagement() {
+        return hasRole('management');
+    }
+
+    /**
+     * @description Checks if the user has the 'pregger_lead' role.
+     * @return {boolean} True if the user has the 'pregger_lead' role, false otherwise.
+     */
+    function isPreggerLead() {
+        return hasRole('pregger_lead');
+    }
+
+    /**
+     * @description Checks if the user has the 'tapehead_operator' role.
+     * @return {boolean} True if the user has the 'tapehead_operator' role, false otherwise.
+     */
+    function isTapeheadOperator() {
+        return hasRole('tapehead_operator');
+    }
+
+    /**
+     * @description Checks if the user has the 'tapehead_lead' role.
+     * @return {boolean} True if the user has the 'tapehead_lead' role, false otherwise.
+     */
+    function isTapeheadLead() {
+        return hasRole('tapehead_lead');
+    }
+
+    /**
+     * @description Checks if the user has the 'gantry_lead' role.
+     * @return {boolean} True if the user has the 'gantry_lead' role, false otherwise.
+     */
+    function isGantryLead() {
+        return hasRole('gantry_lead');
+    }
+
+    /**
+     * @description Checks if the user has the 'films_lead' role.
+     * @return {boolean} True if the user has the 'films_lead' role, false otherwise.
+     */
+    function isFilmsLead() {
+        return hasRole('films_lead');
+    }
+
+    /**
+     * @description Checks if the user has the 'graphics_lead' role.
+     * @return {boolean} True if the user has the 'graphics_lead' role, false otherwise.
+     */
+    function isGraphicsLead() {
+        return hasRole('graphics_lead');
+    }
+
+
+    /**
+     * @description Manages user profiles.
      * @path /users/{userId}
-     * @allow (create) User with ID 'user123' creates their own profile with matching userId.
-     * @allow (get, update, delete) User with ID 'user123' reads/updates/deletes their own profile.
-     * @deny (create) User with ID 'user123' attempts to create a profile with userId 'otherUser'.
-     * @deny (get, update, delete) User with ID 'user123' attempts to read/update/delete the profile of 'otherUser'.
-     * @principle Enforces document ownership for user profiles.
+     * @allow (create) User with ID 'test_user' can create their profile.
+     * @deny (create) User with ID 'another_user' cannot create a profile with ID 'test_user'.
+     * @allow (get) Any signed in user can read a user's profile.
+     * @deny (list) No one can list user profiles.
+     * @allow (update) User with ID 'test_user' can update their own profile.
+     * @deny (update) User with ID 'another_user' cannot update profile with ID 'test_user'.
+     * @principle Enforces document ownership for writes; only the owner can create, update, or delete their profile.
      */
     match /users/{userId} {
-      function isOwner(userId) {
-        return request.auth != null && request.auth.uid == userId;
-      }
-
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
-
-      allow get: if isOwner(userId);
-      allow list: if false;
+      // Only the user themselves can create their profile. The `create` operation happens before the document exists,
+      // so we must compare against the `request.resource.data` (incoming data).
       allow create: if isOwner(userId);
+      allow get: if isSignedInAndActive();
+      allow list: if isSuperuser();
       allow update: if isExistingOwner(userId);
-      allow delete: if isExistingOwner(userId);
+      allow delete: if isSuperuser();
+    }
+
+     /**
+      * @description Manages reports from the Pregger department.
+      * @path /pregger_reports/{docId}
+      * @allow (create) b2_supervisor and pregger_lead can create pregger reports
+      * @deny (create) b1_supervisor can not create pregger reports
+      * @allow (get, list) Any user can read pregger reports.
+      * @allow (update, delete) b2_supervisor can update and delete pregger reports
+      * @principle Enforces role-based access control.
+      */
+    match /pregger_reports/{docId} {
+      allow create: if isB2Supervisor() || isPreggerLead();
+      allow get: if isSignedInAndActive();
+      allow list: if isSignedInAndActive();
+      allow update: if isB2Supervisor();
+      allow delete: if isB2Supervisor();
     }
 
     /**
-     * @description Manages reports submitted by the Pregger department.
-     * @path /pregger_reports/{preggerReportId}
-     * @allow (create) Authenticated user creates a new Pregger report.  The report includes `createdBy: request.auth.uid`.
-     * @allow (get, list) Any user can read or list Pregger reports.
-     * @deny (update, delete) User attempts to update/delete a Pregger report they did not create.
-     * @principle Enforces creator-ownership for write operations and public read access.
+     * @description Manages entries from Tapehead operators.
+     * @path /tapehead_entries/{docId}
+     * @allow (create) b2_supervisor and tapehead_operator can create tapehead entries
+     * @deny (create) b1_supervisor can not create tapehead entries
+     * @allow (get, list) Any user can read tapehead entries.
+     * @allow (update, delete) b2_supervisor can update and delete tapehead entries
+     * @principle Enforces role-based access control.
      */
-    match /pregger_reports/{preggerReportId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
+    match /tapehead_entries/{docId} {
+      allow create: if isB2Supervisor() || isTapeheadOperator() || isTapeheadLead();
+      allow get: if isSignedInAndActive();
+      allow list: if isSignedInAndActive();
+      allow update: if isB2Supervisor();
+      allow delete: if isB2Supervisor();
+    }
+     /**
+      * @description Manages tapehead submissions.
+      * @path /tapeheads-submissions/{docId}
+      */
+     match /tapeheads-submissions/{docId} {
+          allow create: if isB2Supervisor() || isTapeheadOperator() || isTapeheadLead();
+          allow get: if isSignedInAndActive();
+          allow list: if isSignedInAndActive();
+          allow update: if isB2Supervisor();
+          allow delete: if isB2Supervisor();
+        }
 
-      function isOwner(ownerId) {
-        return request.auth != null && request.auth.uid == ownerId;
-      }
+     /**
+      * @description Manages tapehead reviews.
+      * @path /tapehead_reviews/{docId}
+      */
+     match /tapehead_reviews/{docId} {
+       allow create: if isB2Supervisor();
+       allow get: if isSignedInAndActive();
+       allow list: if isSignedInAndActive();
+       allow update: if isB2Supervisor();
+       allow delete: if isB2Supervisor();
+     }
 
-      function isExistingOwner(ownerId) {
-        return isOwner(ownerId) && resource != null;
-      }
+    /**
+     * @description Manages reports from the Gantry department.
+     * @path /gantry_reports/{docId}
+     * @allow (create) b1_supervisor and gantry_lead can create gantry reports
+     * @deny (create) b2_supervisor can not create gantry reports
+     * @allow (get, list) Any user can read gantry reports.
+     * @allow (update, delete) b1_supervisor can update and delete gantry reports
+     * @principle Enforces role-based access control.
+     */
+    match /gantry_reports/{docId} {
+      allow create: if isB1Supervisor() || isGantryLead();
+      allow get: if isSignedInAndActive();
+      allow list: if isSignedInAndActive();
+      allow update: if isB1Supervisor();
+      allow delete: if isB1Supervisor();
+    }
+    /**
+     * @description Manages reports from the Gantry department.
+     * @path /gantry-reports/{docId}
+     */
+     match /gantry-reports/{docId} {
+          allow create: if isB1Supervisor() || isGantryLead();
+          allow get: if isSignedInAndActive();
+          allow list: if isSignedInAndActive();
+          allow update: if isB1Supervisor();
+          allow delete: if isB1Supervisor();
+        }
 
-      allow get, list: if true;
-      allow create: if isSignedIn() && request.resource.data.createdBy == request.auth.uid;
-      allow update: if isExistingOwner(resource.data.createdBy);
-      allow delete: if isExistingOwner(resource.data.createdBy);
+    /**
+     * @description Manages reports from the Films department.
+     * @path /films_reports/{docId}
+     * @allow (create) b1_supervisor and films_lead can create films reports
+     * @deny (create) b2_supervisor can not create films reports
+     * @allow (get, list) Any user can read films reports.
+     * @allow (update, delete) b1_supervisor can update and delete films reports
+     * @principle Enforces role-based access control.
+     */
+    match /films_reports/{docId} {
+      allow create: if isB1Supervisor() || isFilmsLead();
+      allow get: if isSignedInAndActive();
+      allow list: if isSignedInAndActive();
+      allow update: if isB1Supervisor();
+      allow delete: if isB1Supervisor();
     }
 
     /**
-     * @description Manages data entries submitted by Tapehead operators.
-     * @path /tapehead_entries/{tapeheadEntryId}
-     * @allow (create) Authenticated user creates a new Tapehead entry.  The report includes `createdBy: request.auth.uid`.
-     * @allow (get, list) Any user can read or list Tapehead entries.
-     * @deny (update, delete) User attempts to update/delete a Tapehead entry they did not create.
-     * @principle Enforces creator-ownership for write operations and public read access.
+     * @description Manages tasks for the Graphics department.
+     * @path /graphics_reports/{docId}
+     * @allow (create) b1_supervisor and graphics_lead can create graphics reports
+     * @deny (create) b2_supervisor can not create graphics reports
+     * @allow (get, list) Any user can read graphics reports.
+     * @allow (update, delete) b1_supervisor can update and delete graphics reports
+     * @principle Enforces role-based access control.
      */
-    match /tapehead_entries/{tapeheadEntryId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(ownerId) {
-        return request.auth != null && request.auth.uid == ownerId;
-      }
-
-      function isExistingOwner(ownerId) {
-        return isOwner(ownerId) && resource != null;
-      }
-
-      allow get, list: if true;
-      allow create: if isSignedIn() && request.resource.data.createdBy == request.auth.uid;
-      allow update: if isExistingOwner(resource.data.createdBy);
-      allow delete: if isExistingOwner(resource.data.createdBy);
+    match /graphics_reports/{docId} {
+      allow create: if isB1Supervisor() || isGraphicsLead();
+      allow get: if isSignedInAndActive();
+      allow list: if isSignedInAndActive();
+      allow update: if isB1Supervisor();
+      allow delete: if isB1Supervisor();
     }
 
     /**
-     * @description Manages reviews of Tapehead entries by shift leads.
-     * @path /tapehead_reviews/{tapeheadReviewId}
-     * @allow (create) Authenticated user creates a new Tapehead review.
-     * @allow (get, list) Any user can read or list Tapehead reviews.
-     * @deny (update, delete) User attempts to update/delete a Tapehead review they did not create.
-     * @principle Enforces creator-ownership for write operations and public read access.
+     * @description Manages tasks for the Graphics department.
+     * @path /graphics-tasks/{docId}
      */
-    match /tapehead_reviews/{tapeheadReviewId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
+     match /graphics-tasks/{docId} {
+          allow create: if isB1Supervisor() || isGraphicsLead();
+          allow get: if isSignedInAndActive();
+          allow list: if isSignedInAndActive();
+          allow update: if isB1Supervisor();
+          allow delete: if isB1Supervisor();
+        }
 
-      function isOwner(ownerId) {
-        return request.auth != null && request.auth.uid == ownerId;
-      }
-
-      function isExistingOwner(ownerId) {
-        return isOwner(ownerId) && resource != null;
-      }
-
-      allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update: if isExistingOwner(resource.data.reviewedBy);
-      allow delete: if isExistingOwner(resource.data.reviewedBy);
+    /**
+     * @description Manages QC inspection reports.
+     * @path /qc_inspections/{docId}
+     * @allow (create) quality_manager can create QC inspections
+     * @deny (create) b2_supervisor can not create QC inspections
+     * @allow (get, list) Any user can read QC inspections.
+     * @allow (update, delete) quality_manager can update and delete QC inspections
+     * @principle Enforces role-based access control.
+     */
+    match /qc_inspections/{docId} {
+      allow create: if isQualityManager();
+      allow get: if isSignedInAndActive();
+      allow list: if isSignedInAndActive();
+      allow update: if isQualityManager();
+      allow delete: if isQualityManager();
     }
 
     /**
-     * @description Manages reports submitted by the Gantry department.
-     * @path /gantry_reports/{gantryReportId}
-     * @allow (create) Authenticated user creates a new Gantry report. The report includes `createdBy: request.auth.uid`.
-     * @allow (get, list) Any user can read or list Gantry reports.
-     * @deny (update, delete) User attempts to update/delete a Gantry report they did not create.
-     * @principle Enforces creator-ownership for write operations and public read access.
+     * @description Manages aggregated analytics data.
+     * @path /analytics_snapshots/{docId}
+     * @allow (create) superuser can create analytics snapshots
+     * @deny (create) b2_supervisor can not create analytics snapshots
+     * @allow (get, list) Any user can read analytics snapshots.
+     * @allow (update, delete) superuser can update and delete analytics snapshots
+     * @principle Enforces role-based access control.
      */
-    match /gantry_reports/{gantryReportId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(ownerId) {
-        return request.auth != null && request.auth.uid == ownerId;
-      }
-
-      function isExistingOwner(ownerId) {
-        return isOwner(ownerId) && resource != null;
-      }
-
-      allow get, list: if true;
-      allow create: if isSignedIn() && request.resource.data.createdBy == request.auth.uid;
-      allow update: if isExistingOwner(resource.data.createdBy);
-      allow delete: if isExistingOwner(resource.data.createdBy);
+    match /analytics_snapshots/{docId} {
+      allow create: if isSuperuser();
+      allow get: if isSignedInAndActive();
+      allow list: if isSignedInAndActive();
+      allow update: if isSuperuser();
+      allow delete: if isSuperuser();
     }
 
     /**
-     * @description Manages reports submitted by the Films department.
-     * @path /films_reports/{filmsReportId}
-     * @allow (create) Authenticated user creates a new Films report. The report includes `createdBy: request.auth.uid`.
-     * @allow (get, list) Any user can read or list Films reports.
-     * @deny (update, delete) User attempts to update/delete a Films report they did not create.
-     * @principle Enforces creator-ownership for write operations and public read access.
+     * @description Manages sail status information.
+     * @path /sail_status/{docId}
+     * @allow (create) Users with the roles 'b2_supervisor', 'b1_supervisor', 'quality_manager', 'management', 'pregger_lead', 'tapehead_lead', 'gantry_lead', 'films_lead', or 'graphics_lead' can create sail statuses.
+     * @deny (create) Other users cannot create sail statuses.
+     * @allow (get, list) Any user can read sail statuses.
+     * @allow (update, delete) Users with the roles 'b2_supervisor', 'b1_supervisor', 'quality_manager', 'management', 'pregger_lead', 'tapehead_lead', 'gantry_lead', 'films_lead', or 'graphics_lead' can update and delete sail statuses.
+     * @principle Enforces role-based access control.
      */
-    match /films_reports/{filmsReportId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(ownerId) {
-        return request.auth != null && request.auth.uid == ownerId;
-      }
-
-      function isExistingOwner(ownerId) {
-        return isOwner(ownerId) && resource != null;
-      }
-
-      allow get, list: if true;
-      allow create: if isSignedIn() && request.resource.data.createdBy == request.auth.uid;
-      allow update: if isExistingOwner(resource.data.createdBy);
-      allow delete: if isExistingOwner(resource.data.createdBy);
+    match /sail_status/{docId} {
+      allow create: if isB2Supervisor() || isB1Supervisor() || isQualityManager() || isManagement() || isPreggerLead() || isTapeheadLead() || isGantryLead() || isFilmsLead() || isGraphicsLead();
+      allow get: if isSignedInAndActive();
+      allow list: if isSignedInAndActive();
+      allow update: if isB2Supervisor() || isB1Supervisor() || isQualityManager() || isManagement() || isPreggerLead() || isTapeheadLead() || isGantryLead() || isFilmsLead() || isGraphicsLead();
+      allow delete: if isB2Supervisor() || isB1Supervisor() || isQualityManager() || isManagement() || isPreggerLead() || isTapeheadLead() || isGantryLead() || isFilmsLead() || isGraphicsLead();
     }
 
     /**
-     * @description Manages reports submitted by the Graphics department.
-     * @path /graphics_reports/{graphicsReportId}
-     * @allow (create) Authenticated user creates a new Graphics report. The report includes `createdBy: request.auth.uid`.
-     * @allow (get, list) Any user can read or list Graphics reports.
-     * @deny (update, delete) User attempts to update/delete a Graphics report they did not create.
-     * @principle Enforces creator-ownership for write operations and public read access.
+     * @description Manages Order Entry job definitions.
+     * @path /jobs/{docId}
+     * @allow (create) superuser can create Order Entry job definitions
+     * @deny (create) b2_supervisor can not create Order Entry job definitions
+     * @allow (get, list) Any user can read Order Entry job definitions.
+     * @allow (update, delete) superuser can update and delete Order Entry job definitions
+     * @principle Enforces role-based access control.
      */
-    match /graphics_reports/{graphicsReportId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(ownerId) {
-        return request.auth != null && request.auth.uid == ownerId;
-      }
-
-      function isExistingOwner(ownerId) {
-        return isOwner(ownerId) && resource != null;
-      }
-
-      allow get, list: if true;
-      allow create: if isSignedIn() && request.resource.data.createdBy == request.auth.uid;
-      allow update: if isExistingOwner(resource.data.createdBy);
-      allow delete: if isExistingOwner(resource.data.createdBy);
-    }
-
-    /**
-     * @description Manages quality control inspections.
-     * @path /qc_inspections/{qcInspectionId}
-     * @allow (create) Authenticated user creates a new QC inspection. The report includes `createdBy: request.auth.uid`.
-     * @allow (get, list) Any user can read or list QC inspections.
-     * @deny (update, delete) User attempts to update/delete a QC inspection they did not create.
-     * @principle Enforces creator-ownership for write operations and public read access.
-     */
-    match /qc_inspections/{qcInspectionId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(ownerId) {
-        return request.auth != null && request.auth.uid == ownerId;
-      }
-
-      function isExistingOwner(ownerId) {
-        return isOwner(ownerId) && resource != null;
-      }
-
-      allow get, list: if true;
-      allow create: if isSignedIn() && request.resource.data.createdBy == request.auth.uid;
-      allow update: if isExistingOwner(resource.data.createdBy);
-      allow delete: if isExistingOwner(resource.data.createdBy);
-    }
-
-    /**
-     * @description Manages snapshots of analytics data.
-     * @path /analytics_snapshots/{analyticsSnapshotId}
-     * @allow (create) Authenticated user creates a new analytics snapshot.
-     * @allow (get, list) Any user can read or list analytics snapshots.
-     * @deny (update, delete) User attempts to update/delete an analytics snapshot they did not create.
-     * @principle Enforces creator-ownership for write operations and public read access.
-     */
-    match /analytics_snapshots/{analyticsSnapshotId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(ownerId) {
-        return request.auth != null && request.auth.uid == ownerId;
-      }
-
-      function isExistingOwner(ownerId) {
-        return isOwner(ownerId) && resource != null;
-      }
-
-      allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update: if isExistingOwner(resource.data.createdBy);
-      allow delete: if isExistingOwner(resource.data.createdBy);
-    }
-
-    /**
-     * @description Manages the status of sails.
-     * @path /sail_status/{sailStatusId}
-     * @allow (create) Authenticated user creates a new sail status.
-     * @allow (get, list) Any user can read or list sail statuses.
-     * @deny (update, delete) User attempts to update/delete a sail status they did not create.
-     * @principle Enforces creator-ownership for write operations and public read access.
-     */
-    match /sail_status/{sailStatusId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(ownerId) {
-        return request.auth != null && request.auth.uid == ownerId;
-      }
-
-      function isExistingOwner(ownerId) {
-        return isOwner(ownerId) && resource != null;
-      }
-
-      allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update: if isExistingOwner(resource.data.createdBy);
-      allow delete: if isExistingOwner(resource.data.createdBy);
+    match /jobs/{docId} {
+      allow create: if isSuperuser();
+      allow get: if isSignedInAndActive();
+      allow list: if isSignedInAndActive();
+      allow update: if isSuperuser();
+      allow delete: if isSuperuser();
     }
   }
 }
