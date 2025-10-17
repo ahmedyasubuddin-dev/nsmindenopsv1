@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "UserProfile": {
@@ -122,51 +123,39 @@
       "schema": { "$ref": "#/entities/UserProfile" },
       "description": "Stores user profiles."
     },
-    "/pregger_reports/{docId}": {
+    "/pregger-reports/{docId}": {
       "schema": { "$ref": "#/entities/PreggerReport" },
       "description": "Stores reports from the Pregger department."
     },
-    "/tapehead_entries/{docId}": {
+    "/tapeheads-submissions/{docId}": {
       "schema": { "$ref": "#/entities/TapeheadEntry" },
       "description": "Stores entries from Tapehead operators."
     },
-     "/tapeheads-submissions/{docId}": {
-      "schema": { "$ref": "#/entities/TapeheadEntry" },
-      "description": "Stores entries from Tapehead operators."
-    },
-    "/tapehead_reviews/{docId}": {
+    "/tapehead-reviews/{docId}": {
       "schema": { "$ref": "#/entities/TapeheadReview" },
       "description": "Stores reviews of Tapehead entries."
     },
-    "/gantry_reports/{docId}": {
+    "/gantry-reports/{docId}": {
       "schema": { "$ref": "#/entities/GantryReport" },
       "description": "Stores reports from the Gantry department."
     },
-     "/gantry-reports/{docId}": {
-      "schema": { "$ref": "#/entities/GantryReport" },
-      "description": "Stores reports from the Gantry department."
-    },
-    "/films_reports/{docId}": {
+    "/films-reports/{docId}": {
       "schema": { "$ref": "#/entities/FilmsReport" },
       "description": "Stores reports from the Films department."
     },
-    "/graphics_reports/{docId}": {
+    "/graphics-tasks/{docId}": {
       "schema": { "$ref": "#/entities/GraphicsReport" },
       "description": "Stores tasks for the Graphics department."
     },
-     "/graphics-tasks/{docId}": {
-      "schema": { "$ref": "#/entities/GraphicsReport" },
-      "description": "Stores tasks for the Graphics department."
-    },
-    "/qc_inspections/{docId}": {
+    "/qc-inspections/{docId}": {
       "schema": { "$ref": "#/entities/QcInspection" },
       "description": "Stores QC inspection reports."
     },
-    "/analytics_snapshots/{docId}": {
+    "/analytics-snapshots/{docId}": {
       "schema": { "$ref": "#/entities/AnalyticsSnapshot" },
       "description": "Stores aggregated analytics data."
     },
-    "/sail_status/{docId}": {
+    "/sail-status/{docId}": {
       "schema": { "$ref": "#/entities/SailStatus" },
       "description": "Stores sail status information."
     },

@@ -1,384 +1,269 @@
 /**
- * @fileoverview Firestore Security Rules for SRD (Shift Report Dashboard).
- *
- * Core Philosophy:
- * This ruleset enforces strict role-based access control to Firestore data,
- * leveraging Firebase Authentication custom claims ("role" and "active") for authorization.
- * Only authenticated and active users can access the database.
- * Access to specific collections and documents is then granted based on the user's assigned role.
- * Users can only manage their own profiles. A superuser role has full access.
- *
- * Data Structure:
- * - User profiles are stored in `/users/{userId}`.
- * - Department-specific reports are stored in top-level collections (e.g., `/pregger_reports/{reportId}`).
- * - Analytics and Sail Status data are stored in top-level collections (`/analytics_snapshots/{snapshotId}`, `/sail_status/{sailId}`).
- *
- * Key Security Decisions:
- * - User listing is denied to all roles except the superuser.
- * - Custom claims are the source of truth for authorization, NOT data in Firestore documents.
- * - Documents are not listable unless explicitly allowed.
- *
- * Denormalization for Authorization:
- * - The user's role and active status are stored in custom claims, eliminating the need to read the `/users/{userId}` document for every request.
- *
- * Structural Segregation:
- * - Private user data (profiles) is stored in a separate `/users/{userId}` collection, while public data (reports, analytics) is stored in top-level collections. This ensures that user data is not accidentally exposed.
+ * @file Firestore Security Rules
+ * @core Philosophy: This ruleset enforces a strict authentication-based security model.
+ *   All data access requires the user to be signed in. Certain collections may have open read access.
+ *   Write access is generally restricted.
+ * @data Structure: The database consists of several top-level collections, each representing
+ *   a different type of report or data entity. There are no user-specific subcollections except under `/users/{userId}`.
+ * @key Security Decisions:
+ *   - Listing of user documents is disallowed.
+ *   - Collections storing department reports generally have public read access but restricted write access.
+ *   - Data shape validation is minimized to allow for rapid prototyping.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Checks if the user is signed in and active.
-     * @return {boolean} True if the user is signed in and active, false otherwise.
-     */
-    function isSignedInAndActive() {
-      return request.auth != null && request.auth.token.active == true;
-    }
-
-    /**
-     * @description Checks if the user has the superuser role.
-     * @return {boolean} True if the user has the superuser role, false otherwise.
-     */
-    function isSuperuser() {
-      return isSignedInAndActive() && request.auth.token.role == 'superuser';
-    }
-
-    /**
-     * @description Checks if the user is the owner of the resource.
-     * @param {string} userId The user ID to check against.
-     * @return {boolean} True if the user is the owner, false otherwise.
-     */
-    function isOwner(userId) {
-      return isSignedInAndActive() && request.auth.uid == userId;
-    }
-
-    /**
-     * @description Checks if the user is the owner of the resource and the resource exists.
-     * @param {string} userId The user ID to check against.
-     * @return {boolean} True if the user is the owner and the resource exists, false otherwise.
-     */
-    function isExistingOwner(userId) {
-      return isOwner(userId) && exists(resource);
-    }
-
-    /**
-     * @description Checks if the user has the specified role.
-     * @param {string} role The role to check for.
-     * @return {boolean} True if the user has the role, false otherwise.
-     */
-    function hasRole(role) {
-      return isSignedInAndActive() && request.auth.token.role == role;
-    }
-
-    /**
-     * @description Checks if the user has at least one of the specified roles.
-     * @param {array} roles An array of roles to check for.
-     * @return {boolean} True if the user has at least one of the roles, false otherwise.
-     */
-    function hasAnyRole(roles) {
-      return isSignedInAndActive() && roles.hasAny(request.auth.token.role);
-    }
-
-    /**
-     * @description Checks if the user has the 'b2_supervisor' role.
-     * @return {boolean} True if the user has the 'b2_supervisor' role, false otherwise.
-     */
-    function isB2Supervisor() {
-        return hasRole('b2_supervisor');
-    }
-
-    /**
-     * @description Checks if the user has the 'b1_supervisor' role.
-     * @return {boolean} True if the user has the 'b1_supervisor' role, false otherwise.
-     */
-    function isB1Supervisor() {
-        return hasRole('b1_supervisor');
-    }
-
-    /**
-     * @description Checks if the user has the 'quality_manager' role.
-     * @return {boolean} True if the user has the 'quality_manager' role, false otherwise.
-     */
-    function isQualityManager() {
-        return hasRole('quality_manager');
-    }
-
-    /**
-     * @description Checks if the user has the 'management' role.
-     * @return {boolean} True if the user has the 'management' role, false otherwise.
-     */
-    function isManagement() {
-        return hasRole('management');
-    }
-
-    /**
-     * @description Checks if the user has the 'pregger_lead' role.
-     * @return {boolean} True if the user has the 'pregger_lead' role, false otherwise.
-     */
-    function isPreggerLead() {
-        return hasRole('pregger_lead');
-    }
-
-    /**
-     * @description Checks if the user has the 'tapehead_operator' role.
-     * @return {boolean} True if the user has the 'tapehead_operator' role, false otherwise.
-     */
-    function isTapeheadOperator() {
-        return hasRole('tapehead_operator');
-    }
-
-    /**
-     * @description Checks if the user has the 'tapehead_lead' role.
-     * @return {boolean} True if the user has the 'tapehead_lead' role, false otherwise.
-     */
-    function isTapeheadLead() {
-        return hasRole('tapehead_lead');
-    }
-
-    /**
-     * @description Checks if the user has the 'gantry_lead' role.
-     * @return {boolean} True if the user has the 'gantry_lead' role, false otherwise.
-     */
-    function isGantryLead() {
-        return hasRole('gantry_lead');
-    }
-
-    /**
-     * @description Checks if the user has the 'films_lead' role.
-     * @return {boolean} True if the user has the 'films_lead' role, false otherwise.
-     */
-    function isFilmsLead() {
-        return hasRole('films_lead');
-    }
-
-    /**
-     * @description Checks if the user has the 'graphics_lead' role.
-     * @return {boolean} True if the user has the 'graphics_lead' role, false otherwise.
-     */
-    function isGraphicsLead() {
-        return hasRole('graphics_lead');
-    }
-
-
-    /**
-     * @description Manages user profiles.
+     * @description Allows users to read and write their own profile data.
      * @path /users/{userId}
-     * @allow (create) User with ID 'test_user' can create their profile.
-     * @deny (create) User with ID 'another_user' cannot create a profile with ID 'test_user'.
-     * @allow (get) Any signed in user can read a user's profile.
-     * @deny (list) No one can list user profiles.
-     * @allow (update) User with ID 'test_user' can update their own profile.
-     * @deny (update) User with ID 'another_user' cannot update profile with ID 'test_user'.
-     * @principle Enforces document ownership for writes; only the owner can create, update, or delete their profile.
+     * @allow (create) User with UID "ReSdY1OX2Yb86CiBNNHWfDDOYPd2" can create a profile with ID "ReSdY1OX2Yb86CiBNNHWfDDOYPd2".
+     * @allow (get) User with UID "ReSdY1OX2Yb86CiBNNHWfDDOYPd2" can read their own profile.
+     * @allow (update) User with UID "ReSdY1OX2Yb86CiBNNHWfDDOYPd2" can update their own profile.
+     * @allow (delete) User with UID "ReSdY1OX2Yb86CiBNNHWfDDOYPd2" can delete their own profile.
+     * @deny (create) User with UID "ReSdY1OX2Yb86CiBNNHWfDDOYPd2" cannot create a profile with ID "otherUserId".
+     * @principle Enforces document ownership for all operations.
      */
     match /users/{userId} {
-      // Only the user themselves can create their profile. The `create` operation happens before the document exists,
-      // so we must compare against the `request.resource.data` (incoming data).
-      allow create: if isOwner(userId);
-      allow get: if isSignedInAndActive();
-      allow list: if isSuperuser();
-      allow update: if isExistingOwner(userId);
-      allow delete: if isSuperuser();
-    }
-
-     /**
-      * @description Manages reports from the Pregger department.
-      * @path /pregger_reports/{docId}
-      * @allow (create) b2_supervisor and pregger_lead can create pregger reports
-      * @deny (create) b1_supervisor can not create pregger reports
-      * @allow (get, list) Any user can read pregger reports.
-      * @allow (update, delete) b2_supervisor can update and delete pregger reports
-      * @principle Enforces role-based access control.
-      */
-    match /pregger_reports/{docId} {
-      allow create: if isB2Supervisor() || isPreggerLead();
-      allow get: if isSignedInAndActive();
-      allow list: if isSignedInAndActive();
-      allow update: if isB2Supervisor();
-      allow delete: if isB2Supervisor();
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if false;
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.email is string;
+      allow update: if isSignedIn() && isOwner(userId) && resource != null;
+      allow delete: if isSignedIn() && isExistingOwner(userId);
     }
 
     /**
-     * @description Manages entries from Tapehead operators.
+     * @description Allows anyone to read Pregger reports, but restricts creation, updates, and deletion.
+     * @path /pregger_reports/{docId}
+     * @allow (get) Any signed-in user can read a Pregger report.
+     * @allow (list) Any signed-in user can list Pregger reports.
+     * @deny (create) No one can create a Pregger report.
+     * @deny (update) No one can update a Pregger report.
+     * @deny (delete) No one can delete a Pregger report.
+     * @principle Public read access with restricted writes.
+     */
+    match /pregger_reports/{docId} {
+      allow get, list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+     /**
+     * @description Allows anyone to read Tapehead entries, but restricts creation, updates, and deletion.
      * @path /tapehead_entries/{docId}
-     * @allow (create) b2_supervisor and tapehead_operator can create tapehead entries
-     * @deny (create) b1_supervisor can not create tapehead entries
-     * @allow (get, list) Any user can read tapehead entries.
-     * @allow (update, delete) b2_supervisor can update and delete tapehead entries
-     * @principle Enforces role-based access control.
+     * @allow (get) Any signed-in user can read a Tapehead entry.
+     * @allow (list) Any signed-in user can list Tapehead entries.
+     * @deny (create) No one can create a Tapehead entry.
+     * @deny (update) No one can update a Tapehead entry.
+     * @deny (delete) No one can delete a Tapehead entry.
+     * @principle Public read access with restricted writes.
      */
     match /tapehead_entries/{docId} {
-      allow create: if isB2Supervisor() || isTapeheadOperator() || isTapeheadLead();
-      allow get: if isSignedInAndActive();
-      allow list: if isSignedInAndActive();
-      allow update: if isB2Supervisor();
-      allow delete: if isB2Supervisor();
+      allow get, list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
-     /**
-      * @description Manages tapehead submissions.
-      * @path /tapeheads-submissions/{docId}
-      */
-     match /tapeheads-submissions/{docId} {
-          allow create: if isB2Supervisor() || isTapeheadOperator() || isTapeheadLead();
-          allow get: if isSignedInAndActive();
-          allow list: if isSignedInAndActive();
-          allow update: if isB2Supervisor();
-          allow delete: if isB2Supervisor();
-        }
-
-     /**
-      * @description Manages tapehead reviews.
-      * @path /tapehead_reviews/{docId}
-      */
-     match /tapehead_reviews/{docId} {
-       allow create: if isB2Supervisor();
-       allow get: if isSignedInAndActive();
-       allow list: if isSignedInAndActive();
-       allow update: if isB2Supervisor();
-       allow delete: if isB2Supervisor();
-     }
 
     /**
-     * @description Manages reports from the Gantry department.
+     * @description Allows anyone to read Tapehead submissions, but restricts creation, updates, and deletion.
+     * @path /tapeheads-submissions/{docId}
+     * @allow (get) Any signed-in user can read a Tapehead submission.
+     * @allow (list) Any signed-in user can list Tapehead submissions.
+     * @deny (create) No one can create a Tapehead submission.
+     * @deny (update) No one can update a Tapehead submission.
+     * @deny (delete) No one can delete a Tapehead submission.
+     * @principle Public read access with restricted writes.
+     */
+    match /tapeheads-submissions/{docId} {
+      allow get, list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Allows anyone to read Tapehead reviews, but restricts creation, updates, and deletion.
+     * @path /tapehead_reviews/{docId}
+     * @allow (get) Any signed-in user can read a Tapehead review.
+     * @allow (list) Any signed-in user can list Tapehead reviews.
+     * @deny (create) No one can create a Tapehead review.
+     * @deny (update) No one can update a Tapehead review.
+     * @deny (delete) No one can delete a Tapehead review.
+     * @principle Public read access with restricted writes.
+     */
+    match /tapehead_reviews/{docId} {
+      allow get, list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Allows anyone to read Gantry reports, but restricts creation, updates, and deletion.
      * @path /gantry_reports/{docId}
-     * @allow (create) b1_supervisor and gantry_lead can create gantry reports
-     * @deny (create) b2_supervisor can not create gantry reports
-     * @allow (get, list) Any user can read gantry reports.
-     * @allow (update, delete) b1_supervisor can update and delete gantry reports
-     * @principle Enforces role-based access control.
+     * @allow (get) Any signed-in user can read a Gantry report.
+     * @allow (list) Any signed-in user can list Gantry reports.
+     * @deny (create) No one can create a Gantry report.
+     * @deny (update) No one can update a Gantry report.
+     * @deny (delete) No one can delete a Gantry report.
+     * @principle Public read access with restricted writes.
      */
     match /gantry_reports/{docId} {
-      allow create: if isB1Supervisor() || isGantryLead();
-      allow get: if isSignedInAndActive();
-      allow list: if isSignedInAndActive();
-      allow update: if isB1Supervisor();
-      allow delete: if isB1Supervisor();
+      allow get, list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
-    /**
-     * @description Manages reports from the Gantry department.
-     * @path /gantry-reports/{docId}
-     */
-     match /gantry-reports/{docId} {
-          allow create: if isB1Supervisor() || isGantryLead();
-          allow get: if isSignedInAndActive();
-          allow list: if isSignedInAndActive();
-          allow update: if isB1Supervisor();
-          allow delete: if isB1Supervisor();
-        }
 
     /**
-     * @description Manages reports from the Films department.
+     * @description Allows anyone to read Gantry reports, but restricts creation, updates, and deletion.
+     * @path /gantry-reports/{docId}
+     * @allow (get) Any signed-in user can read a Gantry report.
+     * @allow (list) Any signed-in user can list Gantry reports.
+     * @deny (create) No one can create a Gantry report.
+     * @deny (update) No one can update a Gantry report.
+     * @deny (delete) No one can delete a Gantry report.
+     * @principle Public read access with restricted writes.
+     */
+    match /gantry-reports/{docId} {
+      allow get, list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Allows anyone to read Films reports, but restricts creation, updates, and deletion.
      * @path /films_reports/{docId}
-     * @allow (create) b1_supervisor and films_lead can create films reports
-     * @deny (create) b2_supervisor can not create films reports
-     * @allow (get, list) Any user can read films reports.
-     * @allow (update, delete) b1_supervisor can update and delete films reports
-     * @principle Enforces role-based access control.
+     * @allow (get) Any signed-in user can read a Films report.
+     * @allow (list) Any signed-in user can list Films reports.
+     * @deny (create) No one can create a Films report.
+     * @deny (update) No one can update a Films report.
+     * @deny (delete) No one can delete a Films report.
+     * @principle Public read access with restricted writes.
      */
     match /films_reports/{docId} {
-      allow create: if isB1Supervisor() || isFilmsLead();
-      allow get: if isSignedInAndActive();
-      allow list: if isSignedInAndActive();
-      allow update: if isB1Supervisor();
-      allow delete: if isB1Supervisor();
+      allow get, list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Manages tasks for the Graphics department.
+     * @description Allows anyone to read Graphics tasks, but restricts creation, updates, and deletion.
      * @path /graphics_reports/{docId}
-     * @allow (create) b1_supervisor and graphics_lead can create graphics reports
-     * @deny (create) b2_supervisor can not create graphics reports
-     * @allow (get, list) Any user can read graphics reports.
-     * @allow (update, delete) b1_supervisor can update and delete graphics reports
-     * @principle Enforces role-based access control.
+     * @allow (get) Any signed-in user can read a Graphics task.
+     * @allow (list) Any signed-in user can list Graphics tasks.
+     * @deny (create) No one can create a Graphics task.
+     * @deny (update) No one can update a Graphics task.
+     * @deny (delete) No one can delete a Graphics task.
+     * @principle Public read access with restricted writes.
      */
     match /graphics_reports/{docId} {
-      allow create: if isB1Supervisor() || isGraphicsLead();
-      allow get: if isSignedInAndActive();
-      allow list: if isSignedInAndActive();
-      allow update: if isB1Supervisor();
-      allow delete: if isB1Supervisor();
+      allow get, list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Manages tasks for the Graphics department.
+     * @description Allows anyone to read Graphics tasks, but restricts creation, updates, and deletion.
      * @path /graphics-tasks/{docId}
+     * @allow (get) Any signed-in user can read a Graphics task.
+     * @allow (list) Any signed-in user can list Graphics tasks.
+     * @deny (create) No one can create a Graphics task.
+     * @deny (update) No one can update a Graphics task.
+     * @deny (delete) No one can delete a Graphics task.
+     * @principle Public read access with restricted writes.
      */
-     match /graphics-tasks/{docId} {
-          allow create: if isB1Supervisor() || isGraphicsLead();
-          allow get: if isSignedInAndActive();
-          allow list: if isSignedInAndActive();
-          allow update: if isB1Supervisor();
-          allow delete: if isB1Supervisor();
-        }
+    match /graphics-tasks/{docId} {
+      allow get, list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
 
     /**
-     * @description Manages QC inspection reports.
+     * @description Allows anyone to read QC inspections, but restricts creation, updates, and deletion.
      * @path /qc_inspections/{docId}
-     * @allow (create) quality_manager can create QC inspections
-     * @deny (create) b2_supervisor can not create QC inspections
-     * @allow (get, list) Any user can read QC inspections.
-     * @allow (update, delete) quality_manager can update and delete QC inspections
-     * @principle Enforces role-based access control.
+     * @allow (get) Any signed-in user can read a QC inspection.
+     * @allow (list) Any signed-in user can list QC inspections.
+     * @deny (create) No one can create a QC inspection.
+     * @deny (update) No one can update a QC inspection.
+     * @deny (delete) No one can delete a QC inspection.
+     * @principle Public read access with restricted writes.
      */
     match /qc_inspections/{docId} {
-      allow create: if isQualityManager();
-      allow get: if isSignedInAndActive();
-      allow list: if isSignedInAndActive();
-      allow update: if isQualityManager();
-      allow delete: if isQualityManager();
+      allow get, list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Manages aggregated analytics data.
+     * @description Allows anyone to read Analytics snapshots, but restricts creation, updates, and deletion.
      * @path /analytics_snapshots/{docId}
-     * @allow (create) superuser can create analytics snapshots
-     * @deny (create) b2_supervisor can not create analytics snapshots
-     * @allow (get, list) Any user can read analytics snapshots.
-     * @allow (update, delete) superuser can update and delete analytics snapshots
-     * @principle Enforces role-based access control.
+     * @allow (get) Any signed-in user can read an Analytics snapshot.
+     * @allow (list) Any signed-in user can list Analytics snapshots.
+     * @deny (create) No one can create an Analytics snapshot.
+     * @deny (update) No one can update an Analytics snapshot.
+     * @deny (delete) No one can delete an Analytics snapshot.
+     * @principle Public read access with restricted writes.
      */
     match /analytics_snapshots/{docId} {
-      allow create: if isSuperuser();
-      allow get: if isSignedInAndActive();
-      allow list: if isSignedInAndActive();
-      allow update: if isSuperuser();
-      allow delete: if isSuperuser();
+      allow get, list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Manages sail status information.
+     * @description Allows anyone to read Sail statuses, but restricts creation, updates, and deletion.
      * @path /sail_status/{docId}
-     * @allow (create) Users with the roles 'b2_supervisor', 'b1_supervisor', 'quality_manager', 'management', 'pregger_lead', 'tapehead_lead', 'gantry_lead', 'films_lead', or 'graphics_lead' can create sail statuses.
-     * @deny (create) Other users cannot create sail statuses.
-     * @allow (get, list) Any user can read sail statuses.
-     * @allow (update, delete) Users with the roles 'b2_supervisor', 'b1_supervisor', 'quality_manager', 'management', 'pregger_lead', 'tapehead_lead', 'gantry_lead', 'films_lead', or 'graphics_lead' can update and delete sail statuses.
-     * @principle Enforces role-based access control.
+     * @allow (get) Any signed-in user can read a Sail status.
+     * @allow (list) Any signed-in user can list Sail statuses.
+     * @deny (create) No one can create a Sail status.
+     * @deny (update) No one can update a Sail status.
+     * @deny (delete) No one can delete a Sail status.
+     * @principle Public read access with restricted writes.
      */
     match /sail_status/{docId} {
-      allow create: if isB2Supervisor() || isB1Supervisor() || isQualityManager() || isManagement() || isPreggerLead() || isTapeheadLead() || isGantryLead() || isFilmsLead() || isGraphicsLead();
-      allow get: if isSignedInAndActive();
-      allow list: if isSignedInAndActive();
-      allow update: if isB2Supervisor() || isB1Supervisor() || isQualityManager() || isManagement() || isPreggerLead() || isTapeheadLead() || isGantryLead() || isFilmsLead() || isGraphicsLead();
-      allow delete: if isB2Supervisor() || isB1Supervisor() || isQualityManager() || isManagement() || isPreggerLead() || isTapeheadLead() || isGantryLead() || isFilmsLead() || isGraphicsLead();
+      allow get, list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Manages Order Entry job definitions.
+     * @description Allows anyone to read OE Jobs, but restricts creation, updates, and deletion.
      * @path /jobs/{docId}
-     * @allow (create) superuser can create Order Entry job definitions
-     * @deny (create) b2_supervisor can not create Order Entry job definitions
-     * @allow (get, list) Any user can read Order Entry job definitions.
-     * @allow (update, delete) superuser can update and delete Order Entry job definitions
-     * @principle Enforces role-based access control.
+     * @allow (get) Any signed-in user can read an OE Job.
+     * @allow (list) Any signed-in user can list OE Jobs.
+     * @deny (create) No one can create an OE Job.
+     * @deny (update) No one can update an OE Job.
+     * @deny (delete) No one can delete an OE Job.
+     * @principle Public read access with restricted writes.
      */
     match /jobs/{docId} {
-      allow create: if isSuperuser();
-      allow get: if isSignedInAndActive();
-      allow list: if isSignedInAndActive();
-      allow update: if isSuperuser();
-      allow delete: if isSuperuser();
+      allow get, list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
+
+   }
+
+  function isSignedIn() {
+    return request.auth != null;
+  }
+
+  function isOwner(userId) {
+    return request.auth.uid == userId;
+  }
+
+  function isExistingOwner(userId) {
+    return isSignedIn() && isOwner(userId) && resource != null;
   }
 }
