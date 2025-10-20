@@ -184,20 +184,20 @@ export default function LoginPage() {
     <div className="relative min-h-screen w-full bg-cover bg-center bg-no-repeat" style={{backgroundImage: "url('/login-background.jpg')"}}>
       <div className="absolute inset-0 bg-black/50" />
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen p-4 font-body">
-        <Card className="w-full max-w-sm bg-card/80 backdrop-blur-sm border-white/20 text-card-foreground">
+        <Card className="w-full max-w-sm bg-card/80 backdrop-blur-sm border-white/20 text-black">
             <CardHeader className="text-center">
                 <div className="flex justify-center items-center gap-3 mb-4">
-                    <Logo className="size-10 text-white" />
+                    <Logo className="size-10 text-black" />
                 </div>
-            <CardTitle className="text-2xl font-headline font-bold text-white">North Sails Minden Operations Dashboard</CardTitle>
-            <CardDescription className="text-gray-300 !mt-2">Enter your credentials to access the dashboard.</CardDescription>
+            <CardTitle className="text-2xl font-headline font-bold text-black">North Sails Minden Operations Dashboard</CardTitle>
+            <CardDescription className="text-gray-800 !mt-2">Enter your credentials to access the dashboard.</CardDescription>
             </CardHeader>
             <form onSubmit={handleLogin}>
                 <CardContent className="space-y-4">
                 <div className="space-y-2">
-                <Label className="text-gray-300">Select a user to sign in as:</Label>
+                <Label className="text-gray-800">Select a user to sign in as:</Label>
                 <Select value={email} onValueChange={handleUserSelection}>
-                    <SelectTrigger className="bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:ring-primary">
+                    <SelectTrigger className="bg-white/10 border-black/20 text-black placeholder:text-gray-500 focus:ring-primary">
                     <SelectValue placeholder="Select a user role" />
                     </SelectTrigger>
                     <SelectContent>
@@ -210,7 +210,7 @@ export default function LoginPage() {
                 </Select>
                 </div>
                 <div className="space-y-2">
-                    <Label htmlFor="email" className="text-gray-300">Email</Label>
+                    <Label htmlFor="email" className="text-gray-800">Email</Label>
                     <Input
                     id="email"
                     type="email"
@@ -219,18 +219,18 @@ export default function LoginPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     readOnly
-                    className="bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-primary"
+                    className="bg-white/10 border-black/20 text-black placeholder:text-gray-500 focus-visible:ring-primary"
                     />
                 </div>
                 <div className="space-y-2">
-                    <Label htmlFor="password" className="text-gray-300">Password</Label>
+                    <Label htmlFor="password" className="text-gray-800">Password</Label>
                     <Input 
                     id="password" 
                     type="password" 
                     required 
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                     className="bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-primary"
+                     className="bg-white/10 border-black/20 text-black placeholder:text-gray-500 focus-visible:ring-primary"
                     />
                 </div>
                 </CardContent>
