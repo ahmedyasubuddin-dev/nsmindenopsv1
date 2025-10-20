@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth as useFirebaseAuth } from '@/firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 
 const users = {
   'superuser@ns.com': 'password',
@@ -33,15 +34,15 @@ const users = {
 };
 
 const PrivacyPolicy = () => (
-    <div className="prose prose-sm text-gray-300">
-        <h2 className="text-gray-200">PRIVACY POLICY</h2>
+    <div className="prose prose-sm text-gray-700 dark:text-gray-300">
+        <h2 className="text-gray-800 dark:text-gray-200">PRIVACY POLICY</h2>
         <p>Information about personal data processing. In force since 26 September 2023.</p>
         <p>This information is provided pursuant to Regulation (EU) 2016/679 of the European Parliament and Council of 27 April 2016 about the protection of personal data (GDPR) and illustrates how the personal data given on this website are processed.</p>
         
-        <h3 className="text-gray-200">Data Controller.</h3>
+        <h3 className="text-gray-800 dark:text-gray-200">Data Controller.</h3>
         <p>North Sails GmbH - Harkortstraße 79, 22765 Hamburg - DE814864953, Email: webcustomercare@northsail.com, share capital, 33.750,00 Euro, Telephone +39 0185200555, (telephone number active from Monday to Friday, from 09.00 to 18.00) (North Sails) in relation to personal data given by the user on the website www.northsails.com (Website).</p>
         
-        <h3 className="text-gray-200">Purpose of the processing.</h3>
+        <h3 className="text-gray-800 dark:text-gray-200">Purpose of the processing.</h3>
         <p>North Sails shall process personal data provided by the user for the following purposes:</p>
         <ol>
             <li>To register with the Website and make use of the services reserved for registered users (so-called Website registration purposes)</li>
@@ -56,10 +57,10 @@ const PrivacyPolicy = () => (
             <li>For the activation and execution purposes of the LOYALTY PROGRAM (for more information, see the General Sales Conditions published and on the Website, the so-called LOYALTY PROGRAM purposes).</li>
         </ol>
         
-        <h3 className="text-gray-200">Special categories of personal data</h3>
+        <h3 className="text-gray-800 dark:text-gray-200">Special categories of personal data</h3>
         <p>Special categories of personal data are not subject to processing by North Sails. “Special categories” are understood, pursuant to article 9 of the GDPR, to be data that reveal: (i) racial or ethnic origin, (ii) political opinions, religious or philosophical convictions; (iii) trade union membership, (iv) genetic data and biometric data for the purpose of uniquely identifying a natural person; (v) data concerning a natural person’s health, sex life or sexual orientation. These categories of data are not processed via the North Sails Website.</p>
         
-        <h3 className="text-gray-200">Data supply and consequences in the event of failure to consent to processing. Legal basis. Storage period of personal data</h3>
+        <h3 className="text-gray-800 dark:text-gray-200">Data supply and consequences in the event of failure to consent to processing. Legal basis. Storage period of personal data</h3>
         <h4>To register with the Website</h4>
         <p>The supply of data to register with the Website is merely optional (letter a. of previous article 2.) However, since such processing is necessary to register with the Website, the user’s refusal to supply the data in question shall render registration with the Website impossible.The legal basis for this processing is North Sail’s legitimate interest in allowing the user to register with the Website. For this purpose, personal data shall be stored for as long as the user maintains their account active on the Website.</p>
         
@@ -90,13 +91,13 @@ const PrivacyPolicy = () => (
         <h4>To defend its rights in court</h4>
         <p>The supply of data for the purpose of defending one’s rights in court is merely optional (lettera i. of the previous art. 2). However, since such processing is necessary to allow North Sails to defend its rights, the user’s refusal to supply the data in question shall render it impossible or difficult for North Sails to do so. The legal basis for this processing is the legitimate interest of North Sails to defend its rights before the Authority of jurisdiction. For this purpose the personal data shall be stored until the judgement or decision relating to the proceedings in which North Sails had to defend its rights becomes final.</p>
 
-        <h3 className="text-gray-200">How to withdraw consent</h3>
+        <h3 className="text-gray-800 dark:text-gray-200">How to withdraw consent</h3>
         <p>The user may in any case withdraw the consent given for the purposes described in points (c) (marketing purposes) and (d) (profiling purposes) of art. 2: by contacting North Sails at the addresses listed in the previous art. 1; using the special link at the bottom of all promotional emails sent by North Sails. The user can, in any case, revoke any consent given for the purposes described in points (a) (so-called Website registration purposes) and (j) (so-called LOYALTY PROGRAM purposes) of Article 2: by deleting the created account.</p>
 
-        <h3 className="text-gray-200">Scope of data communication</h3>
+        <h3 className="text-gray-800 dark:text-gray-200">Scope of data communication</h3>
         <p>The personal data supplied by the user, for the purposes described in the previous art. 2, can be made known or communicated to the following subjects: employees and/or collaborators of North Sails for carrying out administration, accounting and IT and logistics activities working as data supervisors and persons in charge of processing; companies that manage online payment transactions; all public and/or private entities, natural and/or legal persons (legal, administration and tax consultancy firms) if communication is necessary or functional to the proper fulfilment of the contractual obligations undertaken in relation to the services provided via the Website, as well as legal obligations; all those entities (including Public Authorities) that have access to data in by virtue of regulatory or administrative measures; carriers and entities in charge of delivery and/or collection of the products purchased; companies that send, on behalf of North Sails, the newsletters and other communications. All the personal data supplied by the user in relation to registration with the Website and/or purchases through the Website are not disclosed. The updated list of the data supervisors and persons in charge of processing can be viewed at the Data Controller’s address.</p>
 
-        <h3 className="text-gray-200">User rights</h3>
+        <h3 className="text-gray-800 dark:text-gray-200">User rights</h3>
         <p>The user has the right to:</p>
         <ul>
             <li>a) obtain confirmation of the existence or otherwise of personal data that regards them and their communication in intelligible form; and withdraw consent at any time without prejudice to the lawfulness of the processing based on the consent granted before withdrawal;</li>
@@ -105,10 +106,10 @@ const PrivacyPolicy = () => (
             <li>d) object, wholly or partially: - on legitimate grounds, to the processing of the data that concerns them, even if still relevant to the purpose of the collection; - to the processing of the personal data concerning them for the purposes of commercial information or for sending advertising or direct sales material. The above rights may be exercised by making a request to the Data Controller, at the address listed in art. 1.</li>
         </ul>
 
-        <h3 className="text-gray-200">Transfer of data to non-EU countries</h3>
+        <h3 className="text-gray-800 dark:text-gray-200">Transfer of data to non-EU countries</h3>
         <p>The user’s personal data may be transferred to the USA pursuant to the European Commission’s Adequacy Decision of 10 July 2023, which established that USA law has an adequate level of privacy security. The transfer of data to the USA is necessary for the correct execution of purchase orders made on the Website.</p>
 
-        <h3 className="text-gray-200">Updating of the privacy policy</h3>
+        <h3 className="text-gray-800 dark:text-gray-200">Updating of the privacy policy</h3>
         <p>The user is invited to read this privacy policy each time they make a purchase on the Website. In the event of one or more material changes to this privacy policy, North Sails shall notify the user by email.</p>
     </div>
 );
@@ -241,19 +242,28 @@ export default function LoginPage() {
             </form>
         </Card>
         
-        <div className="w-full max-w-4xl mt-8">
-            <Card className="bg-black/70 backdrop-blur-sm border-white/20 text-white">
-                <CardContent className="p-6">
-                    <ScrollArea className="h-72 w-full">
+        <div className="mt-8">
+           <Dialog>
+                <DialogTrigger asChild>
+                    <Button variant="link" className="text-gray-300 hover:text-white">Privacy Policy</Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-4xl">
+                    <DialogHeader>
+                        <DialogTitle>Privacy Policy</DialogTitle>
+                    </DialogHeader>
+                    <div className="max-h-[70vh] overflow-y-auto pr-6">
                         <PrivacyPolicy />
-                    </ScrollArea>
-                </CardContent>
-            </Card>
+                    </div>
+                    <DialogFooter>
+                        <DialogClose asChild>
+                            <Button>Close</Button>
+                        </DialogClose>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
 
       </div>
     </div>
   );
 }
-
-    
