@@ -262,8 +262,10 @@ export default function LoginPage() {
                 </DialogContent>
             </Dialog>
         </div>
-
       </div>
+      <footer className="absolute bottom-0 w-full p-4 text-center text-xs text-gray-300">
+        © Copyright North Sails 2025
+      </footer>
     </div>
   );
 }
