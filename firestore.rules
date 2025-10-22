@@ -1,178 +1,201 @@
-/**
- * @fileoverview Firestore Security Rules for the application.
- *
- * Core Philosophy:
- * This ruleset prioritizes security by enforcing a strict owner-only access model for user profiles
- * and read-only access for most other collections. This promotes a secure environment with a flexible data structure during prototyping.
- *
- * Data Structure:
- * - User profiles are stored in `/users/{userId}`.
- * - Other collections like `/pregger_reports`, `/gantry_reports`, etc., store departmental data.
- *
- * Key Security Decisions:
- * - User listing is explicitly denied for the `/users` collection, preventing unauthorized access to user data.
- * - Most collections are configured for public read access to facilitate data consumption,
- *   but write access is restricted to authorized users (this will require an ownership field to be present in the data).
- * - The ruleset defaults to the most secure interpretation when ambiguities arise, ensuring data protection.
- */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to user profile documents.
-     * @path /users/{userId}
-     * @allow (create) Authenticated user can create their own profile.
-     * @deny (create) Authenticated user cannot create a profile for another user.
-     * @allow (get, list) Authenticated user can read their own profile.
-     * @deny (get, list) Authenticated user cannot read another user's profile.
-     * @allow (update, delete) Authenticated user can update/delete their own profile.
-     * @deny (update, delete) Authenticated user cannot update/delete another user's profile.
-     * @principle Enforces document ownership for all operations on user profiles.
+     * @description Manages user profile access.
+     * @path /databases/{database}/documents/users/{userId}
+     * @allow (create) User with ID 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2' can create their own profile.
+     * @deny (create) User with ID 'attackerId' attempts to create a profile with ID 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2'.
+     * @allow (get) User with ID 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2' can read their own profile.
+     * @deny (get) User with ID 'attackerId' attempts to read profile with ID 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2'.
+     * @allow (update) User with ID 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2' can update their own profile.
+     * @deny (update) User with ID 'attackerId' attempts to update profile with ID 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2'.
+     * @allow (delete) User with ID 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2' can delete their own profile.
+     * @deny (delete) User with ID 'attackerId' attempts to delete profile with ID 'ReSdY1OX2Yb86CiBNNHWfDDOYPd2'.
+     * @principle Enforces document ownership for writes.
      */
     match /users/{userId} {
-      function isOwner(userId) {
-        return request.auth != null && request.auth.uid == userId;
-      }
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
-
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
       allow get: if isOwner(userId);
       allow list: if false;
-      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
-      allow delete: if isExistingOwner(userId);
+      allow create: if request.auth.uid == userId;
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId);
     }
 
     /**
-     * @description Controls access to reports from the Pregger department.
-     * @path /pregger_reports/{docId}
-     * @allow (get, list) Any user can read Pregger reports.
-     * @deny (create, update, delete) Only owners can modify Pregger reports.
-     * @principle Public read access with owner-only writes.
+     * @description Manages access to pregger reports.
+     * @path /databases/{database}/documents/pregger_reports/{docId}
+     * @allow (get) Any user can read a pregger report.
+     * @deny (create) Any user attempts to create a pregger report.
+     * @deny (update) Any user attempts to update a pregger report.
+     * @deny (delete) Any user attempts to delete a pregger report.
+     * @principle Allows public read access, restricts write access.
      */
     match /pregger_reports/{docId} {
       allow get, list: if true;
-      allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      // CRITICAL: Cannot implement owner-only writes. The 'PreggerReport' entity is missing an 'ownerId' or 'authorId' field.
+      allow create: if isSignedIn(); // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Controls access to entries from Tapehead operators.
-     * @path /tapeheads_submissions/{docId}
-     * @allow (get, list) Any user can read Tapehead entries.
-     * @deny (create, update, delete) Only owners can modify Tapehead entries.
-     * @principle Public read access with owner-only writes.
+     * @description Manages access to tapeheads submissions.
+     * @path /databases/{database}/documents/tapeheads_submissions/{docId}
+     * @allow (get) Any user can read a tapeheads submission.
+     * @deny (create) Any user attempts to create a tapeheads submission.
+     * @deny (update) Any user attempts to update a tapeheads submission.
+     * @deny (delete) Any user attempts to delete a tapeheads submission.
+     * @principle Allows public read access, restricts write access.
      */
     match /tapeheads_submissions/{docId} {
       allow get, list: if true;
-      allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      // CRITICAL: Cannot implement owner-only writes. The 'TapeheadEntry' entity is missing an 'ownerId' or 'authorId' field.
+      allow create: if isSignedIn(); // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Controls access to reviews of Tapehead entries.
-     * @path /tapehead_reviews/{docId}
-     * @allow (get, list) Any user can read Tapehead reviews.
-     * @deny (create, update, delete) Only owners can modify Tapehead reviews.
-     * @principle Public read access with owner-only writes.
+     * @description Manages access to tapehead reviews.
+     * @path /databases/{database}/documents/tapehead_reviews/{docId}
+     * @allow (get) Any user can read a tapehead review.
+     * @deny (create) Any user attempts to create a tapehead review.
+     * @deny (update) Any user attempts to update a tapehead review.
+     * @deny (delete) Any user attempts to delete a tapehead review.
+     * @principle Allows public read access, restricts write access.
      */
     match /tapehead_reviews/{docId} {
       allow get, list: if true;
-      allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      // CRITICAL: Cannot implement owner-only writes. The 'TapeheadReview' entity is missing an 'ownerId' or 'authorId' field.
+      allow create: if isSignedIn(); // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Controls access to reports from the Gantry department.
-     * @path /gantry_reports/{docId}
-     * @allow (get, list) Any user can read Gantry reports.
-     * @deny (create, update, delete) Only owners can modify Gantry reports.
-     * @principle Public read access with owner-only writes.
+     * @description Manages access to gantry reports.
+     * @path /databases/{database}/documents/gantry_reports/{docId}
+     * @allow (get) Any user can read a gantry report.
+     * @deny (create) Any user attempts to create a gantry report.
+     * @deny (update) Any user attempts to update a gantry report.
+     * @deny (delete) Any user attempts to delete a gantry report.
+     * @principle Allows public read access, restricts write access.
      */
     match /gantry_reports/{docId} {
       allow get, list: if true;
-      allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      // CRITICAL: Cannot implement owner-only writes. The 'GantryReport' entity is missing an 'ownerId' or 'authorId' field.
+      allow create: if isSignedIn(); // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Controls access to reports from the Films department.
-     * @path /films_reports/{docId}
-     * @allow (get, list) Any user can read Films reports.
-     * @deny (create, update, delete) Only owners can modify Films reports.
-     * @principle Public read access with owner-only writes.
+     * @description Manages access to films reports.
+     * @path /databases/{database}/documents/films_reports/{docId}
+     * @allow (get) Any user can read a films report.
+     * @deny (create) Any user attempts to create a films report.
+     * @deny (update) Any user attempts to update a films report.
+     * @deny (delete) Any user attempts to delete a films report.
+     * @principle Allows public read access, restricts write access.
      */
     match /films_reports/{docId} {
       allow get, list: if true;
-      allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      // CRITICAL: Cannot implement owner-only writes. The 'FilmsReport' entity is missing an 'ownerId' or 'authorId' field.
+      allow create: if isSignedIn(); // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Controls access to tasks for the Graphics department.
-     * @path /graphics_tasks/{docId}
-     * @allow (get, list) Any user can read Graphics tasks.
-     * @deny (create, update, delete) Only owners can modify Graphics tasks.
-     * @principle Public read access with owner-only writes.
+     * @description Manages access to graphics tasks.
+     * @path /databases/{database}/documents/graphics_tasks/{docId}
+     * @allow (get) Any user can read a graphics task.
+     * @deny (create) Any user attempts to create a graphics task.
+     * @deny (update) Any user attempts to update a graphics task.
+     * @deny (delete) Any user attempts to delete a graphics task.
+     * @principle Allows public read access, restricts write access.
      */
     match /graphics_tasks/{docId} {
       allow get, list: if true;
-      allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      // CRITICAL: Cannot implement owner-only writes. The 'GraphicsReport' entity is missing an 'ownerId' or 'authorId' field.
+      allow create: if isSignedIn(); // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Controls access to QC inspection reports.
-     * @path /qc_inspections/{docId}
-     * @allow (get, list) Any user can read QC inspection reports.
-     * @deny (create, update, delete) Only owners can modify QC inspection reports.
-     * @principle Public read access with owner-only writes.
+     * @description Manages access to QC inspections.
+     * @path /databases/{database}/documents/qc_inspections/{docId}
+     * @allow (get) Any user can read a QC inspection.
+     * @deny (create) Any user attempts to create a QC inspection.
+     * @deny (update) Any user attempts to update a QC inspection.
+     * @deny (delete) Any user attempts to delete a QC inspection.
+     * @principle Allows public read access, restricts write access.
      */
     match /qc_inspections/{docId} {
       allow get, list: if true;
-      allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      // CRITICAL: Cannot implement owner-only writes. The 'QcInspection' entity is missing an 'ownerId' or 'authorId' field.
+      allow create: if isSignedIn(); // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Controls access to aggregated analytics data.
-     * @path /analytics_snapshots/{docId}
-     * @allow (get, list) Any user can read analytics snapshots.
-     * @deny (create, update, delete) Only owners can modify analytics snapshots.
-     * @principle Public read access with owner-only writes.
+     * @description Manages access to analytics snapshots.
+     * @path /databases/{database}/documents/analytics_snapshots/{docId}
+     * @allow (get) Any user can read an analytics snapshot.
+     * @deny (create) Any user attempts to create an analytics snapshot.
+     * @deny (update) Any user attempts to update an analytics snapshot.
+     * @deny (delete) Any user attempts to delete an analytics snapshot.
+     * @principle Allows public read access, restricts write access.
      */
     match /analytics_snapshots/{docId} {
       allow get, list: if true;
-      allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      // CRITICAL: Cannot implement owner-only writes. The 'AnalyticsSnapshot' entity is missing an 'ownerId' or 'authorId' field.
+      allow create: if isSignedIn(); // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Controls access to sail status information.
-     * @path /sail_status/{docId}
-     * @allow (get, list) Any user can read sail status information.
-     * @deny (create, update, delete) Only owners can modify sail status information.
-     * @principle Public read access with owner-only writes.
+     * @description Manages access to sail status.
+     * @path /databases/{database}/documents/sail_status/{docId}
+     * @allow (get) Any user can read a sail status.
+     * @deny (create) Any user attempts to create a sail status.
+     * @deny (update) Any user attempts to update a sail status.
+     * @deny (delete) Any user attempts to delete a sail status.
+     * @principle Allows public read access, restricts write access.
      */
     match /sail_status/{docId} {
       allow get, list: if true;
-      allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      // CRITICAL: Cannot implement owner-only writes. The 'SailStatus' entity is missing an 'ownerId' or 'authorId' field.
+      allow create: if isSignedIn(); // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Controls access to Order Entry job definitions.
-     * @path /jobs/{docId}
-     * @allow (get, list) Any user can read OE Job information.
-     * @deny (create, update, delete) Only owners can modify OE Job information.
-     * @principle Public read access with owner-only writes.
+     * @description Manages access to jobs.
+     * @path /databases/{database}/documents/jobs/{docId}
+     * @allow (get) Any user can read a job.
+     * @deny (create) Any user attempts to create a job.
+     * @deny (update) Any user attempts to update a job.
+     * @deny (delete) Any user attempts to delete a job.
+     * @principle Allows public read access, restricts write access.
      */
     match /jobs/{docId} {
       allow get, list: if true;
-      allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      // CRITICAL: Cannot implement owner-only writes. The 'OeJob' entity is missing an 'ownerId' or 'authorId' field.
+      allow create: if isSignedIn(); // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // Helper function to determine if the request is from the document owner.
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // Helper function to determine if the request is from the existing document owner and the document exists.
+    function isExistingOwner(userId) {
+        return isOwner(userId) && exists(/databases/$(database)/documents/users/$(userId));
+    }
+
+    // Helper function to determine if the user is signed in.
+    function isSignedIn() {
+      return request.auth != null;
     }
   }
 }

@@ -57,8 +57,9 @@ export function UserManagement() {
     const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
     const [isUpdateDialogOpen, setUpdateDialogOpen] = useState(false);
     const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
+    const { isUserLoading } = useUser();
 
-    const usersQuery = useMemoFirebase(() => query(collection(firestore, 'users')), [firestore]);
+    const usersQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'users')), [firestore, isUserLoading]);
     const { data: users, isLoading } = useCollection<UserProfile>(usersQuery);
 
     const form = useForm<NewUserFormValues>({
@@ -149,7 +150,7 @@ export function UserManagement() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {isLoading ? (
+                            {isLoading || isUserLoading ? (
                                 <TableRow><TableCell colSpan={4} className="text-center">Loading users...</TableCell></TableRow>
                             ) : (
                                 users?.map(user => (
