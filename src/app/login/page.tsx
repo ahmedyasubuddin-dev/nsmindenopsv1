@@ -140,7 +140,7 @@ export default function LoginPage() {
               </form>
             </Form>
           <CardFooter className="flex-col items-center justify-center gap-3 text-xs text-center text-muted-foreground pb-4">
-            <p className="px-6">By signing in, you acknowledge and agree to our <PrivacyPolicy /></p>
+             <PrivacyPolicy />
           </CardFooter>
         </Card>
          <footer className="py-4 text-center text-sm text-white/60">
