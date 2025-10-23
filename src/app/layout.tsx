@@ -8,7 +8,7 @@ import { AppTitleProvider } from '@/components/app-title-context';
 import { FirebaseClientProvider, useUser } from '@/firebase';
 import React, { useEffect }from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Logo } from '@/components/icons';
+import Image from 'next/image';
 import LoginPage from './login/page';
 import { hasPermission } from '@/lib/roles';
 import { PrivacyPolicy } from '@/components/privacy-policy';
@@ -63,7 +63,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   if (isUserLoading || (!user && pathname !== '/login')) {
     return (
         <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-background">
-            <Logo className="size-16 animate-pulse text-primary" />
+            <Image src="/images/load-icon.png" alt="Loading" width={64} height={64} className="animate-pulse" />
             <p className="text-muted-foreground">Loading Operations...</p>
         </div>
     );
