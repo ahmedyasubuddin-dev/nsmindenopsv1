@@ -127,14 +127,8 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => void }) {
 
 export default function LoginPage() {
   const router = useRouter();
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
 
-  const handleOpenChange = (isOpen: boolean) => {
-    // Keep modal open until login is successful
-    if (open) return; 
-    setOpen(isOpen);
-  };
-  
   const handleLoginSuccess = () => {
     setOpen(false);
     router.push('/dashboard'); 
@@ -142,7 +136,7 @@ export default function LoginPage() {
   
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center login-background p-4">
-      <Dialog open={open} onOpenChange={handleOpenChange}>
+      <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
            <div className="text-center text-white">
               <Logo className="mx-auto h-16 w-16 text-white drop-shadow-lg" />

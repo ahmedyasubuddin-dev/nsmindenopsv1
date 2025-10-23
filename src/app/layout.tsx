@@ -13,7 +13,7 @@ import LoginPage from './login/page';
 import { hasPermission } from '@/lib/roles';
 import { PrivacyPolicy } from '@/components/privacy-policy';
 
-const APP_TITLE = 'SRD: Minden Operations';
+const APP_TITLE = 'North Sails Minden Operations Dashboard';
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, role, isUserLoading } = useUser();
@@ -88,6 +88,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+         <meta name="robots" content="noindex, nofollow" />
       </head>
       <body className="font-body antialiased">
         <FirebaseClientProvider>
