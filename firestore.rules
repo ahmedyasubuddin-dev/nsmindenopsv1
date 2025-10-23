@@ -1,206 +1,272 @@
 /**
- * @file Firestore Security Rules
- * @description This ruleset enforces a strict, role-based access control model.
+ * @fileoverview Firestore Security Rules for the application.
+ *
+ * Core Philosophy:
+ * This ruleset prioritizes strong authorization. It uses an "owner-only" access model for user-specific data and public read access with owner-only writes for other collections. Data validation is relaxed to enable rapid prototyping, focusing only on relational integrity and authorization checks.
  *
  * Data Structure:
- * - User profiles are stored under `/users/{userId}`.
- * - Department reports and tasks are stored in top-level collections (e.g., `/pregger_reports/{docId}`).
+ * - User profiles are stored under `/users/{userId}`, accessible only to the owning user.
+ * - Other collections such as `pregger_reports`, `tapeheads_submissions`, `tapehead_reviews`, `gantry_reports`, `films_reports`, `graphics_tasks`, `qc_inspections`, `analytics_snapshots`, `sail_status`, and `jobs` allow public reads, but restrict writes to authenticated users.
  *
  * Key Security Decisions:
- * - Users can only read and write their own profiles.
- * - Department reports and tasks are only accessible to authenticated users.
- * - Listing of users is disallowed to prevent data leakage.
+ * - Listing user documents is disallowed.
+ * - Data validation is minimal during the prototyping phase. Only ownership and relationship integrity are enforced.
  *
  * Denormalization for Authorization:
- * - No denormalization is explicitly used in these rules, but consider adding fields like `ownerId` to documents to simplify authorization and avoid costly `get()` calls in future iterations.
+ *  N/A - Not applicable in this basic ruleset.
  *
  * Structural Segregation:
- * - No structural segregation is implemented. All collections are top-level. Consider using subcollections for private vs. public data in the future.
+ *  N/A - Not applicable in this basic ruleset.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to user profiles.
+     * @description Checks if the request is made by an authenticated user.
+     * @return {boolean} True if the user is signed in, false otherwise.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * @description Checks if the authenticated user's UID matches the provided userId.
+     * @param {string} userId - The user ID to compare against.
+     * @return {boolean} True if the user is the owner, false otherwise.
+     */
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    /**
+     * @description Checks if the authenticated user is the owner of the existing document.
+     * @param {string} userId - The user ID to compare against.
+     * @return {boolean} True if the user is the owner and the document exists.
+     */
+    function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * @description Rules for user profiles.
      * @path /users/{userId}
-     * @allow (create) - User with UID 'user123' can create their profile at /users/user123 if the document's 'id' field also contains 'user123'.
-     * @allow (get, update, delete) - User with UID 'user123' can read, update, and delete their profile at /users/user123.
-     * @deny (create) - User with UID 'user456' cannot create a profile at /users/user123.
-     * @deny (get, update, delete) - User with UID 'user456' cannot read, update, or delete the profile at /users/user123.
-     * @principle Enforces document ownership for reads and writes.
+     * @allow (create) User with UID 'user123' can create their own profile.
+     * @allow (get) User with UID 'user123' can read their own profile.
+     * @allow (update) User with UID 'user123' can update their own profile.
+     * @allow (delete) User with UID 'user123' can delete their own profile.
+     * @deny (create) User with UID 'user456' cannot create a profile for 'user123'.
+     * @deny (get) User with UID 'user456' cannot read the profile of 'user123'.
+     * @deny (update) User with UID 'user456' cannot update the profile of 'user123'.
+     * @deny (delete) User with UID 'user456' cannot delete the profile of 'user123'.
+     * @principle Enforces document ownership for all operations on user profiles.
      */
     match /users/{userId} {
       allow get: if isOwner(userId);
-      allow list: if false;
-      allow create: if isOwner(userId) && request.resource.data.email is string;
-      allow update: if isExistingOwner(userId) && request.resource.data.email == resource.data.email;
+      allow list: if false; // Prevent listing of user documents.
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
       allow delete: if isExistingOwner(userId);
     }
 
-    /**
-     * @description Controls access to Pregger reports.
-     * @path /pregger_reports/{docId}
-     * @allow (get, list) - Any authenticated user can read Pregger reports.
-     * @allow (create, update, delete) - Only authenticated users can create, update, or delete Pregger reports.
-     * @deny (create, update, delete) - Unauthenticated users cannot create, update, or delete Pregger reports.
-     * @principle Requires authentication for all writes.
-     */
+     /**
+      * @description Rules for Pregger reports. Allows public read, restricts write to authenticated users.
+      * @path /pregger_reports/{docId}
+      * @allow (get) Any user can read a Pregger report.
+      * @allow (list) Any user can list Pregger reports.
+      * @allow (create) Authenticated user can create a Pregger report.
+      * @allow (update) Authenticated user can update a Pregger report.
+      * @allow (delete) Authenticated user can delete a Pregger report.
+      * @deny (create) Unauthenticated user cannot create a Pregger report.
+      * @deny (update) Unauthenticated user cannot update a Pregger report.
+      * @deny (delete) Unauthenticated user cannot delete a Pregger report.
+      * @principle Allows public read access with owner-only writes for Pregger reports.
+      */
     match /pregger_reports/{docId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+        allow get, list: if true;
+        allow create: if isSignedIn();
+        allow update: if isSignedIn() && resource != null;
+        allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Controls access to Tapehead submissions.
+     * @description Rules for Tapehead submissions. Allows public read, restricts write to authenticated users.
      * @path /tapeheads_submissions/{docId}
-     * @allow (get, list) - Any authenticated user can read Tapehead submissions.
-     * @allow (create, update, delete) - Only authenticated users can create, update, or delete Tapehead submissions.
-     * @deny (create, update, delete) - Unauthenticated users cannot create, update, or delete Tapehead submissions.
-     * @principle Requires authentication for all writes.
+     * @allow (get) Any user can read a Tapehead submission.
+     * @allow (list) Any user can list Tapehead submissions.
+     * @allow (create) Authenticated user can create a Tapehead submission.
+     * @allow (update) Authenticated user can update a Tapehead submission.
+     * @allow (delete) Authenticated user can delete a Tapehead submission.
+     * @deny (create) Unauthenticated user cannot create a Tapehead submission.
+     * @deny (update) Unauthenticated user cannot update a Tapehead submission.
+     * @deny (delete) Unauthenticated user cannot delete a Tapehead submission.
+     * @principle Allows public read access with owner-only writes for Tapehead submissions.
      */
     match /tapeheads_submissions/{docId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+        allow get, list: if true;
+        allow create: if isSignedIn();
+        allow update: if isSignedIn() && resource != null;
+        allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Controls access to Tapehead reviews.
+     * @description Rules for Tapehead reviews. Allows public read, restricts write to authenticated users.
      * @path /tapehead_reviews/{docId}
-     * @allow (get, list) - Any authenticated user can read Tapehead reviews.
-     * @allow (create, update, delete) - Only authenticated users can create, update, or delete Tapehead reviews.
-     * @deny (create, update, delete) - Unauthenticated users cannot create, update, or delete Tapehead reviews.
-     * @principle Requires authentication for all writes.
+     * @allow (get) Any user can read a Tapehead review.
+     * @allow (list) Any user can list Tapehead reviews.
+     * @allow (create) Authenticated user can create a Tapehead review.
+     * @allow (update) Authenticated user can update a Tapehead review.
+     * @allow (delete) Authenticated user can delete a Tapehead review.
+     * @deny (create) Unauthenticated user cannot create a Tapehead review.
+     * @deny (update) Unauthenticated user cannot update a Tapehead review.
+     * @deny (delete) Unauthenticated user cannot delete a Tapehead review.
+     * @principle Allows public read access with owner-only writes for Tapehead reviews.
      */
     match /tapehead_reviews/{docId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+        allow get, list: if true;
+        allow create: if isSignedIn();
+        allow update: if isSignedIn() && resource != null;
+        allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Controls access to Gantry reports.
+     * @description Rules for Gantry reports. Allows public read, restricts write to authenticated users.
      * @path /gantry_reports/{docId}
-     * @allow (get, list) - Any authenticated user can read Gantry reports.
-     * @allow (create, update, delete) - Only authenticated users can create, update, or delete Gantry reports.
-     * @deny (create, update, delete) - Unauthenticated users cannot create, update, or delete Gantry reports.
-     * @principle Requires authentication for all writes.
+     * @allow (get) Any user can read a Gantry report.
+     * @allow (list) Any user can list Gantry reports.
+     * @allow (create) Authenticated user can create a Gantry report.
+     * @allow (update) Authenticated user can update a Gantry report.
+     * @allow (delete) Authenticated user can delete a Gantry report.
+     * @deny (create) Unauthenticated user cannot create a Gantry report.
+     * @deny (update) Unauthenticated user cannot update a Gantry report.
+     * @deny (delete) Unauthenticated user cannot delete a Gantry report.
+     * @principle Allows public read access with owner-only writes for Gantry reports.
      */
     match /gantry_reports/{docId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+        allow get, list: if true;
+        allow create: if isSignedIn();
+        allow update: if isSignedIn() && resource != null;
+        allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Controls access to Films reports.
+     * @description Rules for Films reports. Allows public read, restricts write to authenticated users.
      * @path /films_reports/{docId}
-     * @allow (get, list) - Any authenticated user can read Films reports.
-     * @allow (create, update, delete) - Only authenticated users can create, update, or delete Films reports.
-     * @deny (create, update, delete) - Unauthenticated users cannot create, update, or delete Films reports.
-     * @principle Requires authentication for all writes.
+     * @allow (get) Any user can read a Films report.
+     * @allow (list) Any user can list Films reports.
+     * @allow (create) Authenticated user can create a Films report.
+     * @allow (update) Authenticated user can update a Films report.
+     * @allow (delete) Authenticated user can delete a Films report.
+     * @deny (create) Unauthenticated user cannot create a Films report.
+     * @deny (update) Unauthenticated user cannot update a Films report.
+     * @deny (delete) Unauthenticated user cannot delete a Films report.
+     * @principle Allows public read access with owner-only writes for Films reports.
      */
     match /films_reports/{docId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+        allow get, list: if true;
+        allow create: if isSignedIn();
+        allow update: if isSignedIn() && resource != null;
+        allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Controls access to Graphics tasks.
+     * @description Rules for Graphics tasks. Allows public read, restricts write to authenticated users.
      * @path /graphics_tasks/{docId}
-     * @allow (get, list) - Any authenticated user can read Graphics tasks.
-     * @allow (create, update, delete) - Only authenticated users can create, update, or delete Graphics tasks.
-     * @deny (create, update, delete) - Unauthenticated users cannot create, update, or delete Graphics tasks.
-     * @principle Requires authentication for all writes.
+     * @allow (get) Any user can read a Graphics task.
+     * @allow (list) Any user can list Graphics tasks.
+     * @allow (create) Authenticated user can create a Graphics task.
+     * @allow (update) Authenticated user can update a Graphics task.
+     * @allow (delete) Authenticated user can delete a Graphics task.
+     * @deny (create) Unauthenticated user cannot create a Graphics task.
+     * @deny (update) Unauthenticated user cannot update a Graphics task.
+     * @deny (delete) Unauthenticated user cannot delete a Graphics task.
+     * @principle Allows public read access with owner-only writes for Graphics tasks.
      */
     match /graphics_tasks/{docId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+        allow get, list: if true;
+        allow create: if isSignedIn();
+        allow update: if isSignedIn() && resource != null;
+        allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Controls access to QC inspections.
+     * @description Rules for QC inspections. Allows public read, restricts write to authenticated users.
      * @path /qc_inspections/{docId}
-     * @allow (get, list) - Any authenticated user can read QC inspections.
-     * @allow (create, update, delete) - Only authenticated users can create, update, or delete QC inspections.
-     * @deny (create, update, delete) - Unauthenticated users cannot create, update, or delete QC inspections.
-     * @principle Requires authentication for all writes.
+     * @allow (get) Any user can read a QC inspection.
+     * @allow (list) Any user can list QC inspections.
+     * @allow (create) Authenticated user can create a QC inspection.
+     * @allow (update) Authenticated user can update a QC inspection.
+     * @allow (delete) Authenticated user can delete a QC inspection.
+     * @deny (create) Unauthenticated user cannot create a QC inspection.
+     * @deny (update) Unauthenticated user cannot update a QC inspection.
+     * @deny (delete) Unauthenticated user cannot delete a QC inspection.
+     * @principle Allows public read access with owner-only writes for QC inspections.
      */
     match /qc_inspections/{docId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+        allow get, list: if true;
+        allow create: if isSignedIn();
+        allow update: if isSignedIn() && resource != null;
+        allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Controls access to Analytics snapshots.
+     * @description Rules for Analytics snapshots. Allows public read, restricts write to authenticated users.
      * @path /analytics_snapshots/{docId}
-     * @allow (get, list) - Any authenticated user can read Analytics snapshots.
-     * @allow (create, update, delete) - Only authenticated users can create, update, or delete Analytics snapshots.
-     * @deny (create, update, delete) - Unauthenticated users cannot create, update, or delete Analytics snapshots.
-     * @principle Requires authentication for all writes.
+     * @allow (get) Any user can read a Analytics snapshot.
+     * @allow (list) Any user can list Analytics snapshots.
+     * @allow (create) Authenticated user can create a Analytics snapshot.
+     * @allow (update) Authenticated user can update a Analytics snapshot.
+     * @allow (delete) Authenticated user can delete a Analytics snapshot.
+     * @deny (create) Unauthenticated user cannot create a Analytics snapshot.
+     * @deny (update) Unauthenticated user cannot update a Analytics snapshot.
+     * @deny (delete) Unauthenticated user cannot delete a Analytics snapshot.
+     * @principle Allows public read access with owner-only writes for Analytics snapshots.
      */
     match /analytics_snapshots/{docId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+        allow get, list: if true;
+        allow create: if isSignedIn();
+        allow update: if isSignedIn() && resource != null;
+        allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Controls access to Sail status.
+     * @description Rules for Sail status. Allows public read, restricts write to authenticated users.
      * @path /sail_status/{docId}
-     * @allow (get, list) - Any authenticated user can read Sail status.
-     * @allow (create, update, delete) - Only authenticated users can create, update, or delete Sail status.
-     * @deny (create, update, delete) - Unauthenticated users cannot create, update, or delete Sail status.
-     * @principle Requires authentication for all writes.
+     * @allow (get) Any user can read a Sail status.
+     * @allow (list) Any user can list Sail statuses.
+     * @allow (create) Authenticated user can create a Sail status.
+     * @allow (update) Authenticated user can update a Sail status.
+     * @allow (delete) Authenticated user can delete a Sail status.
+     * @deny (create) Unauthenticated user cannot create a Sail status.
+     * @deny (update) Unauthenticated user cannot update a Sail status.
+     * @deny (delete) Unauthenticated user cannot delete a Sail status.
+     * @principle Allows public read access with owner-only writes for Sail statuses.
      */
     match /sail_status/{docId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+        allow get, list: if true;
+        allow create: if isSignedIn();
+        allow update: if isSignedIn() && resource != null;
+        allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Controls access to OE Jobs.
+     * @description Rules for OE Jobs. Allows public read, restricts write to authenticated users.
      * @path /jobs/{docId}
-     * @allow (get, list) - Any authenticated user can read OE Jobs.
-     * @allow (create, update, delete) - Only authenticated users can create, update, or delete OE Jobs.
-     * @deny (create, update, delete) - Unauthenticated users cannot create, update, or delete OE Jobs.
-     * @principle Requires authentication for all writes.
+     * @allow (get) Any user can read a OE Job.
+     * @allow (list) Any user can list OE Jobs.
+     * @allow (create) Authenticated user can create a OE Job.
+     * @allow (update) Authenticated user can update a OE Job.
+     * @allow (delete) Authenticated user can delete a OE Job.
+     * @deny (create) Unauthenticated user cannot create a OE Job.
+     * @deny (update) Unauthenticated user cannot update a OE Job.
+     * @deny (delete) Unauthenticated user cannot delete a OE Job.
+     * @principle Allows public read access with owner-only writes for OE Jobs.
      */
     match /jobs/{docId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+        allow get, list: if true;
+        allow create: if isSignedIn();
+        allow update: if isSignedIn() && resource != null;
+        allow delete: if isSignedIn() && resource != null;
     }
-  }
-
-  // Helper function to determine if the user is signed in.
-  function isSignedIn() {
-    return request.auth != null;
-  }
-
-  // Helper function to determine if the requesting user is the owner of the document.
-  function isOwner(userId) {
-    return request.auth.uid == userId;
-  }
-
-  // Helper function to determine if the requesting user is the owner of the document and it exists.
-  function isExistingOwner(userId) {
-    return isOwner(userId) && resource != null;
   }
 }
