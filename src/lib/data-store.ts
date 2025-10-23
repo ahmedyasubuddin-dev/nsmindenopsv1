@@ -171,19 +171,19 @@ export async function addOeJob(firestore: Firestore, job: { oeBase: string, sect
 
 export async function addFilmsReport(firestore: Firestore, report: Omit<FilmsReport, 'id'>): Promise<void> {
     const newReport = { ...report };
-    const filmsCollection = collection(firestore, 'films');
+    const filmsCollection = collection(firestore, 'films_reports');
     addDocumentNonBlocking(filmsCollection, newReport);
 }
 
 export async function addGantryReport(firestore: Firestore, report: Omit<GantryReport, 'id'>): Promise<void> {
     const newReport = { ...report, id: `gantry_rpt_${Date.now()}` };
-    const docRef = doc(firestore, 'gantry-reports', newReport.id);
+    const docRef = doc(firestore, 'gantry_reports', newReport.id);
     setDocumentNonBlocking(docRef, newReport, { merge: true });
 }
 
 export async function addPreggerReport(firestore: Firestore, report: Omit<PreggerReport, 'id'>): Promise<void> {
     const newReport = { ...report, id: `pregger_rpt_${Date.now()}` };
-    const docRef = doc(firestore, 'pregger-reports', newReport.id);
+    const docRef = doc(firestore, 'pregger_reports', newReport.id);
     setDocumentNonBlocking(docRef, newReport, { merge: true });
 }
 
@@ -266,5 +266,3 @@ export async function deleteTapeheadsSubmission(firestore: Firestore, id: string
     const docRef = doc(firestore, 'tapeheads_submissions', id);
     await deleteDocumentNonBlocking(docRef);
 }
-
-    
