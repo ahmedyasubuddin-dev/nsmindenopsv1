@@ -119,7 +119,7 @@ export function TapeheadsReviewSummary() {
     endOfDay.setHours(23, 59, 59, 999);
 
     return query(
-      collection(firestore, 'tapeheads-submissions'),
+      collection(firestore, 'tapeheads_submissions'),
       where('date', '>=', startOfDay),
       where('date', '<=', endOfDay),
       where('shift', '==', parseInt(shift, 10))
@@ -320,3 +320,5 @@ export function TapeheadsReviewSummary() {
     </div>
   );
 }
+
+    

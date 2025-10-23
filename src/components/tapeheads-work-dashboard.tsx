@@ -87,7 +87,7 @@ export function TapeheadsWorkDashboard() {
     const { isUserLoading } = useUser();
     const [date, setDate] = useState<Date | undefined>(new Date());
 
-    const reportsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'tapeheads-submissions')), [firestore, isUserLoading]);
+    const reportsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'tapeheads_submissions')), [firestore, isUserLoading]);
     const { data: reports, isLoading: loading } = useCollection<Report>(reportsQuery);
 
     const filteredWorkItems = React.useMemo(() => {
@@ -147,3 +147,5 @@ export function TapeheadsWorkDashboard() {
         </div>
     )
 }
+
+    

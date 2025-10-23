@@ -142,19 +142,19 @@ export async function getOeJobs(firestore: Firestore): Promise<OeJob[]> {
 }
 
 export async function addGraphicsTask(firestore: Firestore, task: Omit<GraphicsTask, 'id'>): Promise<string> {
-    const newDocRef = doc(collection(firestore, 'graphics-tasks'));
+    const newDocRef = doc(collection(firestore, 'graphics_tasks'));
     await setDocumentNonBlocking(newDocRef, { ...task, id: newDocRef.id });
     return newDocRef.id;
 }
 
 
 export async function updateGraphicsTask(firestore: Firestore, task: GraphicsTask): Promise<void> {
-    const docRef = doc(firestore, 'graphics-tasks', task.id);
+    const docRef = doc(firestore, 'graphics_tasks', task.id);
     await setDocumentNonBlocking(docRef, task, { merge: true });
 }
 
 export async function deleteGraphicsTask(firestore: Firestore, taskId: string): Promise<void> {
-    const docRef = doc(firestore, 'graphics-tasks', taskId);
+    const docRef = doc(firestore, 'graphics_tasks', taskId);
     await deleteDocumentNonBlocking(docRef);
 }
 
@@ -253,16 +253,18 @@ export async function markPanelsAsCompleted(firestore: Firestore, oeBase: string
 }
 
 export async function addTapeheadsSubmission(firestore: Firestore, report: Report): Promise<void> {
-    const docRef = doc(firestore, 'tapeheads-submissions', report.id);
+    const docRef = doc(firestore, 'tapeheads_submissions', report.id);
     setDocumentNonBlocking(docRef, report, { merge: true });
 }
 
 export async function updateTapeheadsSubmission(firestore: Firestore, updatedReport: Report): Promise<void> {
-    const docRef = doc(firestore, 'tapeheads-submissions', updatedReport.id);
+    const docRef = doc(firestore, 'tapeheads_submissions', updatedReport.id);
     updateDocumentNonBlocking(docRef, updatedReport);
 }
 
 export async function deleteTapeheadsSubmission(firestore: Firestore, id: string): Promise<void> {
-    const docRef = doc(firestore, 'tapeheads-submissions', id);
+    const docRef = doc(firestore, 'tapeheads_submissions', id);
     await deleteDocumentNonBlocking(docRef);
 }
+
+    
