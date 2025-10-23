@@ -15,6 +15,7 @@ import { DatePicker } from './ui/date-picker';
 import { format, isSameDay } from 'date-fns';
 import { useCollection, useFirebase, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
+import { DoubleChevronRightIcon } from './icons';
 
 function SubmittedReportCard({ report, workItem, itemIndex }: { report: Report, workItem: WorkItem, itemIndex: number }) {
     const router = useRouter();
@@ -69,7 +70,7 @@ function SubmittedReportCard({ report, workItem, itemIndex }: { report: Report, 
                  ) : (
                     <>
                         <Badge variant="outline" className="border-amber-500 text-amber-600">
-                           <ChevronsRight className="mr-1 h-3 w-3"/>
+                           <DoubleChevronRightIcon className="mr-1 h-3 w-3"/>
                            In Progress {workItem.layer && `(${workItem.layer})`}
                         </Badge>
                         <Button size="sm" variant="secondary" onClick={handleTakeOver}>
