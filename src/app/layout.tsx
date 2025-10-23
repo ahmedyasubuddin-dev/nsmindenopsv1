@@ -11,6 +11,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Logo } from '@/components/icons';
 import LoginPage from './login/page';
 import { hasPermission } from '@/lib/roles';
+import { PrivacyPolicy } from '@/components/privacy-policy';
 
 const APP_TITLE = 'SRD: Minden Operations';
 
@@ -91,9 +92,14 @@ export default function RootLayout({
       <body className="font-body antialiased">
         <FirebaseClientProvider>
           <AppTitleProvider title={APP_TITLE}>
-            <AuthGuard>
-              {children}
-            </AuthGuard>
+            <div className="flex flex-col min-h-screen">
+              <main className="flex-grow">
+                <AuthGuard>
+                  {children}
+                </AuthGuard>
+              </main>
+              <PrivacyPolicy />
+            </div>
           </AppTitleProvider>
         </FirebaseClientProvider>
         <Toaster />

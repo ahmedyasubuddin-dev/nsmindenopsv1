@@ -64,17 +64,19 @@ function SmsNotificationDialog() {
 
 export function PrivacyPolicy() {
   return (
-    <div className="flex flex-col items-center gap-1.5 text-center">
-        <p>By signing in, you acknowledge and agree to our</p>
-        <div className="flex gap-4 justify-center">
+    <footer className="w-full p-4 border-t mt-auto bg-background z-10">
+      <div className="container mx-auto flex flex-col sm:flex-row justify-between items-center text-xs text-muted-foreground">
+        <p className="mb-2 sm:mb-0">© 2025 North Sails LLC | All rights reserved.</p>
+        <div className="flex items-center gap-4">
             <SmsNotificationDialog />
-            <a href="https://www.northsails.com/en-us/pages/faq-privacy-policy" target="_blank" rel="noopener noreferrer" className="p-0 h-auto text-muted-foreground hover:text-primary underline">
+            <a href="https://www.northsails.com/en-us/pages/faq-privacy-policy" target="_blank" rel="noopener noreferrer" className="p-0 h-auto hover:text-primary">
                 Privacy Policy
             </a>
-            <a href="https://www.northsails.com/en-us/pages/faq-general-terms-conditions" target="_blank" rel="noopener noreferrer" className="p-0 h-auto text-muted-foreground hover:text-primary underline">
+            <a href="https://www.northsails.com/en-us/pages/faq-general-terms-conditions" target="_blank" rel="noopener noreferrer" className="p-0 h-auto hover:text-primary">
                 Terms & Conditions
             </a>
         </div>
-    </div>
+      </div>
+    </footer>
   )
 }
