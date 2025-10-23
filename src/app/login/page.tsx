@@ -152,6 +152,12 @@ export default function LoginPage() {
             </div>
         </DialogTrigger>
         <DialogContent className="p-0 bg-transparent border-none shadow-none w-full max-w-md">
+            <DialogHeader className="sr-only">
+              <DialogTitle>Sign In</DialogTitle>
+              <DialogDescription>
+                Enter your username and password to access the dashboard.
+              </DialogDescription>
+            </DialogHeader>
            <LoginForm onLoginSuccess={handleLoginSuccess} />
         </DialogContent>
       </Dialog>
