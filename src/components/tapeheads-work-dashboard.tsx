@@ -8,14 +8,13 @@ import { PageHeader } from './page-header';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Badge } from './ui/badge';
-import { CheckCircle, Edit, ChevronsRight } from 'lucide-react';
+import { CheckCircle, Edit } from 'lucide-react';
 import type { Report, WorkItem } from '@/lib/data-store';
 import { Progress } from './ui/progress';
 import { DatePicker } from './ui/date-picker';
 import { format, isSameDay } from 'date-fns';
 import { useCollection, useFirebase, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
-import { DoubleChevronRightIcon } from './icons';
 
 function SubmittedReportCard({ report, workItem, itemIndex }: { report: Report, workItem: WorkItem, itemIndex: number }) {
     const router = useRouter();
@@ -70,7 +69,7 @@ function SubmittedReportCard({ report, workItem, itemIndex }: { report: Report, 
                  ) : (
                     <>
                         <Badge variant="outline" className="border-amber-500 text-amber-600">
-                           <DoubleChevronRightIcon className="mr-1 h-3 w-3"/>
+                           <img src="/images/takeover-icon.svg" alt="In Progress" className="mr-1 h-3 w-3" />
                            In Progress {workItem.layer && `(${workItem.layer})`}
                         </Badge>
                         <Button size="sm" variant="secondary" onClick={handleTakeOver}>
@@ -129,7 +128,7 @@ export function TapeheadsWorkDashboard() {
             </PageHeader>
             
             <h2 className="text-xl font-semibold tracking-tight">
-                Showing In-Progress Tasks & Completed for {date ? date.toLocaleDateString() : 'All Dates'}
+                Showing In-Progress Tasks &amp; Completed for {date ? date.toLocaleDateString() : 'All Dates'}
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
