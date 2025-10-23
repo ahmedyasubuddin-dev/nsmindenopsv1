@@ -133,8 +133,8 @@ export function TapeheadsWorkDashboard() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {filteredWorkItems.length > 0 ? (
-                    filteredWorkItems.map(({ report, workItem, id }) => (
-                         <SubmittedReportCard key={id} report={report} workItem={workItem} itemIndex={0} />
+                    filteredWorkItems.map(({ report, workItem, id }, index) => (
+                         <SubmittedReportCard key={id} report={report} workItem={workItem} itemIndex={index} />
                     ))
                 ) : (
                     <Card className="col-span-full">
