@@ -11,7 +11,6 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import { Logo } from '@/components/icons';
 import { useFirebase } from '@/firebase';
 import { signInAnonymously } from 'firebase/auth';
 import Image from 'next/image';
@@ -88,7 +87,7 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => void }) {
   return (
     <Card className="w-full max-w-md shadow-2xl bg-card/90 backdrop-blur-sm border-none">
       <CardHeader className="text-center">
-        <Logo className="mx-auto h-12 w-12 text-primary" />
+        <Image src="/images/icon_1.png" alt="North Sails Logo" width={48} height={48} className="mx-auto" />
         <CardTitle className="text-2xl font-headline mt-4">SRD: Minden Ops</CardTitle>
         <CardDescription>Please sign in to continue</CardDescription>
       </CardHeader>
