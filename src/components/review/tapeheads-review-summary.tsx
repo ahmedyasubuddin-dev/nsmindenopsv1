@@ -16,12 +16,13 @@ import { Textarea } from '../ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { summarizeShift } from '@/ai/flows/summarize-shift-flow';
 import { Badge } from '../ui/badge';
-import { Edit, Trash2 } from 'lucide-react';
+import { Edit, Trash2, AlertTriangle } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 import { TapeheadsOperatorForm } from '../tapeheads-operator-form';
 import { useCollection, useFirebase, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
 const reviewSchema = z.object({
   date: z.date(),
@@ -126,7 +127,7 @@ export function TapeheadsReviewSummary() {
     );
   }, [date, shift, firestore, isUserLoading]);
 
-  const { data: submissions, isLoading: isLoadingSubmissions } = useCollection<Report>(submissionsQuery);
+  const { data: submissions, isLoading: isLoadingSubmissions, error: submissionsError } = useCollection<Report>(submissionsQuery);
 
   const handleLoadSubmissions = () => {
     setAiSummary(''); 
@@ -311,7 +312,17 @@ export function TapeheadsReviewSummary() {
           ) : (
             <Card>
               <CardContent className="p-6 text-center text-muted-foreground">
-                { !isLoadingSubmissions && !isUserLoading && <p>No submissions found for this date and shift.</p> }
+                {submissionsError ? (
+                     <Alert variant="destructive">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTitle>Permission Error</AlertTitle>
+                        <AlertDescription>
+                            Could not load submissions. Check Firestore security rules for the 'tapeheads_submissions' collection.
+                        </AlertDescription>
+                    </Alert>
+                ) : !isLoadingSubmissions && !isUserLoading && (
+                    <p>No submissions found for this date and shift.</p>
+                )}
               </CardContent>
             </Card>
           )}
@@ -320,5 +331,3 @@ export function TapeheadsReviewSummary() {
     </div>
   );
 }
-
-    

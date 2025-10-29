@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm, useFieldArray } from "react-hook-form"
 import * as z from "zod"
 import React, { useState, useEffect } from "react"
-import { PlusCircle, Trash2 } from "lucide-react"
+import { PlusCircle, Trash2, AlertTriangle } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -30,6 +30,7 @@ import { updateGraphicsTask, deleteGraphicsTask, addGraphicsTask } from "@/lib/d
 import { PageHeader } from "@/components/page-header"
 import { useCollection, useFirebase, useMemoFirebase, useAuth as useFirebaseAuth } from "@/firebase"
 import { collection, query } from "firebase/firestore"
+import { Alert, AlertTitle, AlertDescription } from "./ui/alert"
 
 
 const personnelSchema = z.object({
@@ -85,10 +86,10 @@ export function GraphicsReportForm() {
     
     const tasksQuery = useMemoFirebase(() => {
       if (isUserLoading) return null;
-      return query(collection(firestore, 'graphics-tasks'));
+      return query(collection(firestore, 'graphics_tasks'));
     }, [firestore, isUserLoading]);
     
-    const { data: tasks, isLoading: isLoadingTasks } = useCollection<Task>(tasksQuery);
+    const { data: tasks, isLoading: isLoadingTasks, error: tasksError } = useCollection<Task>(tasksQuery);
     
     const [notifiedTags, setNotifiedTags] = useState<Set<string>>(new Set());
 
@@ -184,8 +185,8 @@ export function GraphicsReportForm() {
                 type: 'inking', tagId: '', status: 'todo',
                 content: '', tagType: 'Sail', startedAt: new Date().toISOString(),
             };
-            await addGraphicsTask(firestore, { ...cuttingTask, id: `cut-${timestamp}` });
-            await addGraphicsTask(firestore, { ...inkingTask, id: `ink-${timestamp}` });
+            await addGraphicsTask(firestore, { ...cuttingTask });
+            await addGraphicsTask(firestore, { ...inkingTask });
             toast({ title: "Task Pair Added", description: `A new Cutting and Inking task pair has been created.` });
 
         } else {
@@ -193,7 +194,7 @@ export function GraphicsReportForm() {
                 type: 'inking', tagId: '', status: 'todo',
                 content: '', tagType: 'Sail', startedAt: new Date().toISOString(),
             };
-             await addGraphicsTask(firestore, { ...inkingTask, id: `ink-${timestamp}` });
+             await addGraphicsTask(firestore, { ...inkingTask });
              toast({ title: "Task Added", description: `A new Inking task has been created.` });
         }
     }
@@ -287,22 +288,29 @@ export function GraphicsReportForm() {
                     </Dialog>
                 </div>
                 
-
-                <Tabs defaultValue="cutting">
-                    <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="cutting">Cutting/Masking Tasks</TabsTrigger>
-                        <TabsTrigger value="inking">Inking Tasks</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="cutting">
-                        <GraphicsKanbanBoard tasks={cuttingTasks} type="cutting" onUpdateTask={onUpdateTask} onDeleteTask={onDeleteTask} onAddTask={() => addNewTask('cutting')} />
-                    </TabsContent>
-                    <TabsContent value="inking">
-                        <GraphicsKanbanBoard tasks={inkingTasks} type="inking" onUpdateTask={onUpdateTask} onDeleteTask={onDeleteTask} onAddTask={() => addNewTask('inking')} />
-                    </TabsContent>
-                </Tabs>
+                {tasksError ? (
+                     <Alert variant="destructive">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTitle>Permission Error</AlertTitle>
+                        <AlertDescription>
+                            Could not load Graphics tasks. Check Firestore security rules for the 'graphics_tasks' collection.
+                        </AlertDescription>
+                    </Alert>
+                ) : (
+                    <Tabs defaultValue="cutting">
+                        <TabsList className="grid w-full grid-cols-2">
+                            <TabsTrigger value="cutting">Cutting/Masking Tasks</TabsTrigger>
+                            <TabsTrigger value="inking">Inking Tasks</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="cutting">
+                            <GraphicsKanbanBoard tasks={cuttingTasks} type="cutting" onUpdateTask={onUpdateTask} onDeleteTask={onDeleteTask} onAddTask={() => addNewTask('cutting')} />
+                        </TabsContent>
+                        <TabsContent value="inking">
+                            <GraphicsKanbanBoard tasks={inkingTasks} type="inking" onUpdateTask={onUpdateTask} onDeleteTask={onDeleteTask} onAddTask={() => addNewTask('inking')} />
+                        </TabsContent>
+                    </Tabs>
+                )}
             </div>
         </Form>
     )
 }
-
-    

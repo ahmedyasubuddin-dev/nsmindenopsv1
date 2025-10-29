@@ -13,10 +13,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Edit } from 'lucide-react';
+import { PlusCircle, Edit, AlertTriangle } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { useCollection, useFirebase, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
 // This is a placeholder. In a real app, this would be a server action calling a Cloud Function.
 async function manageUser(action: 'create' | 'updateRole' | 'toggleStatus', payload: any) {
@@ -60,7 +61,7 @@ export function UserManagement() {
     const { isUserLoading } = useUser();
 
     const usersQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'users')), [firestore, isUserLoading]);
-    const { data: users, isLoading } = useCollection<UserProfile>(usersQuery);
+    const { data: users, isLoading, error } = useCollection<UserProfile>(usersQuery);
 
     const form = useForm<NewUserFormValues>({
         resolver: zodResolver(newUserSchema),
@@ -140,6 +141,15 @@ export function UserManagement() {
                     </div>
                 </CardHeader>
                 <CardContent>
+                    {error && (
+                         <Alert variant="destructive" className="mb-4">
+                            <AlertTriangle className="h-4 w-4" />
+                            <AlertTitle>Permission Error</AlertTitle>
+                            <AlertDescription>
+                                Could not load user data. Check Firestore security rules for the 'users' collection.
+                            </AlertDescription>
+                        </Alert>
+                    )}
                     <Table>
                         <TableHeader>
                             <TableRow>
@@ -152,8 +162,8 @@ export function UserManagement() {
                         <TableBody>
                             {isLoading || isUserLoading ? (
                                 <TableRow><TableCell colSpan={4} className="text-center">Loading users...</TableCell></TableRow>
-                            ) : (
-                                users?.map(user => (
+                            ) : users && users.length > 0 ? (
+                                users.map(user => (
                                     <TableRow key={user.id}>
                                         <TableCell>{user.email}</TableCell>
                                         <TableCell><Badge variant="secondary">{user.role}</Badge></TableCell>
@@ -167,6 +177,8 @@ export function UserManagement() {
                                         </TableCell>
                                     </TableRow>
                                 ))
+                            ) : (
+                                <TableRow><TableCell colSpan={4} className="text-center">No users found.</TableCell></TableRow>
                             )}
                         </TableBody>
                     </Table>

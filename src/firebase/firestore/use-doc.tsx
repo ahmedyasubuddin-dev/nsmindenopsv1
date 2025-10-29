@@ -76,13 +76,14 @@ export function useDoc<T = any>(
           operation: 'get',
           path: memoizedDocRef.path,
         })
+        
+        console.error(contextualError);
+        setError(new Error("Firestore: Insufficient permissions. Check browser console for details."));
+        setData(null);
+        setIsLoading(false);
 
-        setError(contextualError)
-        setData(null)
-        setIsLoading(false)
-
-        // trigger global error propagation
-        errorEmitter.emit('permission-error', contextualError);
+        // We no longer emit the error globally to prevent the app from crashing.
+        // errorEmitter.emit('permission-error', contextualError);
       }
     );
 
