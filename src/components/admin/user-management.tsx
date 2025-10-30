@@ -18,17 +18,7 @@ import { Badge } from '../ui/badge';
 import { useCollection, useFirebase, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
-
-// This is a placeholder. In a real app, this would be a server action calling a Cloud Function.
-async function manageUser(action: 'create' | 'updateRole' | 'toggleStatus', payload: any) {
-    console.log(`Simulating user management action: ${action}`, payload);
-    // In a real implementation, you would have an API route here that calls a secure Cloud Function.
-    // For example: await fetch('/api/admin/users', { method: 'POST', body: JSON.stringify({ action, ...payload }) });
-    
-    // Simulate a successful response for the demo
-    return { success: true, message: `User action '${action}' simulated successfully.` };
-}
-
+import { createUser, type CreateUserInput } from '@/ai/flows/create-user-flow';
 
 const userRoles = [
   "Superuser", "B2 Supervisor", "B1 Supervisor", "Quality Manager", "Management", 
@@ -59,9 +49,10 @@ export function UserManagement() {
     const [isUpdateDialogOpen, setUpdateDialogOpen] = useState(false);
     const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
     const { isUserLoading } = useUser();
+    const [isCreatingUser, setIsCreatingUser] = useState(false);
 
     const usersQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'users')), [firestore, isUserLoading]);
-    const { data: users, isLoading, error } = useCollection<UserProfile>(usersQuery);
+    const { data: users, isLoading, error: usersError } = useCollection<UserProfile>(usersQuery);
 
     const form = useForm<NewUserFormValues>({
         resolver: zodResolver(newUserSchema),
@@ -71,13 +62,17 @@ export function UserManagement() {
     const updateRoleForm = useForm({ defaultValues: { role: '' }});
 
     const handleCreateUser = async (values: NewUserFormValues) => {
-        const result = await manageUser('create', values);
-        if (result.success) {
-            toast({ title: "User Created (Simulated)", description: `User ${values.email} has been created with the role ${values.role}.` });
+        setIsCreatingUser(true);
+        try {
+            const result = await createUser(values);
+            toast({ title: "User Created", description: `User ${result.email} has been created with the role ${result.role}.` });
             setCreateDialogOpen(false);
             form.reset();
-        } else {
-            toast({ title: "Error", description: result.message, variant: 'destructive' });
+        } catch (error: any) {
+            console.error("Error creating user:", error);
+            toast({ title: "Error", description: error.message || "Failed to create user.", variant: 'destructive' });
+        } finally {
+            setIsCreatingUser(false);
         }
     };
     
@@ -89,23 +84,10 @@ export function UserManagement() {
 
     const handleUpdateRole = async (values: { role: string }) => {
         if (!selectedUser) return;
-        const result = await manageUser('updateRole', { uid: selectedUser.id, role: values.role });
-        if (result.success) {
-            toast({ title: "Role Updated (Simulated)", description: `Role for ${selectedUser.email} is now ${values.role}.` });
-            setUpdateDialogOpen(false);
-        } else {
-             toast({ title: "Error", description: result.message, variant: 'destructive' });
-        }
-    };
-    
-     const handleToggleStatus = async (user: UserProfile) => {
-        const action = user.disabled ? 'enable' : 'disable';
-        const result = await manageUser('toggleStatus', { uid: user.id, status: !user.disabled });
-        if (result.success) {
-            toast({ title: `User ${action}d (Simulated)`, description: `${user.email} has been ${action}d.` });
-        } else {
-            toast({ title: "Error", description: result.message, variant: 'destructive' });
-        }
+        // This is still a placeholder. We will need a separate flow for updating roles.
+        console.log("Simulating role update for:", selectedUser.email, "to", values.role);
+        toast({ title: "Role Updated (Simulated)", description: `Role for ${selectedUser.email} is now ${values.role}.` });
+        setUpdateDialogOpen(false);
     };
 
     return (
@@ -132,7 +114,9 @@ export function UserManagement() {
                                         <FormField control={form.control} name="role" render={({ field }) => <FormItem><FormLabel>Role</FormLabel><Select onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue placeholder="Select a role"/></SelectTrigger></FormControl><SelectContent>{userRoles.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>} />
                                         <DialogFooter>
                                             <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
-                                            <Button type="submit">Create</Button>
+                                            <Button type="submit" disabled={isCreatingUser}>
+                                                {isCreatingUser ? 'Creating...' : 'Create'}
+                                            </Button>
                                         </DialogFooter>
                                     </form>
                                 </Form>
@@ -141,7 +125,7 @@ export function UserManagement() {
                     </div>
                 </CardHeader>
                 <CardContent>
-                    {error && (
+                    {usersError && (
                          <Alert variant="destructive" className="mb-4">
                             <AlertTriangle className="h-4 w-4" />
                             <AlertTitle>Permission Error</AlertTitle>
