@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { deleteTapeheadsSubmission, type Report } from '@/lib/data-store';
+import { type Report } from '@/lib/types';
 import { isSameDay, format } from 'date-fns';
 import { Textarea } from '../ui/textarea';
 import { useToast } from '@/hooks/use-toast';
@@ -20,24 +20,9 @@ import { Edit, Trash2, AlertTriangle } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 import { TapeheadsOperatorForm } from '../tapeheads-operator-form';
-import { useCollection, useFirebase, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { useUser } from '@/firebase';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
-
-// --- MOCK DATA ---
-const mockSubmissions: Report[] = [
-  {
-    id: "mock_1", operatorName: "John Doe", shift: 1, thNumber: "TH-1", date: new Date(), status: "Submitted", total_meters: 1250,
-    workItems: [{ oeNumber: "OAUS32160", section: "001", endOfShiftStatus: 'Completed', panelsWorkedOn: ["P1", "P2"], total_meters: 1250, total_tapes: 1, had_spin_out: false, tapes: [] }],
-    checklist: { smoothFuseFull: true, bladesGlasses: true, paperworkUpToDate: true, debriefNewOperator: true, electricScissor: true, tubesAtEndOfTable: true, sprayTracksOnBridge: true, sharpiePens: true, broom: true, cleanedWorkStation: true, meterStickTwoIrons: true, thIsleTrashEmpty: true }
-  },
-  {
-    id: "mock_2", operatorName: "Jane Smith", shift: 1, thNumber: "TH-2", date: new Date(), status: "Submitted", total_meters: 980,
-    workItems: [{ oeNumber: "OAUS32160", section: "002", endOfShiftStatus: 'In Progress', layer: "8 of 15", panelsWorkedOn: ["P10"], total_meters: 980, total_tapes: 1, had_spin_out: true, spin_outs: 1, spin_out_duration_minutes: 15, tapes: [] }],
-    checklist: { smoothFuseFull: true, bladesGlasses: true, paperworkUpToDate: false, debriefNewOperator: false, electricScissor: true, tubesAtEndOfTable: true, sprayTracksOnBridge: true, sharpiePens: true, broom: true, cleanedWorkStation: false, meterStickTwoIrons: true, thIsleTrashEmpty: true }
-  }
-];
-// --- END MOCK DATA ---
+import { getTapeheadsSubmissions } from '@/services/tapeheads-service';
 
 
 const reviewSchema = z.object({
@@ -108,12 +93,14 @@ function OperatorSubmissionCard({ report, onDelete, onEdit }: { report: Report, 
 
 export function TapeheadsReviewSummary() {
   const { toast } = useToast();
-  const { firestore } = useFirebase();
   const { isUserLoading } = useUser();
   const [isLoading, setIsLoading] = useState(false);
   const [aiSummary, setAiSummary] = useState('');
   const [isEditDialogOpen, setEditDialogOpen] = useState(false);
   const [reportToEdit, setReportToEdit] = useState<Report | undefined>();
+  const [submissions, setSubmissions] = useState<Report[]>([]);
+  const [isLoadingSubmissions, setIsLoadingSubmissions] = useState(true);
+  const [submissionsError, setSubmissionsError] = useState<Error | null>(null);
 
   const form = useForm<ReviewFormValues>({
     resolver: zodResolver(reviewSchema),
@@ -126,25 +113,27 @@ export function TapeheadsReviewSummary() {
 
   const { date, shift } = form.watch();
 
-  // MOCK: Replace live query with mock data
-  const { data: submissions, isLoading: isLoadingSubmissions, error: submissionsError } = useMemo(() => {
-    const filteredSubmissions = mockSubmissions.filter(s => {
-      const isSameShift = String(s.shift) === shift;
-      const isSameDateValue = isSameDay(s.date, date);
-      return isSameShift && isSameDateValue;
-    });
-
-    return {
-      data: filteredSubmissions,
-      isLoading: false,
-      error: null
-    };
+  useEffect(() => {
+    async function fetchSubmissions() {
+      setIsLoadingSubmissions(true);
+      setSubmissionsError(null);
+      try {
+        const allSubmissions = await getTapeheadsSubmissions();
+        const filtered = allSubmissions.filter(s => 
+            isSameDay(s.date, date) && String(s.shift) === shift
+        );
+        setSubmissions(filtered);
+      } catch (error) {
+        setSubmissionsError(error as Error);
+        console.error("Failed to fetch tapeheads submissions:", error);
+      } finally {
+        setIsLoadingSubmissions(false);
+      }
+    }
+    fetchSubmissions();
   }, [date, shift]);
 
-  const handleLoadSubmissions = () => {
-    setAiSummary(''); 
-  };
-  
+
   const handleDeleteReport = async (id: string) => {
     // This will not work without a real backend, but we keep it for UI purposes
     toast({
@@ -291,13 +280,15 @@ export function TapeheadsReviewSummary() {
                   <Card className="col-span-2 xl:col-span-2">
                       <CardHeader className="p-4">
                           <CardTitle>Work Orders Processed</CardTitle>
-                          <CardDescription className="space-y-1 pt-2">
-                              {Object.entries(summaryStats.workOrdersProcessed).map(([key, panels]) => (
-                                  <div key={key} className="text-xs">
-                                      <span className="font-bold">{key}:</span>
-                                      <span className="text-muted-foreground ml-2">{Array.from(panels).join(', ')}</span>
-                                  </div>
-                              ))}
+                          <CardDescription>
+                            <div className="space-y-1 pt-2">
+                                {Object.entries(summaryStats.workOrdersProcessed).map(([key, panels]) => (
+                                    <div key={key} className="text-xs">
+                                        <span className="font-bold">{key}:</span>
+                                        <span className="text-muted-foreground ml-2">{Array.from(panels).join(', ')}</span>
+                                    </div>
+                                ))}
+                            </div>
                           </CardDescription>
                       </CardHeader>
                   </Card>
@@ -330,9 +321,9 @@ export function TapeheadsReviewSummary() {
                 {submissionsError ? (
                      <Alert variant="destructive">
                         <AlertTriangle className="h-4 w-4" />
-                        <AlertTitle>Permission Error</AlertTitle>
+                        <AlertTitle>Error</AlertTitle>
                         <AlertDescription>
-                            Could not load submissions. Check Firestore security rules for the 'tapeheads_submissions' collection.
+                            {submissionsError.message || "Could not load submissions."}
                         </AlertDescription>
                     </Alert>
                 ) : !isLoadingSubmissions && !isUserLoading && (
@@ -346,3 +337,5 @@ export function TapeheadsReviewSummary() {
     </div>
   );
 }
+
+    
