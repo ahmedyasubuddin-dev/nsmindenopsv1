@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A flow for creating new users and storing their profiles in Firestore.
@@ -13,14 +14,14 @@ import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { initFirebaseAdmin } from '@/lib/firebase-admin';
 
-export const CreateUserInputSchema = z.object({
+const CreateUserInputSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
   role: z.string(),
 });
 export type CreateUserInput = z.infer<typeof CreateUserInputSchema>;
 
-export const CreateUserOutputSchema = z.object({
+const CreateUserOutputSchema = z.object({
   uid: z.string(),
   email: z.string(),
   role: z.string(),
