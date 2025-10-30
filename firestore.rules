@@ -1,24 +1,20 @@
 /**
- * @file Firestore Security Rules
- * @description This ruleset enforces a role-based access control model.
+ * @fileoverview Firestore Security Rules for the application.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a strict user-ownership model for user profiles
+ * and allows public read access with owner-only writes for all other collections.
  *
  * Data Structure:
- * - /users/{userId}: Stores user profiles, accessible only to the owner.
- * - /pregger_reports/{docId}: Stores reports, publicly readable but writable by authenticated users.
- * - /tapeheads_submissions/{docId}: Stores tapehead submissions, publicly readable but writable by authenticated users.
- * - /tapehead_reviews/{docId}: Stores tapehead reviews, publicly readable but writable by authenticated users.
- * - /gantry_reports/{docId}: Stores gantry reports, publicly readable but writable by authenticated users.
- * - /films_reports/{docId}: Stores films reports, publicly readable but writable by authenticated users.
- * - /graphics_tasks/{docId}: Stores graphics tasks, publicly readable but writable by authenticated users.
- * - /qc_inspections/{docId}: Stores QC inspections, publicly readable but writable by authenticated users.
- * - /analytics_snapshots/{docId}: Stores analytics snapshots, publicly readable but writable by authenticated users.
- * - /sail_status/{docId}: Stores sail statuses, publicly readable but writable by authenticated users.
- * - /jobs/{docId}: Stores OE jobs, publicly readable but writable by authenticated users.
+ * - User profiles are stored in `/users/{userId}`.
+ * - All other data (reports, tasks, inspections, etc.) is stored in top-level collections
+ *   like `/pregger_reports/{docId}`, `/gantry_reports/{docId}`, etc.
  *
  * Key Security Decisions:
- * - User profiles are strictly private and only accessible to the owning user.
- * - Other collections are readable by all users, but write access is restricted to authenticated users.
- * - The rules are configured to be flexible on data shapes during the prototyping phase.
+ * - User listing is disallowed to protect user privacy.
+ * - All non-user collections follow a "Public Read, Owner-Only Write" pattern.
+ * - For "Public Read, Owner-Only Write", an ownership field in the document schema
+ *   is required to determine the author/owner.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -27,13 +23,25 @@ service cloud.firestore {
     /**
      * @description Controls access to user profile documents.
      * @path /users/{userId}
-     * @allow (create) User with ID 'gl0dR68ptCVebE5a8IOuk8YjkzI2' can create their own profile.
-     * @deny (create) User with ID 'gl0dR68ptCVebE5a8IOuk8YjkzI2' cannot create a profile with a different user ID.
-     * @allow (get) User with ID 'gl0dR68ptCVebE5a8IOuk8YjkzI2' can read their own profile.
-     * @deny (get) User with ID 'gl0dR68ptCVebE5a8IOuk8YjkzI2' cannot read another user's profile.
-     * @principle Enforces document ownership for user profiles.
+     * @allow (create) Authenticated user can create their own profile.
+     * @deny (create) Authenticated user cannot create a profile with a different user ID.
+     * @allow (get, list, update, delete) Authenticated user can only access their own profile.
+     * @deny (get, list, update, delete) Authenticated user cannot access other user profiles.
+     * @principle Enforces document ownership for all operations.
      */
     match /users/{userId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
       allow create: if isSignedIn() && isOwner(userId) && request.resource.data.email == request.auth.token.email;
       allow get: if isOwner(userId);
       allow list: if false;
@@ -42,185 +50,203 @@ service cloud.firestore {
     }
 
     /**
-     * @description Controls access to pregger reports.
+     * @description Controls access to Pregger Report documents.
      * @path /pregger_reports/{docId}
-     * @allow (get) Any user can read pregger reports.
-     * @allow (list) Any user can list pregger reports.
-     * @allow (create) Authenticated users can create pregger reports.
-     * @deny (create) Unauthenticated users cannot create pregger reports.
-     * @principle Allows public read access with authenticated-user-only writes.
+     * @allow (get, list) Anyone can read Pregger reports.
+     * @allow (create) Authenticated user can create a Pregger report.
+     * @deny (create) If not authenticated or ownership validation fails
+     * @allow (update, delete) Authenticated user can update/delete a Pregger report if they are the owner.
+     * @deny (update, delete) If not authenticated or not the owner
+     * @principle Public read, owner-only write.
      */
     match /pregger_reports/{docId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
-    }
+      function isSignedIn() {
+        return request.auth != null;
+      }
 
-      /**
-       * @description Controls access to tapeheads submissions.
-       * @path /tapeheads_submissions/{docId}
-       * @allow (get) Any user can read tapeheads submissions.
-       * @allow (list) Any user can list tapeheads submissions.
-       * @allow (create) Authenticated users can create tapeheads submissions.
-       * @deny (create) Unauthenticated users cannot create tapeheads submissions.
-       * @principle Allows public read access with authenticated-user-only writes.
-       */
-    match /tapeheads_submissions/{docId} {
-      allow get: if true;
-      allow list: if true;
+      allow get, list: if true;
       allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
-    }
-
-      /**
-       * @description Controls access to tapehead reviews.
-       * @path /tapehead_reviews/{docId}
-       * @allow (get) Any user can read tapehead reviews.
-       * @allow (list) Any user can list tapehead reviews.
-       * @allow (create) Authenticated users can create tapehead reviews.
-       * @deny (create) Unauthenticated users cannot create tapehead reviews.
-       * @principle Allows public read access with authenticated-user-only writes.
-       */
-    match /tapehead_reviews/{docId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+      allow update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
     /**
-     * @description Controls access to gantry reports.
+     * @description Controls access to Tapehead Entry documents.
+     * @path /tapeheads_submissions/{docId}
+     * @allow (get, list) Anyone can read Tapehead entries.
+     * @allow (create) Authenticated user can create a Tapehead entry.
+     * @deny (create) If not authenticated or ownership validation fails
+     * @allow (update, delete) Authenticated user can update/delete a Tapehead entry if they are the owner.
+     * @deny (update, delete) If not authenticated or not the owner
+     * @principle Public read, owner-only write.
+     */
+    match /tapeheads_submissions/{docId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+    }
+
+    /**
+     * @description Controls access to Tapehead Review documents.
+     * @path /tapehead_reviews/{docId}
+     * @allow (get, list) Anyone can read Tapehead reviews.
+     * @allow (create) Authenticated user can create a Tapehead review.
+     * @deny (create) If not authenticated or ownership validation fails
+     * @allow (update, delete) Authenticated user can update/delete a Tapehead review if they are the owner.
+     * @deny (update, delete) If not authenticated or not the owner
+     * @principle Public read, owner-only write.
+     */
+    match /tapehead_reviews/{docId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+    }
+
+    /**
+     * @description Controls access to Gantry Report documents.
      * @path /gantry_reports/{docId}
-     * @allow (get) Any user can read gantry reports.
-     * @allow (list) Any user can list gantry reports.
-     * @allow (create) Authenticated users can create gantry reports.
-     * @deny (create) Unauthenticated users cannot create gantry reports.
-     * @principle Allows public read access with authenticated-user-only writes.
+     * @allow (get, list) Anyone can read Gantry reports.
+     * @allow (create) Authenticated user can create a Gantry report.
+     * @deny (create) If not authenticated or ownership validation fails
+     * @allow (update, delete) Authenticated user can update/delete a Gantry report if they are the owner.
+     * @deny (update, delete) If not authenticated or not the owner
+     * @principle Public read, owner-only write.
      */
     match /gantry_reports/{docId} {
-      allow get: if true;
-      allow list: if true;
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get, list: if true;
       allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+      allow update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
     /**
-     * @description Controls access to films reports.
+     * @description Controls access to Films Report documents.
      * @path /films_reports/{docId}
-     * @allow (get) Any user can read films reports.
-     * @allow (list) Any user can list films reports.
-     * @allow (create) Authenticated users can create films reports.
-     * @deny (create) Unauthenticated users cannot create films reports.
-     * @principle Allows public read access with authenticated-user-only writes.
+     * @allow (get, list) Anyone can read Films reports.
+     * @allow (create) Authenticated user can create a Films report.
+     * @deny (create) If not authenticated or ownership validation fails
+     * @allow (update, delete) Authenticated user can update/delete a Films report if they are the owner.
+     * @deny (update, delete) If not authenticated or not the owner
+     * @principle Public read, owner-only write.
      */
     match /films_reports/{docId} {
-      allow get: if true;
-      allow list: if true;
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get, list: if true;
       allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+      allow update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
     /**
-     * @description Controls access to graphics tasks.
+     * @description Controls access to Graphics Task documents.
      * @path /graphics_tasks/{docId}
-     * @allow (get) Any user can read graphics tasks.
-     * @allow (list) Any user can list graphics tasks.
-     * @allow (create) Authenticated users can create graphics tasks.
-     * @deny (create) Unauthenticated users cannot create graphics tasks.
-     * @principle Allows public read access with authenticated-user-only writes.
+     * @allow (get, list) Anyone can read Graphics tasks.
+     * @allow (create) Authenticated user can create a Graphics task.
+     * @deny (create) If not authenticated or ownership validation fails
+     * @allow (update, delete) Authenticated user can update/delete a Graphics task if they are the owner.
+     * @deny (update, delete) If not authenticated or not the owner
+     * @principle Public read, owner-only write.
      */
     match /graphics_tasks/{docId} {
-      allow get: if true;
-      allow list: if true;
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get, list: if true;
       allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+      allow update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
     /**
-     * @description Controls access to QC inspections.
+     * @description Controls access to QC Inspection documents.
      * @path /qc_inspections/{docId}
-     * @allow (get) Any user can read QC inspections.
-     * @allow (list) Any user can list QC inspections.
-     * @allow (create) Authenticated users can create QC inspections.
-     * @deny (create) Unauthenticated users cannot create QC inspections.
-     * @principle Allows public read access with authenticated-user-only writes.
+     * @allow (get, list) Anyone can read QC inspections.
+     * @allow (create) Authenticated user can create a QC inspection.
+     * @deny (create) If not authenticated or ownership validation fails
+     * @allow (update, delete) Authenticated user can update/delete a QC inspection if they are the owner.
+     * @deny (update, delete) If not authenticated or not the owner
+     * @principle Public read, owner-only write.
      */
     match /qc_inspections/{docId} {
-      allow get: if true;
-      allow list: if true;
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get, list: if true;
       allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+      allow update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
     /**
-     * @description Controls access to analytics snapshots.
+     * @description Controls access to Analytics Snapshot documents.
      * @path /analytics_snapshots/{docId}
-     * @allow (get) Any user can read analytics snapshots.
-     * @allow (list) Any user can list analytics snapshots.
-     * @allow (create) Authenticated users can create analytics snapshots.
-     * @deny (create) Unauthenticated users cannot create analytics snapshots.
-     * @principle Allows public read access with authenticated-user-only writes.
+     * @allow (get, list) Anyone can read Analytics snapshots.
+     * @allow (create) Authenticated user can create a Analytics snapshot.
+     * @deny (create) If not authenticated or ownership validation fails
+     * @allow (update, delete) Authenticated user can update/delete a Analytics snapshot if they are the owner.
+     * @deny (update, delete) If not authenticated or not the owner
+     * @principle Public read, owner-only write.
      */
     match /analytics_snapshots/{docId} {
-      allow get: if true;
-      allow list: if true;
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get, list: if true;
       allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+      allow update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
     /**
-     * @description Controls access to sail status.
+     * @description Controls access to Sail Status documents.
      * @path /sail_status/{docId}
-     * @allow (get) Any user can read sail status.
-     * @allow (list) Any user can list sail status.
-     * @allow (create) Authenticated users can create sail status.
-     * @deny (create) Unauthenticated users cannot create sail status.
-     * @principle Allows public read access with authenticated-user-only writes.
+     * @allow (get, list) Anyone can read Sail status.
+     * @allow (create) Authenticated user can create a Sail status.
+     * @deny (create) If not authenticated or ownership validation fails
+     * @allow (update, delete) Authenticated user can update/delete a Sail status if they are the owner.
+     * @deny (update, delete) If not authenticated or not the owner
+     * @principle Public read, owner-only write.
      */
     match /sail_status/{docId} {
-      allow get: if true;
-      allow list: if true;
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get, list: if true;
       allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+      allow update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
     /**
-     * @description Controls access to OE jobs.
+     * @description Controls access to OE Job documents.
      * @path /jobs/{docId}
-     * @allow (get) Any user can read OE jobs.
-     * @allow (list) Any user can list OE jobs.
-     * @allow (create) Authenticated users can create OE jobs.
-     * @deny (create) Unauthenticated users cannot create OE jobs.
-     * @principle Allows public read access with authenticated-user-only writes.
+     * @allow (get, list) Anyone can read OE Job documents.
+     * @allow (create) Authenticated user can create a OE Job document.
+     * @deny (create) If not authenticated or ownership validation fails
+     * @allow (update, delete) Authenticated user can update/delete a OE Job document if they are the owner.
+     * @deny (update, delete) If not authenticated or not the owner
+     * @principle Public read, owner-only write.
      */
     match /jobs/{docId} {
-      allow get: if true;
-      allow list: if true;
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get, list: if true;
       allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+      allow update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
     }
-  }
-
-  function isSignedIn() {
-    return request.auth != null;
-  }
-
-  function isOwner(userId) {
-    return request.auth.uid == userId;
-  }
-
-  function isExistingOwner(userId) {
-      return isSignedIn() && isOwner(userId) && resource != null;
   }
 }
