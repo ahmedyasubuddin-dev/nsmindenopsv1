@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -15,10 +15,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { useToast } from '@/hooks/use-toast';
 import { PlusCircle, Edit, AlertTriangle } from 'lucide-react';
 import { Badge } from '../ui/badge';
-import { useCollection, useFirebase, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query } from 'firebase/firestore';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { createUser, type CreateUserInput } from '@/ai/flows/create-user-flow';
+import { listUsers } from '@/ai/flows/list-users-flow';
 
 const userRoles = [
   "Superuser", "B2 Supervisor", "B1 Supervisor", "Quality Manager", "Management", 
@@ -36,23 +35,40 @@ type NewUserFormValues = z.infer<typeof newUserSchema>;
 
 interface UserProfile {
     id: string;
-    email: string;
+    email?: string;
     displayName?: string;
-    role: string;
+    role?: string;
     disabled?: boolean;
 }
 
 export function UserManagement() {
-    const { firestore } = useFirebase();
     const { toast } = useToast();
     const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
     const [isUpdateDialogOpen, setUpdateDialogOpen] = useState(false);
     const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
-    const { isUserLoading } = useUser();
     const [isCreatingUser, setIsCreatingUser] = useState(false);
+    
+    const [users, setUsers] = useState<UserProfile[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-    const usersQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'users')), [firestore, isUserLoading]);
-    const { data: users, isLoading, error: usersError } = useCollection<UserProfile>(usersQuery);
+    const fetchUsers = async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            const userList = await listUsers();
+            setUsers(userList);
+        } catch (err: any) {
+            console.error("Failed to fetch users:", err);
+            setError("Could not load user data. The backend service may be unavailable.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchUsers();
+    }, []);
 
     const form = useForm<NewUserFormValues>({
         resolver: zodResolver(newUserSchema),
@@ -68,6 +84,7 @@ export function UserManagement() {
             toast({ title: "User Created", description: `User ${result.email} has been created with the role ${result.role}.` });
             setCreateDialogOpen(false);
             form.reset();
+            fetchUsers(); // Refresh the user list
         } catch (error: any) {
             console.error("Error creating user:", error);
             toast({ title: "Error", description: error.message || "Failed to create user.", variant: 'destructive' });
@@ -78,7 +95,7 @@ export function UserManagement() {
     
     const handleOpenUpdateDialog = (user: UserProfile) => {
         setSelectedUser(user);
-        updateRoleForm.setValue('role', user.role);
+        updateRoleForm.setValue('role', user.role || '');
         setUpdateDialogOpen(true);
     };
 
@@ -88,6 +105,8 @@ export function UserManagement() {
         console.log("Simulating role update for:", selectedUser.email, "to", values.role);
         toast({ title: "Role Updated (Simulated)", description: `Role for ${selectedUser.email} is now ${values.role}.` });
         setUpdateDialogOpen(false);
+        // Optimistically update the UI while we wait for a full refresh
+        setUsers(users.map(u => u.id === selectedUser.id ? { ...u, role: values.role } : u));
     };
 
     return (
@@ -125,12 +144,12 @@ export function UserManagement() {
                     </div>
                 </CardHeader>
                 <CardContent>
-                    {usersError && (
+                    {error && (
                          <Alert variant="destructive" className="mb-4">
                             <AlertTriangle className="h-4 w-4" />
-                            <AlertTitle>Permission Error</AlertTitle>
+                            <AlertTitle>Error Loading Users</AlertTitle>
                             <AlertDescription>
-                                Could not load user data. Check Firestore security rules for the 'users' collection.
+                                {error}
                             </AlertDescription>
                         </Alert>
                     )}
@@ -144,7 +163,7 @@ export function UserManagement() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {isLoading || isUserLoading ? (
+                            {isLoading ? (
                                 <TableRow><TableCell colSpan={4} className="text-center">Loading users...</TableCell></TableRow>
                             ) : users && users.length > 0 ? (
                                 users.map(user => (

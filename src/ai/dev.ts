@@ -4,3 +4,4 @@
 import './flows/summarize-shift-flow';
 import './flows/send-notification-flow';
 import './flows/create-user-flow';
+import './flows/list-users-flow';
