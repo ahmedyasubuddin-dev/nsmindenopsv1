@@ -21,7 +21,7 @@ const UserProfileSchema = z.object({
   disabled: z.boolean().optional(),
 });
 
-export const ListUsersOutputSchema = z.array(UserProfileSchema);
+const ListUsersOutputSchema = z.array(UserProfileSchema);
 export type ListUsersOutput = z.infer<typeof ListUsersOutputSchema>;
 
 export async function listUsers(): Promise<ListUsersOutput> {
