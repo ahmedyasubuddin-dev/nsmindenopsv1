@@ -24,6 +24,22 @@ import { useCollection, useFirebase, useMemoFirebase, useUser } from '@/firebase
 import { collection, query, where } from 'firebase/firestore';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
+// --- MOCK DATA ---
+const mockSubmissions: Report[] = [
+  {
+    id: "mock_1", operatorName: "John Doe", shift: 1, thNumber: "TH-1", date: new Date(), status: "Submitted", total_meters: 1250,
+    workItems: [{ oeNumber: "OAUS32160", section: "001", endOfShiftStatus: 'Completed', panelsWorkedOn: ["P1", "P2"], total_meters: 1250, total_tapes: 1, had_spin_out: false, tapes: [] }],
+    checklist: { smoothFuseFull: true, bladesGlasses: true, paperworkUpToDate: true, debriefNewOperator: true, electricScissor: true, tubesAtEndOfTable: true, sprayTracksOnBridge: true, sharpiePens: true, broom: true, cleanedWorkStation: true, meterStickTwoIrons: true, thIsleTrashEmpty: true }
+  },
+  {
+    id: "mock_2", operatorName: "Jane Smith", shift: 1, thNumber: "TH-2", date: new Date(), status: "Submitted", total_meters: 980,
+    workItems: [{ oeNumber: "OAUS32160", section: "002", endOfShiftStatus: 'In Progress', layer: "8 of 15", panelsWorkedOn: ["P10"], total_meters: 980, total_tapes: 1, had_spin_out: true, spin_outs: 1, spin_out_duration_minutes: 15, tapes: [] }],
+    checklist: { smoothFuseFull: true, bladesGlasses: true, paperworkUpToDate: false, debriefNewOperator: false, electricScissor: true, tubesAtEndOfTable: true, sprayTracksOnBridge: true, sharpiePens: true, broom: true, cleanedWorkStation: false, meterStickTwoIrons: true, thIsleTrashEmpty: true }
+  }
+];
+// --- END MOCK DATA ---
+
+
 const reviewSchema = z.object({
   date: z.date(),
   shift: z.string(),
@@ -110,34 +126,30 @@ export function TapeheadsReviewSummary() {
 
   const { date, shift } = form.watch();
 
-  const submissionsQuery = useMemoFirebase(() => {
-    if (!date || !shift || isUserLoading) return null;
-    
-    // Firestore queries are best with start/end ranges for dates
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
+  // MOCK: Replace live query with mock data
+  const { data: submissions, isLoading: isLoadingSubmissions, error: submissionsError } = useMemo(() => {
+    const filteredSubmissions = mockSubmissions.filter(s => {
+      const isSameShift = String(s.shift) === shift;
+      const isSameDateValue = isSameDay(s.date, date);
+      return isSameShift && isSameDateValue;
+    });
 
-    return query(
-      collection(firestore, 'tapeheads_submissions'),
-      where('date', '>=', startOfDay),
-      where('date', '<=', endOfDay),
-      where('shift', '==', parseInt(shift, 10))
-    );
-  }, [date, shift, firestore, isUserLoading]);
-
-  const { data: submissions, isLoading: isLoadingSubmissions, error: submissionsError } = useCollection<Report>(submissionsQuery);
+    return {
+      data: filteredSubmissions,
+      isLoading: false,
+      error: null
+    };
+  }, [date, shift]);
 
   const handleLoadSubmissions = () => {
     setAiSummary(''); 
   };
   
   const handleDeleteReport = async (id: string) => {
-    await deleteTapeheadsSubmission(firestore, id);
+    // This will not work without a real backend, but we keep it for UI purposes
     toast({
-        title: "Report Deleted",
-        description: "The operator submission has been removed.",
+        title: "Report Deleted (Mock)",
+        description: "In a real app, this report would be removed.",
     });
   };
   
@@ -149,7 +161,10 @@ export function TapeheadsReviewSummary() {
   const handleUpdateReport = async (updatedReport: Report) => {
     setEditDialogOpen(false);
     setReportToEdit(undefined);
-    // Real-time updates handle UI refresh
+    toast({
+      title: "Report Updated (Mock)",
+      description: "In a real app, these changes would be saved.",
+    });
   }
   
   const handleGenerateSummary = async () => {
@@ -213,8 +228,8 @@ export function TapeheadsReviewSummary() {
   const onSubmit = (data: ReviewFormValues) => {
     console.log("Finalized Report:", { ...data, submissions, summaryStats });
     toast({
-      title: 'Report Finalized',
-      description: `Shift ${data.shift} for ${data.date.toLocaleDateString()} has been finalized.`,
+      title: 'Report Finalized (Mock)',
+      description: `In a real app, this report for shift ${data.shift} would be finalized.`,
     });
   };
 

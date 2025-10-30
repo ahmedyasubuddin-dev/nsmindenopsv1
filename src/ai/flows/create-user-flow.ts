@@ -10,9 +10,6 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { getAuth } from 'firebase-admin/auth';
-import { getFirestore } from 'firebase-admin/firestore';
-import { initFirebaseAdmin } from '@/lib/firebase-admin';
 
 const CreateUserInputSchema = z.object({
   email: z.string().email(),
@@ -39,33 +36,18 @@ const createUserFlow = ai.defineFlow(
     outputSchema: CreateUserOutputSchema,
   },
   async ({ email, password, role }) => {
-    await initFirebaseAdmin();
-    const auth = getAuth();
-    const firestore = getFirestore();
-
-    // 1. Create the user in Firebase Authentication
-    const userRecord = await auth.createUser({
-      email,
-      password,
-    });
-
-    // 2. Set the custom claim for the user's role
-    await auth.setCustomUserClaims(userRecord.uid, { role });
-
-    // 3. Create the user profile in Firestore
-    const userProfile = {
-      email,
-      role,
-      disabled: false,
-      createdAt: new Date().toISOString(),
-    };
-
-    await firestore.collection('users').doc(userRecord.uid).set(userProfile);
-
+    // MOCK IMPLEMENTATION: This is a placeholder.
+    // In a real application, this would interact with the Firebase Admin SDK.
+    console.log(`[Mock] Creating user: ${email} with role: ${role}`);
+    
+    // Simulate creating a user record.
+    const mockUid = `mock_uid_${Date.now()}`;
+    
+    // Return a successful response.
     return {
-      uid: userRecord.uid,
-      email: userRecord.email!,
-      role,
+      uid: mockUid,
+      email: email,
+      role: role,
     };
   }
 );

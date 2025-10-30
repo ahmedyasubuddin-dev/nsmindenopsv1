@@ -9,9 +9,6 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { getAuth } from 'firebase-admin/auth';
-import { getFirestore } from 'firebase-admin/firestore';
-import { initFirebaseAdmin } from '@/lib/firebase-admin';
 
 const UserProfileSchema = z.object({
   id: z.string(),
@@ -35,33 +32,35 @@ const listUsersFlow = ai.defineFlow(
     outputSchema: ListUsersOutputSchema,
   },
   async () => {
-    await initFirebaseAdmin();
-    const auth = getAuth();
-    const firestore = getFirestore();
+    // MOCK IMPLEMENTATION: This is a placeholder.
+    // In a real application, this would use the Firebase Admin SDK to list users.
+    console.log("[Mock] Listing users from mock data source.");
+    
+    // Return a mock list of users for UI development.
+    const mockUsers: ListUsersOutput = [
+      {
+        id: 'mock_uid_1',
+        email: 'superuser@northsails.com',
+        displayName: 'Super User',
+        role: 'Superuser',
+        disabled: false,
+      },
+      {
+        id: 'mock_uid_2',
+        email: 'tapelead@northsails.com',
+        displayName: 'Tape Lead',
+        role: 'Tapehead Lead',
+        disabled: false,
+      },
+      {
+        id: 'mock_uid_3',
+        email: 'operator@northsails.com',
+        displayName: 'Tape Operator',
+        role: 'Tapehead Operator',
+        disabled: true,
+      }
+    ];
 
-    // 1. Get all users from Firebase Auth
-    const listUsersResult = await auth.listUsers(1000);
-    const authUsers = listUsersResult.users;
-
-    // 2. Get all user profiles from Firestore
-    const usersCollection = await firestore.collection('users').get();
-    const firestoreUsers = new Map(
-        usersCollection.docs.map(doc => [doc.id, doc.data()])
-    );
-
-    // 3. Combine Auth and Firestore data
-    const combinedUsers = authUsers.map(userRecord => {
-      const firestoreProfile = firestoreUsers.get(userRecord.uid);
-      return {
-        id: userRecord.uid,
-        email: userRecord.email,
-        displayName: userRecord.displayName,
-        disabled: userRecord.disabled,
-        // Prioritize role from custom claims, fall back to Firestore
-        role: (userRecord.customClaims?.role as string) || firestoreProfile?.role || 'N/A',
-      };
-    });
-
-    return combinedUsers;
+    return mockUsers;
   }
 );
