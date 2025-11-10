@@ -57,7 +57,7 @@ const preggerReportSchema = z.object({
     tape_id: z.string().min(1, "Tape ID is required."),
     meters: z.coerce.number().min(0),
     waste_meters: z.coerce.number().min(0),
-    material_description: z.string().min(1, "Description is required."),
+    material_description: z.string().optional(),
   })).min(1, "At least one work item is required."),
   personnel: z.array(z.object({
     name: z.string().min(1, "Name is required."),
@@ -199,7 +199,7 @@ export function PreggerReportForm() {
                         <FormItem><FormLabel>Waste (m)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
                       )}/>
                     <FormField control={form.control} name={`workCompleted.${index}.material_description`} render={({ field }) => (
-                        <FormItem><FormLabel>Material Desc.</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormLabel>Material Desc.</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                       )}/>
                   </div>
                   <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 text-destructive" onClick={() => removeWork(index)}>
