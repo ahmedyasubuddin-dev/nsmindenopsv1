@@ -13,8 +13,8 @@ import type { Report, WorkItem } from '@/lib/data-store';
 import { Progress } from './ui/progress';
 import { DatePicker } from './ui/date-picker';
 import { format, isSameDay } from 'date-fns';
-import { useCollection, useFirebase, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query } from 'firebase/firestore';
+import { useCollection } from '@/lib/supabase/hooks/use-collection';
+import { useUser } from '@/lib/supabase/provider';
 
 function SubmittedReportCard({ report, workItem, itemIndex }: { report: Report, workItem: WorkItem, itemIndex: number }) {
     const router = useRouter();
@@ -83,12 +83,27 @@ function SubmittedReportCard({ report, workItem, itemIndex }: { report: Report, 
 }
 
 export function TapeheadsWorkDashboard() {
-    const { firestore } = useFirebase();
     const { isUserLoading } = useUser();
     const [date, setDate] = useState<Date | undefined>(new Date());
 
-    const reportsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'tapeheads_submissions')), [firestore, isUserLoading]);
-    const { data: reports, isLoading: loading } = useCollection<Report>(reportsQuery);
+        // Only fetch last 30 days for faster loading
+        const dashboardDateFrom = new Date();
+        dashboardDateFrom.setDate(dashboardDateFrom.getDate() - 30);
+
+        const { data: reports, isLoading: loading } = useCollection<Report>(
+            isUserLoading
+                ? null
+                : {
+                    table: 'tapeheads_submissions',
+                    orderBy: { column: 'date', ascending: false },
+                    enabled: true,
+                    limit: 200,
+                    dateRange: {
+                      column: 'date',
+                      from: dashboardDateFrom.toISOString(),
+                    },
+                }
+        );
 
     const filteredWorkItems = React.useMemo(() => {
         if (!reports) return [];
@@ -108,7 +123,14 @@ export function TapeheadsWorkDashboard() {
     }, [date, reports]);
     
     if (loading || isUserLoading) {
-        return <div>Loading dashboard...</div>;
+        return (
+            <div className="flex items-center justify-center p-8">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-muted-foreground">Loading dashboard...</p>
+                </div>
+            </div>
+        );
     }
 
     return (

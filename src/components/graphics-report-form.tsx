@@ -26,10 +26,9 @@ import { GraphicsKanbanBoard } from "./graphics/graphics-kanban-board"
 import type { GraphicsTask as Task } from "@/lib/data-store"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "./ui/dialog"
 import { sendShippingNotification } from "@/ai/flows/send-notification-flow"
-import { updateGraphicsTask, deleteGraphicsTask, addGraphicsTask } from "@/lib/data-store"
 import { PageHeader } from "@/components/page-header"
-import { useCollection, useFirebase, useMemoFirebase, useAuth as useFirebaseAuth } from "@/firebase"
-import { collection, query } from "firebase/firestore"
+import { useCollection } from '@/lib/supabase/hooks/use-collection';
+import { useUser } from '@/lib/supabase/provider';
 import { Alert, AlertTitle, AlertDescription } from "./ui/alert"
 
 
@@ -81,15 +80,26 @@ function Section({ title, description, children, actions }: { title: string, des
 
 export function GraphicsReportForm() {
     const { toast } = useToast();
-    const { firestore } = useFirebase();
-    const { isUserLoading } = useFirebaseAuth();
+    const { isUserLoading } = useUser();
     
-    const tasksQuery = useMemoFirebase(() => {
-      if (isUserLoading) return null;
-      return query(collection(firestore, 'graphics_tasks'));
-    }, [firestore, isUserLoading]);
-    
-    const { data: tasks, isLoading: isLoadingTasks, error: tasksError } = useCollection<Task>(tasksQuery);
+        // Only fetch last 30 days for faster loading
+        const tasksDateFrom = new Date();
+        tasksDateFrom.setDate(tasksDateFrom.getDate() - 30);
+
+        const { data: tasks, isLoading: isLoadingTasks, error: tasksError } = useCollection<Task>(
+          isUserLoading
+            ? null
+            : {
+                table: 'graphics_tasks',
+                orderBy: { column: 'created_at', ascending: false },
+                enabled: true,
+                limit: 200,
+                dateRange: {
+                  column: 'created_at',
+                  from: tasksDateFrom.toISOString(),
+                },
+              }
+        );
     
     const [notifiedTags, setNotifiedTags] = useState<Set<string>>(new Set());
 
@@ -185,8 +195,16 @@ export function GraphicsReportForm() {
                 type: 'inking', tagId: '', status: 'todo',
                 content: '', tagType: 'Sail', startedAt: new Date().toISOString(),
             };
-            await addGraphicsTask(firestore, { ...cuttingTask });
-            await addGraphicsTask(firestore, { ...inkingTask });
+            await fetch('/api/graphics', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(cuttingTask),
+            });
+            await fetch('/api/graphics', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(inkingTask),
+            });
             toast({ title: "Task Pair Added", description: `A new Cutting and Inking task pair has been created.` });
 
         } else {
@@ -194,13 +212,21 @@ export function GraphicsReportForm() {
                 type: 'inking', tagId: '', status: 'todo',
                 content: '', tagType: 'Sail', startedAt: new Date().toISOString(),
             };
-             await addGraphicsTask(firestore, { ...inkingTask });
+             await fetch('/api/graphics', {
+               method: 'POST',
+               headers: { 'Content-Type': 'application/json' },
+               body: JSON.stringify(inkingTask),
+             });
              toast({ title: "Task Added", description: `A new Inking task has been created.` });
         }
     }
     
     const onUpdateTask = async (updatedTask: Task) => {
-        await updateGraphicsTask(firestore, updatedTask);
+        await fetch(`/api/graphics/${updatedTask.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedTask),
+        });
         
         if (updatedTask.type === 'cutting') {
             const correspondingInkingId = updatedTask.id.replace('cut-', 'ink-');
@@ -214,13 +240,19 @@ export function GraphicsReportForm() {
                     sideOfWork: updatedTask.sideOfWork,
                     content: updatedTask.content,
                 };
-                await updateGraphicsTask(firestore, syncedInkingTask);
+                await fetch(`/api/graphics/${syncedInkingTask.id}`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(syncedInkingTask),
+                });
             }
         }
     }
     
     const onDeleteTask = async (taskId: string) => {
-        await deleteGraphicsTask(firestore, taskId);
+        await fetch(`/api/graphics/${taskId}`, {
+          method: 'DELETE',
+        });
         toast({ title: "Task Deleted", variant: "destructive" });
     }
 
@@ -228,7 +260,24 @@ export function GraphicsReportForm() {
     const inkingTasks = tasks?.filter(t => t.type === 'inking') || [];
 
     if (isLoadingTasks) {
-        return <div>Loading tasks...</div>
+        return (
+            <div className="flex items-center justify-center p-8">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-muted-foreground">Loading tasks...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (tasksError) {
+        return (
+            <div className="p-4 border border-destructive rounded-md bg-destructive/10">
+                <p className="text-destructive font-semibold">Error loading tasks</p>
+                <p className="text-sm text-muted-foreground mt-1">{tasksError.message}</p>
+                <p className="text-xs text-muted-foreground mt-2">The app will continue to work, but tasks may not be up to date.</p>
+            </div>
+        );
     }
 
     return (

@@ -20,8 +20,6 @@ import { cn } from '@/lib/utils';
 import { Card } from '../ui/card';
 import { defectCategories } from '@/lib/qc-data';
 import { FileDown } from 'lucide-react';
-import { addInspection } from '@/lib/data-store';
-import { useFirestore } from '@/firebase';
 
 const temperatureSchema = z.object({
   head: z.coerce.number().optional(),
@@ -105,7 +103,6 @@ export type InspectionFormValues = z.infer<typeof inspectionFormSchema>;
 
 export function ThreeDiInspectionForm() {
   const { toast } = useToast();
-  const firestore = useFirestore();
   const methods = useForm<InspectionFormValues>({
     resolver: zodResolver(inspectionFormSchema),
     defaultValues: {
@@ -183,17 +180,34 @@ export function ThreeDiInspectionForm() {
         status: inspectionStatus.text as 'Pass' | 'Reinspection Required' | 'Fail'
     };
     
-    await addInspection(firestore, submissionData);
-    
-    // Dynamically import the PDF generator only on the client-side
-    const { generatePdf } = await import('@/lib/generate-qc-pdf');
-    await generatePdf(data, { totalScore, statusText: inspectionStatus.text });
-    
-    toast({
-      title: 'Inspection Submitted & PDF Generated',
-      description: `OE# ${data.oeNumber} has been submitted with a score of ${totalScore}.`,
-    });
-    methods.reset();
+    try {
+      const response = await fetch('/api/qc', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(submissionData),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to submit inspection');
+      }
+
+      // Dynamically import the PDF generator only on the client-side
+      const { generatePdf } = await import('@/lib/generate-qc-pdf');
+      await generatePdf(data, { totalScore, statusText: inspectionStatus.text });
+      
+      toast({
+        title: 'Inspection Submitted & PDF Generated',
+        description: `OE# ${data.oeNumber} has been submitted with a score of ${totalScore}.`,
+      });
+      methods.reset();
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to submit inspection.",
+      });
+    }
   }
 
   const handleExportPdf = async () => {

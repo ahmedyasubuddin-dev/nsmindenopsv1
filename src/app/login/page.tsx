@@ -11,8 +11,6 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import { useFirebase } from '@/firebase';
-import { signInAnonymously } from 'firebase/auth';
 import Image from 'next/image';
 import {
   Dialog,
@@ -30,25 +28,36 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
-async function signInWithUsernameAndPassword(auth: any, { username, password }: LoginFormValues) {
-  console.log("Attempting sign-in for:", username);
-  
-  if (username === 'superuser' && password.toLowerCase() === 'password') {
-     try {
-        const userCredential = await signInAnonymously(auth);
-        return userCredential;
-     } catch (error) {
-        console.error("Anonymous sign-in for placeholder failed:", error);
-        throw new Error("Could not create a temporary session.");
-     }
-  } else {
-    throw new Error("Invalid username or password.");
+async function signInWithUsernameAndPassword({ username, password }: LoginFormValues) {
+  console.log("Attempting sign-in for username:", username);
+
+  // Call our custom username-based login endpoint
+  const response = await fetch('/api/auth/login-username', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ username, password }),
+    credentials: 'include', // Important: include cookies
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Invalid username or password.");
   }
+
+  // Session cookies are automatically set by the server via Supabase SSR
+  // The SupabaseProvider will automatically detect the session change
+  // via onAuthStateChange listener, so we just need to wait a moment
+  // for the cookies to be available to the client
+
+  return data;
 }
 
-function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => void }) {
+function LoginForm({ onLoginSuccess, setOpen }: { onLoginSuccess: () => void; setOpen: (open: boolean) => void }) {
   const { toast } = useToast();
-  const { auth: firebaseAuth } = useFirebase();
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<LoginFormValues>({
@@ -59,21 +68,34 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => void }) {
   const onSubmit = async (values: LoginFormValues) => {
     setIsLoading(true);
     try {
-      await signInWithUsernameAndPassword(firebaseAuth, values);
+      const result = await signInWithUsernameAndPassword(values);
+
+      console.log('Login response:', result);
+
+      // Show success toast first
       toast({
         title: 'Login Successful',
-        description: `Welcome, ${values.username}!`,
+        description: `Welcome, ${values.username}! Redirecting...`,
       });
-      onLoginSuccess();
+
+      // Stop loading immediately so button doesn't stay in "Processing..." state
+      setIsLoading(false);
+
+      // Close the dialog
+      setOpen(false);
+
+      // Redirect immediately - cookies are already set by server response
+      // The middleware will allow access based on the cookie
+      window.location.href = '/dashboard';
+
     } catch (error: any) {
       console.error("Sign In Error:", error);
+      setIsLoading(false); // Make sure to stop loading on error
       toast({
         variant: "destructive",
         title: 'Login Failed',
         description: error.message || "An unknown error occurred.",
       });
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -97,7 +119,7 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => void }) {
             <FormField control={form.control} name="username" render={({ field }) => (
               <FormItem>
                 <FormLabel>Username</FormLabel>
-                <FormControl><Input type="text" placeholder="e.g., superuser" {...field} /></FormControl>
+                <FormControl><Input type="text" placeholder="e.g., tapehead_operator" {...field} /></FormControl>
                 <FormMessage />
               </FormItem>
             )} />
@@ -131,28 +153,28 @@ export default function LoginPage() {
 
   const handleLoginSuccess = () => {
     setOpen(false);
-    router.push('/dashboard'); 
+    router.push('/dashboard');
   };
-  
+
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center login-background p-4">
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
-           <div className="text-center text-white">
-              <Image src="/images/icon_1.png" alt="North Sails Logo" width={64} height={64} className="mx-auto drop-shadow-lg" />
-              <h1 className="mt-4 text-4xl font-bold font-headline drop-shadow-md">North Sails Minden Operations Dashboard</h1>
-              <p className="mt-2 text-lg text-white/80 drop-shadow">Operations insight across all departments.</p>
-              <Button size="lg" className="mt-8">Sign In</Button>
-            </div>
+          <div className="text-center text-white">
+            <Image src="/images/icon_1.png" alt="North Sails Logo" width={64} height={64} className="mx-auto drop-shadow-lg" />
+            <h1 className="mt-4 text-4xl font-bold font-headline drop-shadow-md">North Sails Minden Operations Dashboard</h1>
+            <p className="mt-2 text-lg text-white/80 drop-shadow">Operations insight across all departments.</p>
+            <Button size="lg" className="mt-8">Sign In</Button>
+          </div>
         </DialogTrigger>
         <DialogContent className="p-0 bg-transparent border-none shadow-none w-full max-w-md">
-            <DialogHeader className="sr-only">
-              <DialogTitle>Sign In</DialogTitle>
-              <DialogDescription>
-                Enter your username and password to access the dashboard.
-              </DialogDescription>
-            </DialogHeader>
-           <LoginForm onLoginSuccess={handleLoginSuccess} />
+          <DialogHeader className="sr-only">
+            <DialogTitle>Sign In</DialogTitle>
+            <DialogDescription>
+              Enter your username and password to access the dashboard.
+            </DialogDescription>
+          </DialogHeader>
+          <LoginForm onLoginSuccess={handleLoginSuccess} setOpen={setOpen} />
         </DialogContent>
       </Dialog>
     </div>

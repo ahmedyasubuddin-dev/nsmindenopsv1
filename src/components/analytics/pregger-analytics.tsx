@@ -18,9 +18,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Factory, TrendingUp, Clock, Zap } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../ui/accordion"
 import { Badge } from "../ui/badge"
-import { useCollection, useFirebase, useMemoFirebase, useAuth as useFirebaseAuth } from "@/firebase"
+import { useCollection } from '@/lib/supabase/hooks/use-collection';
+import { useUser } from '@/lib/supabase/provider';
 import type { PreggerReport } from "@/lib/data-store"
-import { collection, query } from "firebase/firestore"
 
 const productionChartConfig = {
   shift1: { label: "Shift 1", color: "hsl(var(--chart-1))" },
@@ -40,14 +40,26 @@ const CustomLegend = () => {
 };
 
 export function PreggerAnalytics() {
-  const { firestore } = useFirebase();
-  const { isUserLoading } = useFirebaseAuth();
+  const { isUserLoading } = useUser();
 
-  const preggerQuery = useMemoFirebase(() => {
-    if (isUserLoading) return null;
-    return query(collection(firestore, 'pregger_reports'))
-  }, [firestore, isUserLoading]);
-  const { data: allData, isLoading: loading } = useCollection<PreggerReport>(preggerQuery);
+  // Default to last 30 days for faster loading, but allow empty results
+  const defaultDateFrom = new Date();
+  defaultDateFrom.setDate(defaultDateFrom.getDate() - 30);
+
+  const { data: allData, isLoading: loading, error: dataError } = useCollection<PreggerReport>(
+    isUserLoading 
+      ? null 
+      : {
+          table: 'pregger_reports',
+          orderBy: { column: 'report_date', ascending: false },
+          enabled: true,
+          limit: 500,
+          dateRange: {
+            column: 'report_date',
+            from: defaultDateFrom.toISOString(),
+          },
+        }
+  );
 
   const [filters, setFilters] = React.useState({
     dateFrom: '2023-10-25',
@@ -118,7 +130,39 @@ export function PreggerAnalytics() {
   }, [data]);
 
   if (loading || isUserLoading) {
-    return <p>Loading analytics...</p>;
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading analytics...</p>
+          <p className="text-xs text-muted-foreground mt-2">Fetching last 30 days of data</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (dataError) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-center">
+          <p className="text-destructive font-semibold mb-2">Error loading analytics</p>
+          <p className="text-sm text-muted-foreground">{dataError.message}</p>
+          <p className="text-xs text-muted-foreground mt-2">Check browser console for details</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!allData || allData.length === 0) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-center">
+          <p className="text-muted-foreground font-semibold mb-2">No data available</p>
+          <p className="text-sm text-muted-foreground">No reports found in the last 30 days.</p>
+          <p className="text-xs text-muted-foreground mt-2">Try adjusting the date range filter or check if reports have been submitted.</p>
+        </div>
+      </div>
+    );
   }
 
   return (

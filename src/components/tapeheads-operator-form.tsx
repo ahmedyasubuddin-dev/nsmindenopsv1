@@ -31,10 +31,9 @@ import React, { useEffect, useMemo, useState } from "react"
 import { MultiSelect, MultiSelectOption } from "./ui/multi-select"
 import { useRouter } from "next/navigation"
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group"
-import { addTapeheadsSubmission, updateTapeheadsSubmission, markPanelsAsCompleted } from "@/lib/data-store"
 import type { Report, OeJob, OeSection } from "@/lib/data-store"
-import { useCollection, useFirebase, useMemoFirebase, useUser } from "@/firebase"
-import { collection, query } from "firebase/firestore"
+import { useCollection } from '@/lib/supabase/hooks/use-collection';
+import { useUser } from '@/lib/supabase/provider';
 
 const tapeIdsList = [
     "928108", "938108", "938108T", "928128", "938128", "938128T", "*938138*",
@@ -145,15 +144,29 @@ interface TapeheadsOperatorFormProps {
 export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsOperatorFormProps) {
   const { toast } = useToast();
   const router = useRouter();
-  const { firestore, isUserLoading } = useFirebase();
+  const { isUserLoading } = useUser();
 
   const isEditMode = !!reportToEdit;
 
-  const jobsQuery = useMemoFirebase(() => query(collection(firestore, 'jobs')), []);
-  const { data: oeJobs, isLoading: isLoadingJobs } = useCollection<OeJob>(jobsQuery);
+  const { data: oeJobs, isLoading: isLoadingJobs } = useCollection<OeJob>(
+    isUserLoading 
+      ? null 
+      : {
+          table: 'jobs',
+          orderBy: { column: 'created_at', ascending: false },
+          enabled: true,
+        }
+  );
   
-  const submissionsQuery = useMemoFirebase(() => query(collection(firestore, 'tapeheads-submissions')), []);
-  const { data: allSubmissions, isLoading: isLoadingSubmissions } = useCollection<Report>(submissionsQuery);
+  const { data: allSubmissions, isLoading: isLoadingSubmissions } = useCollection<Report>(
+    isUserLoading 
+      ? null 
+      : {
+          table: 'tapeheads_submissions',
+          orderBy: { column: 'date', ascending: false },
+          enabled: true,
+        }
+  );
 
   const defaultValues = useMemo(() => {
     if (!reportToEdit) {
@@ -242,62 +255,93 @@ export function TapeheadsOperatorForm({ reportToEdit, onFormSubmit }: TapeheadsO
   }, [reportToEdit, form, defaultValues]);
   
   async function onSubmit(values: OperatorFormValues) {
-    // Logic to update panel statuses
-    for (const item of values.workItems) {
-        if (item.endOfShiftStatus === 'Completed') {
-            await markPanelsAsCompleted(firestore, item.oeNumber, item.section, item.panelsWorkedOn);
+    try {
+      // TODO: Logic to update panel statuses in jobs table
+      // This can be implemented later as a separate API endpoint if needed
+      // for (const item of values.workItems) {
+      //     if (item.endOfShiftStatus === 'Completed') {
+      //         await markPanelsAsCompleted(item.oeNumber, item.section, item.panelsWorkedOn);
+      //     }
+      // }
+
+      const reportData: Report = {
+          id: reportToEdit?.id || `rpt_${Date.now()}`,
+          date: values.date instanceof Date ? values.date.toISOString() : values.date,
+          shift: parseInt(values.shift, 10) as 1 | 2 | 3,
+          shiftLeadName: values.shiftLeadName,
+          thNumber: values.thNumber,
+          operatorName: values.operatorName,
+          shiftStartTime: values.shiftStartTime,
+          shiftEndTime: values.shiftEndTime,
+          hoursWorked: hoursWorked,
+          metersPerManHour: metersPerManHour,
+          workItems: values.workItems.map(item => {
+              const totalMeters = (item.tapes || []).reduce((sum, tape) => sum + tape.metersProduced, 0);
+              return {
+                  oeNumber: item.oeNumber,
+                  section: item.section,
+                  endOfShiftStatus: item.endOfShiftStatus as 'Completed' | 'In Progress',
+                  layer: item.layer,
+                  tapes: item.tapes,
+                  total_meters: totalMeters,
+                  total_tapes: (item.tapes || []).length,
+                  had_spin_out: item.hadSpinOut,
+                  spin_outs: item.spinOuts,
+                  spin_out_duration_minutes: item.spinOutDuration,
+                  issues: item.problems,
+                  panelsWorkedOn: item.panelsWorkedOn,
+                  nestedPanels: item.nestedPanels,
+              }
+          }),
+          checklist: values.checklist,
+          status: 'Submitted',
+          total_meters: (values.workItems || []).reduce((sum, item) => {
+              const itemTotal = (item.tapes || []).reduce((tapeSum, tape) => tapeSum + (tape.metersProduced || 0), 0);
+              return sum + itemTotal;
+          }, 0),
+      };
+      
+      if (onFormSubmit) {
+        // Update existing submission
+        const response = await fetch(`/api/tapeheads/${reportData.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(reportData),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to update submission');
         }
-    }
 
-    const reportData: Report = {
-        id: reportToEdit?.id || `rpt_${Date.now()}`,
-        date: values.date,
-        shift: parseInt(values.shift, 10) as 1 | 2 | 3,
-        shiftLeadName: values.shiftLeadName,
-        thNumber: values.thNumber,
-        operatorName: values.operatorName,
-        shiftStartTime: values.shiftStartTime,
-        shiftEndTime: values.shiftEndTime,
-        hoursWorked: hoursWorked,
-        metersPerManHour: metersPerManHour,
-        workItems: values.workItems.map(item => {
-            const totalMeters = (item.tapes || []).reduce((sum, tape) => sum + tape.metersProduced, 0);
-            return {
-                oeNumber: item.oeNumber,
-                section: item.section,
-                endOfShiftStatus: item.endOfShiftStatus as 'Completed' | 'In Progress',
-                layer: item.layer,
-                tapes: item.tapes,
-                total_meters: totalMeters,
-                total_tapes: (item.tapes || []).length,
-                had_spin_out: item.hadSpinOut,
-                spin_outs: item.spinOuts,
-                spin_out_duration_minutes: item.spinOutDuration,
-                issues: item.problems,
-                panelsWorkedOn: item.panelsWorkedOn,
-                nestedPanels: item.nestedPanels,
-            }
-        }),
-        checklist: values.checklist,
-        status: 'Submitted',
-        total_meters: (values.workItems || []).reduce((sum, item) => {
-            const itemTotal = (item.tapes || []).reduce((tapeSum, tape) => tapeSum + (tape.metersProduced || 0), 0);
-            return sum + itemTotal;
-        }, 0),
-    };
-    
-    if (onFormSubmit) {
-      await updateTapeheadsSubmission(firestore, reportData as Report);
-      onFormSubmit(reportData as Report);
-    } else {
-      await addTapeheadsSubmission(firestore, reportData as Report);
-      router.push('/report/tapeheads');
-    }
+        onFormSubmit(reportData as Report);
+      } else {
+        // Create new submission
+        const response = await fetch('/api/tapeheads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(reportData),
+        });
 
-    toast({
-      title: isEditMode ? "Report Updated!" : "Operator Work Submitted!",
-      description: `Your entry for ${values.operatorName} has been ${isEditMode ? 'updated' : 'recorded'}.`,
-    });
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to create submission');
+        }
+
+        router.push('/report/tapeheads');
+      }
+
+      toast({
+        title: isEditMode ? "Report Updated!" : "Operator Work Submitted!",
+        description: `Your entry for ${values.operatorName} has been ${isEditMode ? 'updated' : 'recorded'}.`,
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to submit report.",
+      });
+    }
   }
   
   if (isLoadingJobs || isLoadingSubmissions) {

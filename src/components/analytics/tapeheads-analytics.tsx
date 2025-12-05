@@ -18,8 +18,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Target, Gauge, Clock, Zap, AlertTriangle } from "lucide-react"
 import type { Report } from "@/lib/types"
 import { Badge } from "../ui/badge"
-import { useCollection, useFirebase, useMemoFirebase, useUser } from "@/firebase"
-import { collection, query } from "firebase/firestore"
+import { useCollection } from '@/lib/supabase/hooks/use-collection';
+import { useUser } from '@/lib/supabase/provider';
 
 const downtimeReasonsConfig = {
     "Machine Jam": { label: 'Machine Jam', color: 'hsl(var(--chart-1))' },
@@ -50,15 +50,30 @@ const calculateHours = (startTimeStr?: string, endTimeStr?: string): number => {
 }
 
 export function TapeheadsAnalytics() {
-  const { firestore } = useFirebase();
   const { isUserLoading } = useUser();
   const [filters, setFilters] = React.useState({
     shift: 'all',
     operatorName: '',
   });
 
-  const reportsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'tapeheads_submissions')), [firestore, isUserLoading]);
-  const { data: allData, isLoading: loading } = useCollection<Report>(reportsQuery);
+  // Default to last 30 days for faster loading, but allow empty results
+  const defaultDateFrom = new Date();
+  defaultDateFrom.setDate(defaultDateFrom.getDate() - 30);
+
+  const { data: allData, isLoading: loading, error: dataError } = useCollection<Report>(
+    isUserLoading 
+      ? null 
+      : {
+          table: 'tapeheads_submissions',
+          orderBy: { column: 'date', ascending: false },
+          enabled: true,
+          limit: 500,
+          dateRange: {
+            column: 'date',
+            from: defaultDateFrom.toISOString(),
+          },
+        }
+  );
 
   const handleFilterChange = (key: keyof typeof filters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -170,7 +185,39 @@ export function TapeheadsAnalytics() {
     }, [data]);
 
   if (loading || isUserLoading) {
-    return <p>Loading analytics...</p>;
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading analytics...</p>
+          <p className="text-xs text-muted-foreground mt-2">Fetching last 30 days of data</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (dataError) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-center">
+          <p className="text-destructive font-semibold mb-2">Error loading analytics</p>
+          <p className="text-sm text-muted-foreground">{dataError.message}</p>
+          <p className="text-xs text-muted-foreground mt-2">Check browser console for details</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!allData || allData.length === 0) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-center">
+          <p className="text-muted-foreground font-semibold mb-2">No data available</p>
+          <p className="text-sm text-muted-foreground">No submissions found in the last 30 days.</p>
+          <p className="text-xs text-muted-foreground mt-2">Try adjusting the date range filter or check if reports have been submitted.</p>
+        </div>
+      </div>
+    );
   }
 
   return (

@@ -1,16 +1,10 @@
 
 'use server';
 /**
- * @fileoverview This file serves as the single, centralized file-based data store for the application.
- * Data is persisted to JSON files in the `src/lib/data` directory.
+ * @fileoverview This file serves as the centralized data store for the application.
+ * Data operations now use Supabase via API routes.
  */
 import type { Report, WorkItem } from './types';
-import { 
-    readData,
-    writeData
-} from './data-store-server';
-import { addDocumentNonBlocking, deleteDocumentNonBlocking, setDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
-import { collection, doc, Firestore, getDoc, getDocs, query, updateDoc, where } from 'firebase/firestore';
 
 //_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 //
@@ -135,77 +129,157 @@ export interface InspectionSubmission {
     };
 }
 
-export async function getOeJobs(firestore: Firestore): Promise<OeJob[]> {
-    const jobsCollection = collection(firestore, 'jobs');
-    const snapshot = await getDocs(jobsCollection);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as OeJob));
+export async function getOeJobs(): Promise<OeJob[]> {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/jobs`, {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        cache: 'no-store',
+    });
+    
+    if (!response.ok) {
+        throw new Error('Failed to fetch jobs');
+    }
+    
+    const { data } = await response.json();
+    return data || [];
 }
 
-export async function addGraphicsTask(firestore: Firestore, task: Omit<GraphicsTask, 'id'>): Promise<string> {
-    const newDocRef = doc(collection(firestore, 'graphics_tasks'));
-    await setDocumentNonBlocking(newDocRef, { ...task, id: newDocRef.id });
-    return newDocRef.id;
+export async function addGraphicsTask(task: Omit<GraphicsTask, 'id'>): Promise<string> {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/graphics`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(task),
+    });
+    
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create graphics task');
+    }
+    
+    const { data } = await response.json();
+    return data.id;
 }
 
 
-export async function updateGraphicsTask(firestore: Firestore, task: GraphicsTask): Promise<void> {
-    const docRef = doc(firestore, 'graphics_tasks', task.id);
-    await setDocumentNonBlocking(docRef, task, { merge: true });
+export async function updateGraphicsTask(task: GraphicsTask): Promise<void> {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/graphics/${task.id}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(task),
+    });
+    
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update graphics task');
+    }
 }
 
-export async function deleteGraphicsTask(firestore: Firestore, taskId: string): Promise<void> {
-    const docRef = doc(firestore, 'graphics_tasks', taskId);
-    await deleteDocumentNonBlocking(docRef);
+export async function deleteGraphicsTask(taskId: string): Promise<void> {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/graphics/${taskId}`, {
+        method: 'DELETE',
+    });
+    
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to delete graphics task');
+    }
 }
 
-export async function addOeJob(firestore: Firestore, job: { oeBase: string, sections: Array<{ sectionId: string, panelStart: number, panelEnd: number }> }): Promise<void> {
+export async function addOeJob(job: { oeBase: string, sections: Array<{ sectionId: string, panelStart: number, panelEnd: number }> }): Promise<void> {
     const newJob = {
         oeBase: job.oeBase,
         status: 'pending',
         sections: job.sections.map(s => ({ ...s, completedPanels: [] })),
     };
-    const jobsCollection = collection(firestore, 'jobs');
-    addDocumentNonBlocking(jobsCollection, newJob);
+    
+    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/jobs`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newJob),
+    });
+    
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create job');
+    }
 }
 
 
-export async function addFilmsReport(firestore: Firestore, report: Omit<FilmsReport, 'id'>): Promise<void> {
-    const newReport = { ...report };
-    const filmsCollection = collection(firestore, 'films_reports');
-    addDocumentNonBlocking(filmsCollection, newReport);
+export async function addFilmsReport(report: Omit<FilmsReport, 'id'>): Promise<void> {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/films`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(report),
+    });
+    
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create films report');
+    }
 }
 
-export async function addGantryReport(firestore: Firestore, report: Omit<GantryReport, 'id'>): Promise<void> {
-    const newReport = { ...report, id: `gantry_rpt_${Date.now()}` };
-    const docRef = doc(firestore, 'gantry_reports', newReport.id);
-    setDocumentNonBlocking(docRef, newReport, { merge: true });
+export async function addGantryReport(report: Omit<GantryReport, 'id'>): Promise<void> {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/gantry`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(report),
+    });
+    
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create gantry report');
+    }
 }
 
-export async function addPreggerReport(firestore: Firestore, report: Omit<PreggerReport, 'id'>): Promise<void> {
-    const newReport = { ...report, id: `pregger_rpt_${Date.now()}` };
-    const docRef = doc(firestore, 'pregger_reports', newReport.id);
-    setDocumentNonBlocking(docRef, newReport, { merge: true });
+export async function addPreggerReport(report: Omit<PreggerReport, 'id'>): Promise<void> {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/pregger`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(report),
+    });
+    
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create pregger report');
+    }
 }
 
-export async function addInspection(firestore: Firestore, inspection: Omit<InspectionSubmission, 'id'>): Promise<void> {
-    const newInspection = { ...inspection, id: `qc_${Date.now()}` };
-    const docRef = doc(firestore, 'qc_inspections', newInspection.id);
-    setDocumentNonBlocking(docRef, newInspection, { merge: true });
+export async function addInspection(inspection: Omit<InspectionSubmission, 'id'>): Promise<void> {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/qc`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(inspection),
+    });
+    
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create inspection');
+    }
 }
 
-export async function getOeSection(firestore: Firestore, oeBase?: string, sectionId?: string): Promise<(OeSection & { jobStatus: OeJob['status']}) | undefined> {
+export async function getOeSection(oeBase?: string, sectionId?: string): Promise<(OeSection & { jobStatus: OeJob['status']}) | undefined> {
     if (!oeBase || !sectionId) return undefined;
     
-    const jobsRef = collection(firestore, 'jobs');
-    const q = query(jobsRef, where("oeBase", "==", oeBase));
+    const jobs = await getOeJobs();
+    const job = jobs.find(j => j.oeBase === oeBase);
     
-    const querySnapshot = await getDocs(q);
-    if (querySnapshot.empty) {
-        return undefined;
-    }
-    
-    const jobDoc = querySnapshot.docs[0];
-    const job = { id: jobDoc.id, ...jobDoc.data() } as OeJob;
+    if (!job) return undefined;
 
     const section = job.sections.find(s => s.sectionId === sectionId);
     if (!section) return undefined;
@@ -213,15 +287,11 @@ export async function getOeSection(firestore: Firestore, oeBase?: string, sectio
     return { ...section, jobStatus: job.status };
 }
 
-export async function markPanelsAsCompleted(firestore: Firestore, oeBase: string, sectionId: string, panels: string[]): Promise<void> {
-    const jobsRef = collection(firestore, 'jobs');
-    const q = query(jobsRef, where("oeBase", "==", oeBase));
+export async function markPanelsAsCompleted(oeBase: string, sectionId: string, panels: string[]): Promise<void> {
+    const jobs = await getOeJobs();
+    const job = jobs.find(j => j.oeBase === oeBase);
     
-    const querySnapshot = await getDocs(q);
-    if (querySnapshot.empty) return;
-
-    const jobDoc = querySnapshot.docs[0];
-    const job = { id: jobDoc.id, ...jobDoc.data() } as OeJob;
+    if (!job) return;
 
     const sectionIndex = job.sections.findIndex(s => s.sectionId === sectionId);
     if (sectionIndex === -1) return;
@@ -245,24 +315,60 @@ export async function markPanelsAsCompleted(firestore: Firestore, oeBase: string
         job.status = 'in-progress';
     }
     
-    const jobDocRef = doc(firestore, 'jobs', job.id);
-    updateDocumentNonBlocking(jobDocRef, {
-        sections: job.sections,
-        status: job.status
+    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/jobs/${job.id}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            sections: job.sections,
+            status: job.status
+        }),
     });
+    
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update job');
+    }
 }
 
-export async function addTapeheadsSubmission(firestore: Firestore, report: Report): Promise<void> {
-    const docRef = doc(firestore, 'tapeheads_submissions', report.id);
-    setDocumentNonBlocking(docRef, report, { merge: true });
+export async function addTapeheadsSubmission(report: Report): Promise<void> {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/tapeheads`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(report),
+    });
+    
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create tapeheads submission');
+    }
 }
 
-export async function updateTapeheadsSubmission(firestore: Firestore, updatedReport: Report): Promise<void> {
-    const docRef = doc(firestore, 'tapeheads_submissions', updatedReport.id);
-    updateDocumentNonBlocking(docRef, updatedReport);
+export async function updateTapeheadsSubmission(updatedReport: Report): Promise<void> {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/tapeheads/${updatedReport.id}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedReport),
+    });
+    
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update tapeheads submission');
+    }
 }
 
-export async function deleteTapeheadsSubmission(firestore: Firestore, id: string): Promise<void> {
-    const docRef = doc(firestore, 'tapeheads_submissions', id);
-    await deleteDocumentNonBlocking(docRef);
+export async function deleteTapeheadsSubmission(id: string): Promise<void> {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/tapeheads/${id}`, {
+        method: 'DELETE',
+    });
+    
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to delete tapeheads submission');
+    }
 }

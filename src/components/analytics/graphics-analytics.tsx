@@ -12,14 +12,24 @@ import type { GraphicsTask } from '@/lib/data-store';
 import { Button } from '../ui/button';
 import { sendShippingNotification } from '@/ai/flows/send-notification-flow';
 import { useToast } from '@/hooks/use-toast';
-import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
-import { collection, query } from 'firebase/firestore';
-
+import { useCollection } from '@/lib/supabase/hooks/use-collection';
+import { useUser } from '@/lib/supabase/provider';
 export function GraphicsAnalytics() {
-    const { firestore } = useFirebase();
     const [date, setDate] = useState<Date | undefined>(new Date());
-    const tasksQuery = useMemoFirebase(() => query(collection(firestore, 'graphics_tasks')), [firestore]);
-    const { data: allTasks, isLoading: loading } = useCollection<GraphicsTask>(tasksQuery);
+    // Default to last 30 days for faster loading, but allow empty results
+    const defaultDateFrom = new Date();
+    defaultDateFrom.setDate(defaultDateFrom.getDate() - 30);
+
+    const { data: allTasks, isLoading: loading, error: dataError } = useCollection<GraphicsTask>({
+        table: 'graphics_tasks',
+        orderBy: { column: 'created_at', ascending: false },
+        enabled: true,
+        limit: 500,
+        dateRange: {
+          column: 'created_at',
+          from: defaultDateFrom.toISOString(),
+        },
+    });
     
     const [notifiedTags, setNotifiedTags] = useState<Set<string>>(new Set());
     const { toast } = useToast();
@@ -108,9 +118,40 @@ export function GraphicsAnalytics() {
     };
     
     if (loading) {
-        return <p>Loading analytics...</p>;
+        return (
+          <div className="flex items-center justify-center p-8">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-muted-foreground">Loading analytics...</p>
+              <p className="text-xs text-muted-foreground mt-2">Fetching last 30 days of data</p>
+            </div>
+          </div>
+        );
     }
 
+    if (dataError) {
+        return (
+          <div className="flex items-center justify-center p-8">
+            <div className="text-center">
+              <p className="text-destructive font-semibold mb-2">Error loading analytics</p>
+              <p className="text-sm text-muted-foreground">{dataError.message}</p>
+              <p className="text-xs text-muted-foreground mt-2">Check browser console for details</p>
+            </div>
+          </div>
+        );
+    }
+
+    if (!allTasks || allTasks.length === 0) {
+        return (
+          <div className="flex items-center justify-center p-8">
+            <div className="text-center">
+              <p className="text-muted-foreground font-semibold mb-2">No data available</p>
+              <p className="text-sm text-muted-foreground">No tasks found in the last 30 days.</p>
+              <p className="text-xs text-muted-foreground mt-2">Try adjusting the date range filter or check if tasks have been created.</p>
+            </div>
+          </div>
+        );
+    }
 
     return (
         <div className="space-y-6">

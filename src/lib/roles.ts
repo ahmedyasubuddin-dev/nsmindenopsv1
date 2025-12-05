@@ -1,42 +1,42 @@
 
 export type UserRole =
-  | 'superuser'
-  | 'b2_supervisor'
-  | 'b1_supervisor'
-  | 'quality_manager'
-  | 'management'
-  | 'pregger_lead'
-  | 'tapehead_operator'
-  | 'tapehead_lead'
-  | 'gantry_lead'
-  | 'films_lead'
-  | 'graphics_lead'
-  | null;
+    | 'superuser'
+    | 'b2_supervisor'
+    | 'b1_supervisor'
+    | 'quality_manager'
+    | 'management'
+    | 'pregger_lead'
+    | 'tapehead_operator'
+    | 'tapehead_lead'
+    | 'gantry_lead'
+    | 'films_lead'
+    | 'graphics_lead'
+    | null;
 
-export type Permission = 
-  // Navigation Links
-  | 'nav:dashboard'
-  | 'nav:report:pregger'
-  | 'nav:report:tapeheads'
-  | 'nav:report:gantry'
-  | 'nav:report:films'
-  | 'nav:report:graphics'
-  | 'nav:review:tapeheads'
-  | 'nav:analytics' // A parent permission to see the main menu
-  | 'nav:analytics:pregger'
-  | 'nav:analytics:tapeheads'
-  | 'nav:analytics:gantry'
-  | 'nav:analytics:films'
-  | 'nav:analytics:graphics'
-  | 'nav:qc'
-  | 'nav:status'
-  | 'nav:file-processing'
-  | 'nav:admin';
+export type Permission =
+    // Navigation Links
+    | 'nav:dashboard'
+    | 'nav:report:pregger'
+    | 'nav:report:tapeheads'
+    | 'nav:report:gantry'
+    | 'nav:report:films'
+    | 'nav:report:graphics'
+    | 'nav:review:tapeheads'
+    | 'nav:analytics' // A parent permission to see the main menu
+    | 'nav:analytics:pregger'
+    | 'nav:analytics:tapeheads'
+    | 'nav:analytics:gantry'
+    | 'nav:analytics:films'
+    | 'nav:analytics:graphics'
+    | 'nav:qc'
+    | 'nav:status'
+    | 'nav:file-processing'
+    | 'nav:admin';
 
 const allAnalytics: Permission[] = [
     'nav:analytics',
     'nav:analytics:pregger',
-    'nav_analytics_tapeheads',
+    'nav:analytics:tapeheads',
     'nav:analytics:gantry',
     'nav:analytics:films',
     'nav:analytics:graphics',
@@ -47,7 +47,7 @@ const roles: Record<Exclude<UserRole, null>, Permission[]> = {
         'nav:dashboard',
         'nav:report:pregger', 'nav:report:tapeheads', 'nav:report:gantry', 'nav:report:films', 'nav:report:graphics',
         'nav:review:tapeheads',
-        'nav:analytics', 'nav:analytics:pregger', 'nav:analytics:tapeheads', 'nav:analytics:gantry', 'nav:analytics:films', 'nav-analytics:graphics',
+        'nav:analytics', 'nav:analytics:pregger', 'nav:analytics:tapeheads', 'nav:analytics:gantry', 'nav:analytics:films', 'nav:analytics:graphics',
         'nav:qc',
         'nav:status',
         'nav:file-processing',
@@ -55,7 +55,7 @@ const roles: Record<Exclude<UserRole, null>, Permission[]> = {
     ],
     'b2_supervisor': [
         'nav:dashboard',
-        'nav:report:pregger', 
+        'nav:report:pregger',
         'nav:report:tapeheads',
         'nav:review:tapeheads',
         'nav:analytics', 'nav:analytics:pregger', 'nav:analytics:tapeheads',
@@ -63,8 +63,8 @@ const roles: Record<Exclude<UserRole, null>, Permission[]> = {
     ],
     'b1_supervisor': [
         'nav:dashboard',
-        'nav:report:gantry', 
-        'nav:report:films', 
+        'nav:report:gantry',
+        'nav:report:films',
         'nav:report:graphics',
         'nav:analytics', 'nav:analytics:gantry', 'nav:analytics:films', 'nav:analytics:graphics',
         'nav:status',
@@ -92,7 +92,7 @@ export function hasPermission(role: UserRole, permission: Permission): boolean {
     if (!role) return false;
     // Superuser has all permissions
     if (role === 'superuser') return true;
-    
+
     // Check for parent analytics permission
     if (permission.startsWith('nav:analytics:') && roles[role]?.includes('nav:analytics')) {
         return true;

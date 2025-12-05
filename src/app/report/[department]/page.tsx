@@ -11,8 +11,9 @@ function isValidDepartment(department: string): department is Department {
 }
 
 
-export default function ReportPage({ params }: { params: { department: string } }) {
-  const departmentName = params.department.charAt(0).toUpperCase() + params.department.slice(1) as Department;
+export default async function ReportPage({ params }: { params: Promise<{ department: string }> }) {
+  const { department } = await params;
+  const departmentName = department.charAt(0).toUpperCase() + department.slice(1) as Department;
   
   if (!isValidDepartment(departmentName)) {
     notFound();

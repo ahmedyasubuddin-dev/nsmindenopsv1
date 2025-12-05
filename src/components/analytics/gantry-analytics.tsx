@@ -14,9 +14,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Factory, TrendingUp, CheckCircle, AlertTriangle, Users } from "lucide-react"
-import { useCollection, useFirebase, useMemoFirebase, useAuth as useFirebaseAuth } from "@/firebase"
+import { useCollection } from '@/lib/supabase/hooks/use-collection';
+import { useUser } from '@/lib/supabase/provider';
 import type { GantryReport } from "@/lib/data-store"
-import { collection, query } from "firebase/firestore"
 
 const classifySailType = (sailNumber?: string): 'Sail' | 'Panel' | 'Scarf' => {
   if (!sailNumber || sailNumber.length < 3) return 'Scarf';
@@ -47,14 +47,26 @@ const issueTypesConfig: ChartConfig = {
 }
 
 export function GantryAnalytics() {
-  const { firestore } = useFirebase();
-  const { isUserLoading } = useFirebaseAuth();
+  const { isUserLoading } = useUser();
 
-  const gantryQuery = useMemoFirebase(() => {
-    if (isUserLoading) return null;
-    return query(collection(firestore, 'gantry_reports'))
-  }, [firestore, isUserLoading]);
-  const { data: allReports, isLoading: loading } = useCollection<GantryReport>(gantryQuery);
+  // Default to last 30 days for faster loading, but allow empty results
+  const defaultDateFrom = new Date();
+  defaultDateFrom.setDate(defaultDateFrom.getDate() - 30);
+
+  const { data: allReports, isLoading: loading, error: dataError } = useCollection<GantryReport>(
+    isUserLoading 
+      ? null 
+      : {
+          table: 'gantry_reports',
+          orderBy: { column: 'date', ascending: false },
+          enabled: true,
+          limit: 500,
+          dateRange: {
+            column: 'date',
+            from: defaultDateFrom.toISOString(),
+          },
+        }
+  );
 
   const [filters, setFilters] = React.useState({
     shift: "all",
@@ -224,7 +236,39 @@ export function GantryAnalytics() {
     }, [allSails]);
 
   if (loading || isUserLoading) {
-    return <p>Loading analytics...</p>;
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading analytics...</p>
+          <p className="text-xs text-muted-foreground mt-2">Fetching last 30 days of data</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (dataError) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-center">
+          <p className="text-destructive font-semibold mb-2">Error loading analytics</p>
+          <p className="text-sm text-muted-foreground">{dataError.message}</p>
+          <p className="text-xs text-muted-foreground mt-2">Check browser console for details</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!allReports || allReports.length === 0) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-center">
+          <p className="text-muted-foreground font-semibold mb-2">No data available</p>
+          <p className="text-sm text-muted-foreground">No reports found in the last 30 days.</p>
+          <p className="text-xs text-muted-foreground mt-2">Try adjusting the date range filter or check if reports have been submitted.</p>
+        </div>
+      </div>
+    );
   }
 
   return (

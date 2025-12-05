@@ -1,61 +1,75 @@
-
 import type { Report } from '@/lib/types';
 
-// MOCK DATA - Replace with your actual backend call (e.g., Supabase)
-const mockSubmissions: Report[] = [
-  {
-    id: "mock_1", operatorName: "John Doe", shift: 1, thNumber: "TH-1", date: new Date(), status: "Submitted", total_meters: 1250,
-    workItems: [{ oeNumber: "OAUS32160", section: "001", endOfShiftStatus: 'Completed', panelsWorkedOn: ["P1", "P2"], total_meters: 1250, total_tapes: 1, had_spin_out: false, tapes: [] }],
-    checklist: { smoothFuseFull: true, bladesGlasses: true, paperworkUpToDate: true, debriefNewOperator: true, electricScissor: true, tubesAtEndOfTable: true, sprayTracksOnBridge: true, sharpiePens: true, broom: true, cleanedWorkStation: true, meterStickTwoIrons: true, thIsleTrashEmpty: true }
-  },
-  {
-    id: "mock_2", operatorName: "Jane Smith", shift: 1, thNumber: "TH-2", date: new Date(), status: "Submitted", total_meters: 980,
-    workItems: [{ oeNumber: "OAUS32160", section: "002", endOfShiftStatus: 'In Progress', layer: "8 of 15", panelsWorkedOn: ["P10"], total_meters: 980, total_tapes: 1, had_spin_out: true, spin_outs: 1, spin_out_duration_minutes: 15, tapes: [] }],
-    checklist: { smoothFuseFull: true, bladesGlasses: true, paperworkUpToDate: false, debriefNewOperator: false, electricScissor: true, tubesAtEndOfTable: true, sprayTracksOnBridge: true, sharpiePens: true, broom: true, cleanedWorkStation: false, meterStickTwoIrons: true, thIsleTrashEmpty: true }
-  },
-   {
-    id: "mock_3", operatorName: "Mike Ross", shift: 2, thNumber: "TH-4", date: new Date(), status: "Submitted", total_meters: 1500,
-    workItems: [{ oeNumber: "OAUS32161", section: "001", endOfShiftStatus: 'Completed', panelsWorkedOn: ["P1", "P2", "P3"], total_meters: 1500, total_tapes: 1, had_spin_out: false, tapes: [] }],
-    checklist: { smoothFuseFull: true, bladesGlasses: true, paperworkUpToDate: true, debriefNewOperator: true, electricScissor: true, tubesAtEndOfTable: true, sprayTracksOnBridge: true, sharpiePens: true, broom: true, cleanedWorkStation: true, meterStickTwoIrons: true, thIsleTrashEmpty: true }
-  }
-];
-
-
 /**
- * Fetches all Tapeheads submissions.
- * This is a mock implementation. Replace with your Supabase client call.
+ * Fetches all Tapeheads submissions from the API.
  */
 export async function getTapeheadsSubmissions(): Promise<Report[]> {
-    console.log("Fetching mock Tapeheads submissions...");
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // In a real Supabase implementation, you would do:
-    // const { data, error } = await supabase.from('tapeheads_submissions').select('*');
-    // if (error) throw error;
-    // return data;
-
-    return mockSubmissions;
+    try {
+        const response = await fetch('/api/tapeheads');
+        if (!response.ok) {
+            throw new Error('Failed to fetch tapeheads submissions');
+        }
+        const result = await response.json();
+        return (result.data || []).map((item: any) => ({
+            ...item,
+            date: new Date(item.date),
+        })) as Report[];
+    } catch (error) {
+        console.error('Error fetching tapeheads submissions:', error);
+        throw error;
+    }
 }
 
 /**
  * Adds or updates a Tapeheads submission.
- * This is a mock implementation.
  */
 export async function saveTapeheadsSubmission(report: Report): Promise<Report> {
-    console.log("Saving mock Tapeheads submission:", report);
-    await new Promise(resolve => setTimeout(resolve, 300));
-    return report;
+    try {
+        const url = report.id ? `/api/tapeheads/${report.id}` : '/api/tapeheads';
+        const method = report.id ? 'PUT' : 'POST';
+        
+        const response = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                ...report,
+                date: report.date instanceof Date ? report.date.toISOString() : report.date,
+            }),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to save submission');
+        }
+
+        const result = await response.json();
+        return {
+            ...result.data,
+            date: new Date(result.data.date),
+        } as Report;
+    } catch (error) {
+        console.error('Error saving tapeheads submission:', error);
+        throw error;
+    }
 }
 
 /**
  * Deletes a Tapeheads submission.
- * This is a mock implementation.
  */
 export async function deleteTapeheadsSubmission(reportId: string): Promise<void> {
-    console.log("Deleting mock Tapeheads submission:", reportId);
-    await new Promise(resolve => setTimeout(resolve, 300));
-    return;
+    try {
+        const response = await fetch(`/api/tapeheads/${reportId}`, {
+            method: 'DELETE',
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to delete submission');
+        }
+    } catch (error) {
+        console.error('Error deleting tapeheads submission:', error);
+        throw error;
+    }
 }
 
     

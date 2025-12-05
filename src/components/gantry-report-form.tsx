@@ -31,27 +31,27 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ImageUpload } from "./image-upload"
 import { Switch } from "./ui/switch"
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert"
-import { addGantryReport, type FilmsReport } from "@/lib/data-store"
-import { useCollection, useFirebase, useMemoFirebase, useAuth as useFirebaseAuth, useFirestore } from "@/firebase"
-import { collection, query } from "firebase/firestore"
+import { type FilmsReport } from "@/lib/data-store"
+import { useCollection } from '@/lib/supabase/hooks/use-collection';
+import { useUser } from '@/lib/supabase/provider';
 
 const stageOfProcessOptions = [
-    "RF Smart Mold Adjust", "Grid Base Film Installation", "Panel Installation", 
-    "Tape Installation", "Iron Scarves", "Top Film Installation", "Supply Vacuum", 
-    "Top Film Inspection", "Lamination", "Lamination Inspection", "Move to Cute"
+  "RF Smart Mold Adjust", "Grid Base Film Installation", "Panel Installation",
+  "Tape Installation", "Iron Scarves", "Top Film Installation", "Supply Vacuum",
+  "Top Film Inspection", "Lamination", "Lamination Inspection", "Move to Cute"
 ];
 
 const issueOptions = [
-    "Creases", "Sail Damage", "Other Damage", "Debris", "Vacuum Issues", 
-    "Lamination Issues", "Mold Shape Issues", "Panel Alignment Issues", "Other"
+  "Creases", "Sail Damage", "Other Damage", "Debris", "Vacuum Issues",
+  "Lamination Issues", "Mold Shape Issues", "Panel Alignment Issues", "Other"
 ];
 
 const moldNumberOptions = [
-    "Gantry 4/MOLD 105",
-    "Gantry 6/MOLD 109",
-    "Gantry 6/MOLD 110",
-    "Gantry 7/MOLD 111",
-    "Gantry 8/MOLD 100",
+  "Gantry 4/MOLD 105",
+  "Gantry 6/MOLD 109",
+  "Gantry 6/MOLD 110",
+  "Gantry 7/MOLD 111",
+  "Gantry 8/MOLD 100",
 ];
 
 
@@ -155,7 +155,7 @@ function Section({ title, description, children }: { title: string, description?
 
 export function GantryReportForm() {
   const { toast } = useToast();
-  const firestore = useFirestore();
+  const { isUserLoading } = useUser();
   const form = useForm<GantryReportFormValues>({
     resolver: zodResolver(gantryReportSchema),
     defaultValues,
@@ -167,46 +167,64 @@ export function GantryReportForm() {
   const { fields: recognitionFields, append: appendRecognition, remove: removeRecognition } = useFieldArray({ control: form.control, name: "recognition" });
   const { fields: moldFields, append: appendMold, remove: removeMold } = useFieldArray({ control: form.control, name: "molds" });
   const { fields: maintenanceFields, append: appendMaintenance, remove: removeMaintenance } = useFieldArray({ control: form.control, name: "maintenance" });
-  
+
   const selectedShift = useWatch({ control: form.control, name: "shift" });
 
   React.useEffect(() => {
     if (selectedShift) {
-        const defaultPersonnel = personnelDefaults[selectedShift as keyof typeof personnelDefaults] || [];
-        form.setValue("personnel", defaultPersonnel);
+      const defaultPersonnel = personnelDefaults[selectedShift as keyof typeof personnelDefaults] || [];
+      form.setValue("personnel", defaultPersonnel);
     }
   }, [selectedShift, form]);
 
 
   async function onSubmit(values: GantryReportFormValues) {
-    await addGantryReport(firestore, {
-        ...values,
-        report_date: values.report_date.toISOString(),
-        date: values.report_date.toISOString(),
-    });
-    toast({
-      title: "Gantry Report Submitted!",
-      description: "Your detailed report has been successfully submitted.",
-    });
-    form.reset();
+    try {
+      const response = await fetch('/api/gantry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...values,
+          report_date: values.report_date.toISOString(),
+          date: values.report_date.toISOString(),
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to submit report');
+      }
+
+      toast({
+        title: "Gantry Report Submitted!",
+        description: "Your detailed report has been successfully submitted.",
+      });
+      form.reset();
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to submit report.",
+      });
+    }
   }
-  
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-        
+
         <Section title="Gantry Shift Report" description="Submit your shift report with production details and operational data.">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <FormField control={form.control} name="report_date" render={({ field }) => (<FormItem><FormLabel>Date</FormLabel><FormControl><DatePicker value={field.value} onChange={field.onChange} /></FormControl><FormMessage /></FormItem>)} />
-              <FormField control={form.control} name="shift" render={({ field }) => (<FormItem><FormLabel>Shift</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a shift" /></SelectTrigger></FormControl><SelectContent><SelectItem value="1">Shift 1</SelectItem><SelectItem value="2">Shift 2</SelectItem><SelectItem value="3">Shift 3</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <FormField control={form.control} name="report_date" render={({ field }) => (<FormItem><FormLabel>Date</FormLabel><FormControl><DatePicker value={field.value} onChange={field.onChange} /></FormControl><FormMessage /></FormItem>)} />
+            <FormField control={form.control} name="shift" render={({ field }) => (<FormItem><FormLabel>Shift</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a shift" /></SelectTrigger></FormControl><SelectContent><SelectItem value="1">Shift 1</SelectItem><SelectItem value="2">Shift 2</SelectItem><SelectItem value="3">Shift 3</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
+          </div>
         </Section>
-        
+
         <Section title="Zone Leads">
           <div className="space-y-4">
             {zoneLeadFields.map((field, index) => (
               <div key={field.id} className="flex items-end gap-4 p-4 border rounded-md relative">
-                <FormField control={form.control} name={`zone_leads.${index}.zone_number`} render={({ field }) => (<FormItem className="flex-1"><FormLabel>Zone #</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent>{[...Array(5)].map((_, i) => <SelectItem key={i} value={`Zone ${i+1}`}>Zone {i+1}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name={`zone_leads.${index}.zone_number`} render={({ field }) => (<FormItem className="flex-1"><FormLabel>Zone #</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{[...Array(5)].map((_, i) => <SelectItem key={i} value={`Zone ${i + 1}`}>Zone {i + 1}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
                 <FormField control={form.control} name={`zone_leads.${index}.lead_name`} render={({ field }) => (<FormItem className="flex-1"><FormLabel>Lead Name</FormLabel><FormControl><Input placeholder="Lead name" {...field} /></FormControl><FormMessage /></FormItem>)} />
                 <Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={() => removeZoneLead(index)}><Trash2 className="size-4" /></Button>
               </div>
@@ -214,7 +232,7 @@ export function GantryReportForm() {
             <Button type="button" variant="outline" size="sm" onClick={() => appendZoneLead({ zone_number: 'Zone 1', lead_name: '' })}><PlusCircle className="mr-2 h-4 w-4" />Add Zone Lead</Button>
           </div>
         </Section>
-        
+
         <Section title="Personnel">
           <div className="space-y-4">
             {personnelFields.map((field, index) => (
@@ -227,11 +245,11 @@ export function GantryReportForm() {
             ))}
             <Button type="button" variant="outline" size="sm" onClick={() => appendPersonnel({ employee_name: '', start_time: '', end_time: '' })}><PlusCircle className="mr-2 h-4 w-4" />Add Personnel</Button>
             <FormField control={form.control} name="personnel_exceptions" render={({ field }) => (
-                <FormItem className="pt-4"><FormLabel>Exceptions / Called Out Early / Left Early</FormLabel><FormControl><Textarea placeholder="Note any personnel exceptions here..." {...field} /></FormControl><FormMessage /></FormItem>
-            )}/>
+              <FormItem className="pt-4"><FormLabel>Exceptions / Called Out Early / Left Early</FormLabel><FormControl><Textarea placeholder="Note any personnel exceptions here..." {...field} /></FormControl><FormMessage /></FormItem>
+            )} />
           </div>
         </Section>
-        
+
         <Section title="Atta Boy / Girl (Recognition)">
           <div className="space-y-4">
             {recognitionFields.map((field, index) => (
@@ -255,42 +273,42 @@ export function GantryReportForm() {
         </Section>
 
         <Section title="Maintenance">
-            <div className="space-y-4">
+          <div className="space-y-4">
             {maintenanceFields.map((field, index) => (
               <div key={field.id} className="flex flex-col gap-4 p-4 border rounded-md relative">
-                 <div className="flex items-end gap-4">
-                    <FormField control={form.control} name={`maintenance.${index}.description`} render={({ field }) => (<FormItem className="flex-1"><FormLabel>Description</FormLabel><FormControl><Textarea placeholder="Maintenance description" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                    <FormField control={form.control} name={`maintenance.${index}.duration_minutes`} render={({ field }) => (<FormItem><FormLabel>Duration (minutes)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                    <Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={() => removeMaintenance(index)}><Trash2 className="size-4" /></Button>
-                 </div>
-                 <FormField
-                    control={form.control}
-                    name={`maintenance.${index}.images`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Maintenance Visual Log</FormLabel>
-                        <FormControl>
-                          <ImageUpload 
-                            value={field.value} 
-                            onChange={field.onChange} 
-                            maxFiles={5}
-                            maxSize={5 * 1024 * 1024}
-                            />
-                        </FormControl>
-                         <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                <div className="flex items-end gap-4">
+                  <FormField control={form.control} name={`maintenance.${index}.description`} render={({ field }) => (<FormItem className="flex-1"><FormLabel>Description</FormLabel><FormControl><Textarea placeholder="Maintenance description" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                  <FormField control={form.control} name={`maintenance.${index}.duration_minutes`} render={({ field }) => (<FormItem><FormLabel>Duration (minutes)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                  <Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={() => removeMaintenance(index)}><Trash2 className="size-4" /></Button>
+                </div>
+                <FormField
+                  control={form.control}
+                  name={`maintenance.${index}.images`}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Maintenance Visual Log</FormLabel>
+                      <FormControl>
+                        <ImageUpload
+                          value={field.value}
+                          onChange={field.onChange}
+                          maxFiles={5}
+                          maxSize={5 * 1024 * 1024}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
             ))}
-            <Button type="button" variant="outline" size="sm" onClick={() => appendMaintenance({ description: '', duration_minutes: 0, images:[] })}><PlusCircle className="mr-2 h-4 w-4" />Add Maintenance</Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => appendMaintenance({ description: '', duration_minutes: 0, images: [] })}><PlusCircle className="mr-2 h-4 w-4" />Add Maintenance</Button>
           </div>
         </Section>
-        
+
         <Section title="Truck Run Log">
-             <FormField control={form.control} name="truck_runs" render={({ field }) => (
-                <FormItem><FormLabel>Number of Truck Runs in This Shift</FormLabel><FormControl><Input type="number" placeholder="0" {...field} /></FormControl><FormMessage /></FormItem>
-            )}/>
+          <FormField control={form.control} name="truck_runs" render={({ field }) => (
+            <FormItem><FormLabel>Number of Truck Runs in This Shift</FormLabel><FormControl><Input type="number" placeholder="0" {...field} /></FormControl><FormMessage /></FormItem>
+          )} />
         </Section>
 
         <Button type="submit" size="lg" className="w-full">Submit Report</Button>
@@ -300,14 +318,17 @@ export function GantryReportForm() {
 }
 
 function MoldField({ moldIndex, control, removeMold }: { moldIndex: number, control: any, removeMold: (index: number) => void }) {
-  const firestore = useFirestore();
-  const { isUserLoading } = useFirebaseAuth();
+  const { isUserLoading } = useUser();
 
-  const filmsQuery = useMemoFirebase(() => {
-    if (isUserLoading) return null;
-    return query(collection(firestore, 'films_reports'))
-  }, [firestore, isUserLoading]);
-  const { data: filmsData, isLoading: isLoadingFilms } = useCollection<FilmsReport>(filmsQuery);
+  const { data: filmsData, isLoading: isLoadingFilms } = useCollection<FilmsReport>(
+    isUserLoading
+      ? null
+      : {
+        table: 'films_reports',
+        orderBy: { column: 'report_date', ascending: false },
+        enabled: true,
+      }
+  );
 
   const { fields: sailFields, append: appendSail, remove: removeSail } = useFieldArray({
     control,
@@ -315,8 +336,8 @@ function MoldField({ moldIndex, control, removeMold }: { moldIndex: number, cont
   });
 
   const downtimeCaused = useWatch({
-      control,
-      name: `molds.${moldIndex}.downtime_caused`,
+    control,
+    name: `molds.${moldIndex}.downtime_caused`,
   });
 
   const watchSails = useWatch({
@@ -325,160 +346,126 @@ function MoldField({ moldIndex, control, removeMold }: { moldIndex: number, cont
   });
 
   const watchMoldNumber = useWatch({
-      control,
-      name: `molds.${moldIndex}.mold_number`
+    control,
+    name: `molds.${moldIndex}.mold_number`
   });
-  
+
   const sailsReadyForGantry = React.useMemo(() => {
-    if (!filmsData) return [];
-    const finishedSails = filmsData.flatMap(report => report.sails_finished.map(sail => sail.sail_number));
+    if (!filmsData || !watchMoldNumber) return [];
+
+    // Extract Gantry Number from "Gantry 4/MOLD 105" -> "Gantry 4"
+    const match = watchMoldNumber.match(/Gantry\s*(\d+)/i);
+    const currentGantry = match ? `Gantry ${match[1]}` : null;
+
+    if (!currentGantry) return [];
+
+    const finishedSails = filmsData.flatMap(report =>
+      (report.sails_finished || [])
+        .filter((sail: any) => sail.gantry_assignment === currentGantry)
+        .map((sail: any) => sail.sail_number)
+    );
     return [...new Set(finishedSails)]; // Return unique sail numbers
-  }, [filmsData]);
+  }, [filmsData, watchMoldNumber]);
 
+  // Removed gantryMismatch logic as the dropdown is now strictly filtered.
+  const gantryMismatch = null;
 
-  const gantryMismatch = React.useMemo(() => {
-    if (!watchMoldNumber || !watchSails || !filmsData) return null;
-
-    const getGantryNumberFromString = (str: string) => {
-        const match = str.match(/Gantry\s*(\d+)/i);
-        return match ? match[1] : null;
-    };
-
-    const selectedGantryNumber = getGantryNumberFromString(watchMoldNumber);
-    if (!selectedGantryNumber) return null;
-
-    for (const sail of watchSails) {
-        if (!sail.sail_number) continue;
-        const filmEntry = filmsData.find(f => f.sails_finished.some(s => s.sail_number === sail.sail_number));
-        
-        if (filmEntry && filmEntry.gantry_number && filmEntry.gantry_number !== selectedGantryNumber) {
-            return {
-                sailNumber: sail.sail_number,
-                expected: filmEntry.gantry_number,
-                actual: selectedGantryNumber
-            };
-        }
-    }
-    return null;
-  }, [watchSails, watchMoldNumber, filmsData]);
-  
   return (
     <Card className="p-4 bg-muted/30" key={`mold-${moldIndex}`}>
-       <div className="flex items-center justify-between mb-4">
-            <FormField
+      <div className="flex items-center justify-between mb-4">
+        <FormField
+          control={control}
+          name={`molds.${moldIndex}.mold_number`}
+          render={({ field }) => (
+            <FormItem className="flex-1 max-w-sm">
+              <FormLabel>Mold Number</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a Gantry/MOLD" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {moldNumberOptions.map(option => (
+                    <SelectItem key={option} value={option}>{option}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={() => removeMold(moldIndex)}><Trash2 className="size-4" /></Button>
+      </div>
+      {/* Removed gantryMismatch alert */}
+      <div className="space-y-4 pl-4 border-l-2 ml-2">
+        <FormLabel>Sails</FormLabel>
+        {sailFields.map((sailField, sailIndex) => (
+          <div key={sailField.id} className="flex flex-col gap-2 p-2 border rounded-md relative bg-background">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <FormField
                 control={control}
-                name={`molds.${moldIndex}.mold_number`}
-                render={({ field }) => (
-                    <FormItem className="flex-1 max-w-sm">
-                        <FormLabel>Mold Number</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select a Gantry/MOLD"/>
-                                </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                                {moldNumberOptions.map(option => (
-                                    <SelectItem key={option} value={option}>{option}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        <FormMessage />
-                    </FormItem>
-                )}
-            />
-            <Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={() => removeMold(moldIndex)}><Trash2 className="size-4" /></Button>
-        </div>
-        {gantryMismatch && (
-            <Alert variant="destructive" className="mb-4">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Gantry Mismatch Detected</AlertTitle>
-                <AlertDescription className="space-y-3">
-                    <p>
-                        Sail <span className="font-bold">{gantryMismatch.sailNumber}</span> was assigned to Gantry <span className="font-bold">{gantryMismatch.expected}</span>, but you selected a mold on Gantry <span className="font-bold">{gantryMismatch.actual}</span>. Please provide a reason for this override below.
-                    </p>
-                    <FormField
-                        control={control}
-                        name={`molds.${moldIndex}.gantry_override_reason`}
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Gantry Override Reason</FormLabel>
-                                <FormControl><Textarea placeholder="Explain why the gantry is different from the one assigned by Films..." {...field} /></FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                </AlertDescription>
-            </Alert>
-        )}
-        <div className="space-y-4 pl-4 border-l-2 ml-2">
-           <FormLabel>Sails</FormLabel>
-           {sailFields.map((sailField, sailIndex) => (
-               <div key={sailField.id} className="flex flex-col gap-2 p-2 border rounded-md relative bg-background">
-                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <FormField 
-                        control={control} 
-                        name={`molds.${moldIndex}.sails.${sailIndex}.sail_number`} 
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel className="text-xs">Sail Number</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                    <FormControl><SelectTrigger><SelectValue placeholder="Select a finished sail..."/></SelectTrigger></FormControl>
-                                    <SelectContent>
-                                        {sailsReadyForGantry.map(sailNumber => (
-                                            <SelectItem key={sailNumber} value={sailNumber}>{sailNumber}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                <FormMessage />
-                            </FormItem>
-                        )} 
-                    />
-                    <FormField control={control} name={`molds.${moldIndex}.sails.${sailIndex}.stage_of_process`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Stage of Process</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent>{stageOfProcessOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
-                    <FormField control={control} name={`molds.${moldIndex}.sails.${sailIndex}.issue`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Issues</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent>{issueOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
-                   </div>
-                   <Button type="button" variant="ghost" size="icon" className="text-destructive absolute top-1 right-1" onClick={() => removeSail(sailIndex)}><Trash2 className="size-4" /></Button>
-               </div>
-           ))}
-           <Button type="button" variant="outline" size="sm" onClick={() => appendSail({ sail_number: '', stage_of_process: '', issue: '' })}><PlusCircle className="mr-2 h-4 w-4" />Add Sail</Button>
-        </div>
-        
-        <div className="mt-6 space-y-4">
-             <FormField
-                control={control}
-                name={`molds.${moldIndex}.images`}
+                name={`molds.${moldIndex}.sails.${sailIndex}.sail_number`}
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Mold Visual Log</FormLabel>
-                    <FormControl>
-                      <ImageUpload 
-                        value={field.value} 
-                        onChange={field.onChange} 
-                        maxFiles={5}
-                        maxSize={5 * 1024 * 1024}
-                        />
-                    </FormControl>
-                     <FormMessage />
-                  </FormItem>
-                )}
-            />
-             <FormField
-                control={control}
-                name={`molds.${moldIndex}.downtime_caused`}
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4">
-                    <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                    <FormLabel className="text-base font-normal">Downtime Caused?</FormLabel>
+                    <FormLabel className="text-xs">Sail Number</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl><SelectTrigger><SelectValue placeholder="Select a finished sail..." /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        {sailsReadyForGantry.map(sailNumber => (
+                          <SelectItem key={sailNumber} value={sailNumber}>{sailNumber}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
-              {downtimeCaused && (
-                  <Card className="p-4 space-y-4">
-                      <FormField control={control} name={`molds.${moldIndex}.downtime_cause_description`} render={({ field }) => (<FormItem><FormLabel>Description of Downtime Cause</FormLabel><FormControl><Textarea {...field}/></FormControl><FormMessage /></FormItem>)} />
-                      <FormField control={control} name={`molds.${moldIndex}.downtime_duration_minutes`} render={({ field }) => (<FormItem><FormLabel>Downtime Duration (minutes)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                  </Card>
-              )}
-        </div>
+              <FormField control={control} name={`molds.${moldIndex}.sails.${sailIndex}.stage_of_process`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Stage of Process</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{stageOfProcessOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
+              <FormField control={control} name={`molds.${moldIndex}.sails.${sailIndex}.issue`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Issues</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{issueOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
+            </div>
+            <Button type="button" variant="ghost" size="icon" className="text-destructive absolute top-1 right-1" onClick={() => removeSail(sailIndex)}><Trash2 className="size-4" /></Button>
+          </div>
+        ))}
+        <Button type="button" variant="outline" size="sm" onClick={() => appendSail({ sail_number: '', stage_of_process: '', issue: '' })}><PlusCircle className="mr-2 h-4 w-4" />Add Sail</Button>
+      </div>
+
+      <div className="mt-6 space-y-4">
+        <FormField
+          control={control}
+          name={`molds.${moldIndex}.images`}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Mold Visual Log</FormLabel>
+              <FormControl>
+                <ImageUpload
+                  value={field.value}
+                  onChange={field.onChange}
+                  maxFiles={5}
+                  maxSize={5 * 1024 * 1024}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={control}
+          name={`molds.${moldIndex}.downtime_caused`}
+          render={({ field }) => (
+            <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4">
+              <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+              <FormLabel className="text-base font-normal">Downtime Caused?</FormLabel>
+            </FormItem>
+          )}
+        />
+        {downtimeCaused && (
+          <Card className="p-4 space-y-4">
+            <FormField control={control} name={`molds.${moldIndex}.downtime_cause_description`} render={({ field }) => (<FormItem><FormLabel>Description of Downtime Cause</FormLabel><FormControl><Textarea {...field} /></FormControl><FormMessage /></FormItem>)} />
+            <FormField control={control} name={`molds.${moldIndex}.downtime_duration_minutes`} render={({ field }) => (<FormItem><FormLabel>Downtime Duration (minutes)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>)} />
+          </Card>
+        )}
+      </div>
     </Card>
   )
 }

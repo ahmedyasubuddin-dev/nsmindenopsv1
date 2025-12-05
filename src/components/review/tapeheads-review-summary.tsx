@@ -20,9 +20,9 @@ import { Edit, Trash2, AlertTriangle } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 import { TapeheadsOperatorForm } from '../tapeheads-operator-form';
-import { useUser } from '@/firebase';
+import { useUser } from '@/lib/supabase/provider';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
-import { getTapeheadsSubmissions } from '@/services/tapeheads-service';
+import { getTapeheadsSubmissions, saveTapeheadsSubmission, deleteTapeheadsSubmission } from '@/services/tapeheads-service';
 
 
 const reviewSchema = z.object({
@@ -135,11 +135,25 @@ export function TapeheadsReviewSummary() {
 
 
   const handleDeleteReport = async (id: string) => {
-    // This will not work without a real backend, but we keep it for UI purposes
-    toast({
-        title: "Report Deleted (Mock)",
-        description: "In a real app, this report would be removed.",
-    });
+    try {
+      await deleteTapeheadsSubmission(id);
+      // Refresh submissions after delete
+      const allSubmissions = await getTapeheadsSubmissions();
+      const filtered = allSubmissions.filter(s => 
+        isSameDay(s.date, date) && String(s.shift) === shift
+      );
+      setSubmissions(filtered);
+      toast({
+        title: "Report Deleted",
+        description: "The submission has been removed.",
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to delete submission.",
+      });
+    }
   };
   
   const handleEditReport = (report: Report) => {
@@ -148,12 +162,27 @@ export function TapeheadsReviewSummary() {
   };
   
   const handleUpdateReport = async (updatedReport: Report) => {
-    setEditDialogOpen(false);
-    setReportToEdit(undefined);
-    toast({
-      title: "Report Updated (Mock)",
-      description: "In a real app, these changes would be saved.",
-    });
+    try {
+      await saveTapeheadsSubmission(updatedReport);
+      // Refresh submissions after update
+      const allSubmissions = await getTapeheadsSubmissions();
+      const filtered = allSubmissions.filter(s => 
+        isSameDay(s.date, date) && String(s.shift) === shift
+      );
+      setSubmissions(filtered);
+      setEditDialogOpen(false);
+      setReportToEdit(undefined);
+      toast({
+        title: "Report Updated",
+        description: "The submission has been saved.",
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to update submission.",
+      });
+    }
   }
   
   const handleGenerateSummary = async () => {
@@ -214,12 +243,46 @@ export function TapeheadsReviewSummary() {
     };
   }, [submissions]);
 
-  const onSubmit = (data: ReviewFormValues) => {
-    console.log("Finalized Report:", { ...data, submissions, summaryStats });
-    toast({
-      title: 'Report Finalized (Mock)',
-      description: `In a real app, this report for shift ${data.shift} would be finalized.`,
-    });
+  const onSubmit = async (data: ReviewFormValues) => {
+    try {
+      const reviewData = {
+        date: data.date.toISOString(),
+        shift: parseInt(data.shift),
+        shift_lead_name: data.shiftLeadName,
+        summary: aiSummary || '',
+        total_meters: summaryStats?.totalMeters || 0,
+        total_tapes: summaryStats?.totalTapes || 0,
+        total_hours: summaryStats?.totalHours || 0,
+        average_mpmh: parseFloat(summaryStats?.averageMpmh || '0'),
+        total_downtime_minutes: summaryStats?.totalDowntime || 0,
+        total_spin_outs: summaryStats?.totalSpinOuts || 0,
+        unique_panels_worked: summaryStats?.uniquePanelsWorked || 0,
+        nested_panel_count: summaryStats?.nestedPanelCount || 0,
+        submission_ids: submissions.map(s => s.id),
+      };
+
+      const response = await fetch('/api/reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(reviewData),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to save review');
+      }
+
+      toast({
+        title: 'Report Finalized',
+        description: `Shift ${data.shift} review has been saved successfully.`,
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to finalize review.",
+      });
+    }
   };
 
   return (

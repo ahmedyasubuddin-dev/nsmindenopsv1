@@ -8,7 +8,8 @@ function isValidDepartment(department: string): department is Department {
   return (validDepartments as string[]).includes(department);
 }
 
-export default async function AnalyticsPage({ params: { department } }: { params: { department: string } }) {
+export default async function AnalyticsPage({ params }: { params: Promise<{ department: string }> }) {
+  const { department } = await params;
   const departmentName = department.charAt(0).toUpperCase() + department.slice(1);
   
   if (!isValidDepartment(departmentName)) {

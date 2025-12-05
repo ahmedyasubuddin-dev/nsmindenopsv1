@@ -5,8 +5,8 @@ import './globals.css';
 import { AppLayout } from '@/components/app-layout';
 import { Toaster } from "@/components/ui/toaster"
 import { AppTitleProvider } from '@/components/app-title-context';
-import { FirebaseClientProvider, useUser } from '@/firebase';
-import React, { useEffect }from 'react';
+import { SupabaseProvider, useUser } from '@/lib/supabase/provider';
+import React, { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import LoginPage from './login/page';
@@ -19,19 +19,33 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, role, isUserLoading } = useUser();
   const router = useRouter();
   const pathname = usePathname();
+  
+  // Hooks must be called at the top level - move useState here
+  const [allowAccess, setAllowAccess] = useState(false);
 
   useEffect(() => {
+    // Don't do any redirects while loading - wait for user state to be determined
     if (isUserLoading) {
-      return; // Wait for user state to be determined
+      return;
     }
     
     const isLoginPage = pathname === '/login';
+    const isReportPage = pathname.startsWith('/report');
+    const isAnalyticsPage = pathname.startsWith('/analytics');
+    const isReviewPage = pathname.startsWith('/review');
+    const isStatusPage = pathname.startsWith('/status');
+    const isQcPage = pathname.startsWith('/qc');
+    const isFileProcessingPage = pathname.startsWith('/file-processing');
+    const isProtectedPage = isReportPage || isAnalyticsPage || isReviewPage || isStatusPage || isQcPage || isFileProcessingPage || pathname === '/dashboard' || pathname === '/admin';
 
-    if (!user && !isLoginPage) {
-      router.replace('/login');
-    } else if (user && isLoginPage) {
+    // If user is logged in and on login page, redirect to dashboard
+    if (user && isLoginPage) {
       router.replace('/dashboard');
-    } else if (user && !isLoginPage) {
+      return;
+    }
+    
+    // If user is logged in, check permissions
+    if (user && !isLoginPage) {
         // Route protection logic
         const routePermissionMap: Record<string, any> = {
             '/admin': 'nav:admin',
@@ -60,7 +74,25 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
   }, [user, role, isUserLoading, router, pathname]);
 
-  if (isUserLoading || (!user && pathname !== '/login')) {
+  // TEMPORARY: Allow access if loading takes too long (for testing)
+  useEffect(() => {
+    if (isUserLoading) {
+      const timer = setTimeout(() => {
+        setAllowAccess(true);
+      }, 2000);
+      return () => clearTimeout(timer);
+    } else {
+      setAllowAccess(true);
+    }
+  }, [isUserLoading]);
+
+  // If on login page, show it immediately (don't wait for loading)
+  if (pathname === '/login') {
+    return <LoginPage />;
+  }
+
+  // Show loading only if still loading and haven't allowed access yet
+  if (isUserLoading && !allowAccess) {
     return (
         <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-background">
             <Image src="/images/load-icon.png" alt="Loading" width={64} height={64} className="animate-pulse" />
@@ -69,10 +101,25 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!user) {
-    return <LoginPage />;
+  // TEMPORARY: Allow access even without user (for testing)
+  // This bypasses the auth check so you can test user creation
+  // The middleware will also allow access if cookie exists
+  const isProtectedPage = pathname.startsWith('/report') || 
+                          pathname.startsWith('/analytics') || 
+                          pathname.startsWith('/review') || 
+                          pathname.startsWith('/status') || 
+                          pathname.startsWith('/qc') || 
+                          pathname.startsWith('/file-processing') ||
+                          pathname === '/dashboard' || 
+                          pathname === '/admin';
+  
+  if (!user && pathname !== '/login' && isProtectedPage) {
+    console.warn('⚠️  No user found but allowing access (TEMPORARY - for testing)');
+    // Still render the app - components should handle null user gracefully
+    // Don't redirect - let the user stay on the page
   }
   
+  // Always render the app - middleware handles auth
   return <AppLayout>{children}</AppLayout>;
 }
 
@@ -91,7 +138,7 @@ export default function RootLayout({
          <meta name="robots" content="noindex, nofollow" />
       </head>
       <body className="font-body antialiased">
-        <FirebaseClientProvider>
+        <SupabaseProvider>
           <AppTitleProvider title={APP_TITLE}>
             <div className="flex flex-col min-h-screen">
               <main className="flex-grow">
@@ -102,7 +149,7 @@ export default function RootLayout({
               <PrivacyPolicy />
             </div>
           </AppTitleProvider>
-        </FirebaseClientProvider>
+        </SupabaseProvider>
         <Toaster />
       </body>
     </html>

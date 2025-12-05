@@ -16,9 +16,9 @@ import { SailStatusCard } from '@/components/status/sail-status-card';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Layers } from 'lucide-react';
-import { useCollection, useFirebase, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query } from 'firebase/firestore';
-import { getRoleFromEmail, hasPermission } from '@/lib/roles';
+import { useCollection } from '@/lib/supabase/hooks/use-collection';
+import { useUser } from '@/lib/supabase/provider';
+import { hasPermission } from '@/lib/roles';
 
 interface FilmsInfo {
     status: 'Prepped' | 'In Progress' | 'No Entry';
@@ -45,29 +45,62 @@ interface EnrichedWorkItem extends WorkItem {
 }
 
 export default function TapeheadsStatusPage() {
-  const { firestore } = useFirebase();
-  const { user, isUserLoading } = useUser();
+  const { user, isUserLoading, role } = useUser();
   const [selectedOe, setSelectedOe] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [sortBy, setSortBy] = useState<'date' | 'status'>('date');
-  const role = getRoleFromEmail(user?.email);
   
   const canView = (permission: any) => hasPermission(role, permission);
 
-  const tapeheadsQuery = useMemoFirebase(() => (isUserLoading || !canView('nav:report:tapeheads')) ? null : query(collection(firestore, 'tapeheads_submissions')), [firestore, isUserLoading, role]);
-  const { data: tapeheadsSubmissions, isLoading: isLoadingTapeheads } = useCollection<Report>(tapeheadsQuery);
+  const { data: tapeheadsSubmissions, isLoading: isLoadingTapeheads } = useCollection<Report>(
+    isUserLoading || !canView('nav:report:tapeheads')
+      ? null
+      : {
+          table: 'tapeheads_submissions',
+          orderBy: { column: 'date', ascending: false },
+          enabled: true,
+        }
+  );
 
-  const filmsQuery = useMemoFirebase(() => (isUserLoading || !canView('nav:report:films')) ? null : query(collection(firestore, 'films_reports')), [firestore, isUserLoading, role]);
-  const { data: filmsData, isLoading: isLoadingFilms } = useCollection<FilmsReport>(filmsQuery);
+  const { data: filmsData, isLoading: isLoadingFilms } = useCollection<FilmsReport>(
+    isUserLoading || !canView('nav:report:films')
+      ? null
+      : {
+          table: 'films_reports',
+          orderBy: { column: 'report_date', ascending: false },
+          enabled: true,
+        }
+  );
 
-  const gantryQuery = useMemoFirebase(() => (isUserLoading || !canView('nav:report:gantry')) ? null : query(collection(firestore, 'gantry_reports')), [firestore, isUserLoading, role]);
-  const { data: gantryReportsData, isLoading: isLoadingGantry } = useCollection<GantryReport>(gantryQuery);
+  const { data: gantryReportsData, isLoading: isLoadingGantry } = useCollection<GantryReport>(
+    isUserLoading || !canView('nav:report:gantry')
+      ? null
+      : {
+          table: 'gantry_reports',
+          orderBy: { column: 'date', ascending: false },
+          enabled: true,
+        }
+  );
 
-  const inspectionsQuery = useMemoFirebase(() => (isUserLoading || !canView('nav:qc')) ? null : query(collection(firestore, 'qc_inspections')), [firestore, isUserLoading, role]);
-  const { data: inspectionsData, isLoading: isLoadingInspections } = useCollection<InspectionSubmission>(inspectionsQuery);
+  const { data: inspectionsData, isLoading: isLoadingInspections } = useCollection<InspectionSubmission>(
+    isUserLoading || !canView('nav:qc')
+      ? null
+      : {
+          table: 'qc_inspections',
+          orderBy: { column: 'inspection_date', ascending: false },
+          enabled: true,
+        }
+  );
 
-  const jobsQuery = useMemoFirebase(() => isUserLoading ? null : query(collection(firestore, 'jobs')), [firestore, isUserLoading]);
-  const { data: oeJobs, isLoading: isLoadingJobs } = useCollection<OeJob>(jobsQuery);
+  const { data: oeJobs, isLoading: isLoadingJobs } = useCollection<OeJob>(
+    isUserLoading
+      ? null
+      : {
+          table: 'jobs',
+          orderBy: { column: 'created_at', ascending: false },
+          enabled: true,
+        }
+  );
   
   const loading = isLoadingTapeheads || isLoadingFilms || isLoadingGantry || isLoadingInspections || isLoadingJobs || isUserLoading;
 

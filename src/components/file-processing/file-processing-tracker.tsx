@@ -10,7 +10,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { addOeJob } from '@/lib/data-store';
 import { PlusCircle, Trash2 } from 'lucide-react';
 import {
   AlertDialog,
@@ -24,7 +23,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '../ui/badge';
 import { Alert, AlertDescription } from '../ui/alert';
-import { useFirestore } from '@/firebase';
 
 const sectionSchema = z.object({
   sectionId: z.string().min(1, 'Sail # is required.').length(3, 'Must be 3 digits.'),
@@ -62,7 +60,6 @@ type OeTrackerFormValues = z.infer<typeof oeTrackerSchema>;
 
 export function FileProcessingTracker() {
   const { toast } = useToast();
-  const firestore = useFirestore();
   const [isReviewing, setIsReviewing] = useState(false);
   const [reviewData, setReviewData] = useState<OeTrackerFormValues | null>(null);
 
@@ -88,24 +85,42 @@ export function FileProcessingTracker() {
   const onFinalSubmit = async () => {
     if (!reviewData) return;
     
-    addOeJob(firestore, {
-      oeBase: reviewData.oeBase,
-      sections: reviewData.sections.map(s => ({
-        sectionId: s.sectionId,
-        panelStart: s.panelStart,
-        panelEnd: s.panelEnd,
-      })),
-    });
-    
-    toast({
-      title: 'OE Job Initialized',
-      description: `Job for ${reviewData.oeBase} has been created and saved to Firestore.`,
-    });
-    
-    setIsReviewing(false);
-    setReviewData(null);
-    form.reset();
-    replace([]);
+    try {
+      const response = await fetch('/api/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          oe_base: reviewData.oeBase,
+          status: 'pending',
+          sections: reviewData.sections.map(s => ({
+            sectionId: s.sectionId,
+            panelStart: s.panelStart,
+            panelEnd: s.panelEnd,
+          })),
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create job');
+      }
+
+      toast({
+        title: 'OE Job Initialized',
+        description: `Job for ${reviewData.oeBase} has been created and saved.`,
+      });
+      
+      setIsReviewing(false);
+      setReviewData(null);
+      form.reset();
+      replace([]);
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to create job.",
+      });
+    }
   };
   
   const calculateTotalPanels = (sections: OeTrackerFormValues['sections'] = []) => {
